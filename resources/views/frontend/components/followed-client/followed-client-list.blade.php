@@ -1,0 +1,109 @@
+@extends('frontend.components.dashboard.dashboard-master')
+@section('dashboard-content')
+
+<div class="card">
+    <div class="card-header header-elements">
+        <span class="me-2"><h5>Followed Clients List (<span id="totalClients">0</span>)</h5></span>
+    </div>
+
+    <div class="card-datatable table-responsive pt-0">
+        <table id="foodTable" class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Sl</th>
+                    <th>client Name</th>
+                    <th>Date</th>
+                    <th>Time</th>
+                </tr>
+            </thead>
+            <tbody id="tableList">
+                
+            </tbody>
+        </table>
+    </div>
+</div>
+@endsection
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        getList(); 
+    });
+
+    async function getList() {
+        showLoader();
+        try {
+            let res = await axios.get("/user/followed-clients");
+
+            let tableList = $("#tableList");
+            tableList.empty(); 
+
+            document.getElementById('totalClients').textContent = res.data.totalClients;
+
+            res.data.data.forEach(function (item, index) {
+                let updatedAt = new Date(item.updated_at);
+                let followDate = updatedAt.toLocaleDateString('en-GB', {
+                    day: '2-digit',
+                    month: 'long',
+                    year: 'numeric'
+                });
+                
+                let followTime = updatedAt.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                });
+
+                let clientName = item.client
+                    ? `${item.client.firstName} ${item.client.lastName || ''}`.trim()
+                    : 'Unknown Customer';
+
+                let row = `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${clientName}</td>
+                        <td>${followDate}</td>
+                        <td>${followTime}</td>
+                    </tr>`;
+                tableList.append(row);
+            });
+
+            initializeDataTable();
+            attachEventListeners();
+
+        } catch (error) {
+            handleError(error);
+        } finally {
+            hideLoader();
+        }
+    }
+
+    function initializeDataTable() {
+        if ($.fn.DataTable.isDataTable('#foodTable')) {
+            $('#foodTable').DataTable().destroy();
+        }
+
+        $('#foodTable').DataTable({
+            "paging": true,
+            "serverSide": false, 
+            "autoWidth": false,
+            "ordering": true,
+            "searching": true, 
+            "lengthMenu": [10, 25, 50, 100], 
+            "pageLength": 10, 
+        });
+    }
+    
+    function handleError(error) {
+        if (error.response) {
+            if (error.response.status === 500) {
+                errorToast(error.response.data.error || "An internal server error occurred.");
+            } else {
+                errorToast("Request failed!");
+            }
+        } else {
+            errorToast("Request failed!");
+        }
+    }
+
+</script>
+
