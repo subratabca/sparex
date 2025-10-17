@@ -22,7 +22,6 @@ class AdminAuthController extends Controller
         return view('backend.pages.auth.registration-page');
     }
 
-
     public function Registration(Request $request)
     {
         try {
@@ -61,12 +60,10 @@ class AdminAuthController extends Controller
         }
     }
 
-
     public function LoginPage()
     {
         return view('backend.pages.auth.login-page');
     }
-
 
     public function Login(Request $request)
     {
@@ -118,12 +115,10 @@ class AdminAuthController extends Controller
         }
     }
 
-
     public function SendOtpPage()
     {
         return view('backend.pages.auth.send-otp-page');
     }
-
 
     public function SendOTPCode(Request $request)
     {
@@ -187,12 +182,10 @@ class AdminAuthController extends Controller
         }
     }
 
-
     public function VerifyOTPPage()
     {
         return view('backend.pages.auth.verify-otp-page');
     }
-
 
     public function VerifyOTP(Request $request)
     {
@@ -255,12 +248,10 @@ class AdminAuthController extends Controller
         }
     }
 
-
     public function ResetPasswordPage()
     {
         return view('backend.pages.auth.reset-password-page');
     }
-
 
     public function ResetPassword(Request $request)
     {

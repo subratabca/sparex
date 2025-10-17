@@ -30,28 +30,22 @@ function errorToast(msg) {
 }
 
 
-function isTokenValid() {
-    const token = getCookie('token');
 
-    if (!token) {
-        return false;
+
+async function isTokenValid() {
+    try {
+        const token = getCookie('token'); // your method to get token
+        if (!token) return false;
+
+        const response = await axios.get('/user/validate-token', { headers: { Authorization: `Bearer ${token}` }});
+        return response.data.valid; // true or false from backend
+    } catch (error) {
+        return false; // always return boolean
     }
-
-    const decodedToken = decodeJwt(token);
-    if (decodedToken && decodedToken.exp) {
-        const currentTime = Math.floor(Date.now() / 1000); 
-        if (decodedToken.exp < currentTime) {
-            return false; 
-        }
-    }
-
-    if (!verifyTokenWithServer(token)) {
-        return false;
-    }
-
-    return true;
 }
 
+
+// Get cookie value by name
 function getCookie(name) {
     const cookies = document.cookie.split(';');
     for (let i = 0; i < cookies.length; i++) {
@@ -63,6 +57,7 @@ function getCookie(name) {
     return null;
 }
 
+// Decode JWT payload
 function decodeJwt(token) {
     try {
         const payload = token.split('.')[1];
@@ -72,27 +67,25 @@ function decodeJwt(token) {
     }
 }
 
-function verifyTokenWithServer(token) {
-    const isValid = fetch('/verify-token', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-        },
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'unauthorized') {
-            return false; 
-        }
-        return true;
-    })
-    .catch(() => {
-        return false; 
-    });
-
-    return isValid;
+// Verify token with server
+async function verifyTokenWithServer(token) {
+    try {
+        const response = await axios.post('/verify-token', {}, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Accept': 'application/json'
+            }
+        });
+        return response.data.status === 'authorized';
+    } catch (error) {
+        return false;
+    }
 }
+
+
+window.isTokenValid = isTokenValid;
+
+
 
 
 

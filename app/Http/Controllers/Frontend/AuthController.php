@@ -171,7 +171,7 @@ class AuthController extends Controller
             ->select('firstName', 'id', 'password', 'is_email_verified')
             ->first();
 
-            if ($customer === null) {
+            if (!$customer) {
                 ActivityLogger::beforeAuthLog('login_failed', 'Login failed. Customer not found.', $request, 'users');
                 return response()->json([
                     'status' => 'failed',
@@ -198,6 +198,7 @@ class AuthController extends Controller
             }
 
             $token = JWTToken::CreateToken($request->input('email'), $customer->id, $customer->role);
+            session()->forget('url.intended');
             $intendedUrl = session('url.intended', '/user/dashboard');
 
             ActivityLogger::beforeAuthLog('login_success', 'Customer login successful.', $request, 'users');

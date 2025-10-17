@@ -7,7 +7,7 @@
     </div>
 
     <div class="card-datatable table-responsive pt-0">
-        <table id="foodTable" class="table table-bordered">
+        <table id="notificationTable" class="table table-bordered">
             <thead>
                 <tr>
                     <th>Sl</th>
@@ -84,11 +84,11 @@
     }
 
     function initializeDataTable() {
-        if ($.fn.DataTable.isDataTable('#foodTable')) {
-            $('#foodTable').DataTable().destroy();
+        if ($.fn.DataTable.isDataTable('#notificationTable')) {
+            $('#notificationTable').DataTable().destroy();
         }
 
-        $('#foodTable').DataTable({
+        $('#notificationTable').DataTable({
             "paging": true,
             "serverSide": false, 
             "autoWidth": false,

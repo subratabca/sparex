@@ -50,11 +50,6 @@
 
     <!-- Helpers -->
     <script src="{{ asset('frontend/assets/vendor/js/helpers.js') }}"></script>
-    <!--! Template customizer & Theme config files MUST be included after core stylesheets and helpers.js in the <head> section -->
-    <!--? Template customizer: To hide customizer set displayCustomizer value false in config.js.  -->
-    <!-- <script src="{{ asset('frontend/assets/vendor/js/template-customizer.js') }}"></script> -->
-    <!--? Config:  Mandatory theme config file contain global vars & default theme options, Set your preferred theme option in this file.  -->
-    <!-- <script src="{{ asset('frontend/assets/js/config.js') }}"></script> -->
 
     <script src="{{ asset('backend/custom-js/axios.min.js') }}"></script>
     <link href="{{ asset('backend/custom-css/toastify.min.css') }}" rel="stylesheet" />
@@ -150,3 +145,40 @@
       }
     }
 </script>
+
+<style type="text/css">
+.loading-spinner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.spinner-container {
+  display: flex;
+}
+
+.spinner-circle {
+  width: 20px;
+  height: 20px;
+  margin: 0 5px;
+  border-radius: 50%;
+  background-color: #007bff;
+  animation: bouncing 0.6s infinite alternate;
+}
+
+@keyframes bouncing {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-20px);
+  }
+}
+</style>
