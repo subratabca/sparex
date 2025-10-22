@@ -36,7 +36,7 @@ async function getList() {
     try {
         let res = await axios.get("/user/get/complaints");
         if (res.status === 200 && res.data.status === 'success') {
-            console.log('------',res);
+            //console.log('------',res);
             let tableList = $("#tableList");
             tableList.empty();
 

@@ -80,6 +80,34 @@
                           </li>
                         </ul>
                       </li>
+        <li class="nav-item mb-1">
+          <a class="nav-link dropdown-toggle {{ Route::is(['customer.meal.types', 'customer.menus', 'meal.orders']) ? 'active' : '' }}" 
+             href="#" id="menuTypesDropdown" role="button" data-bs-toggle="dropdown" 
+             aria-expanded="false">
+            <i class="mdi mdi-cross-bolnisi me-2"></i>
+            <span class="align-middle">Meal Settings</span>
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="productComplaintsDropdown">
+            <li>
+              <a class="dropdown-item {{ Route::is('customer.meal.types') ? 'active' : '' }}" href="{{ route('customer.meal.types') }}">
+                <i class="mdi mdi-package-variant me-2"></i>
+                <span>Meal Types</span>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item {{ Route::is('customer.menus') ? 'active' : '' }}" href="{{ route('customer.menus') }}">
+                <i class="mdi mdi-account-outline me-2"></i>
+                <span>Menus</span>
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item {{ Route::is('meal.orders') ? 'active' : '' }}" href="{{ route('meal.orders') }}">
+                <i class="mdi mdi-account-outline me-2"></i>
+                <span>Orders</span>
+              </a>
+            </li>
+          </ul>
+        </li>
                       <li class="nav-item mb-1">
                         <a class="nav-link {{ Route::is('followers') ? 'active' : '' }}" href="{{ route('followers') }}">
                           <i class="mdi mdi mdi-alpha-f-box-outline me-2"></i>

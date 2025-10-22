@@ -259,4 +259,46 @@ class ValidationHelper
 
         return $validator;
     }
+
+    public static function mealTypeValidationRules($isUpdate = false)
+    {
+        return [
+            'name' => ['required','string','max:255',
+                $isUpdate
+                    ? Rule::unique('meal_types')->ignore(request()->id)
+                    : 'unique:meal_types,name',
+            ],
+        ];
+    }
+
+    public static function customerMenuValidationRules($isUpdate = false, $isCustomer = false, $customerMenuId = null)
+    {
+        $customer_id = request()->header('id');
+
+        $rules = [
+            'customer_id' => $isCustomer ? 'prohibited' : 'required|integer|exists:users,id',
+            'meal_type_id' => 'required|exists:meal_types,id',
+            'name' => [
+                'required',
+                'string',
+                'min:3',
+                'max:100',
+                Rule::unique('customer_menus')->where(function ($query) use ($customer_id, $isUpdate, $customerMenuId) {
+                    $query->where('customer_id', $customer_id);
+                    if ($isUpdate && $customerMenuId) {
+                        $query->where('id', '!=', $customerMenuId);
+                    }
+                }),
+            ],
+            'description' => 'nullable|string|min:3',
+        ];
+
+        if ($isUpdate) {
+            $rules['id'] = 'required|exists:customer_menus,id';
+        }
+
+        return $rules;
+    }
+
+
 }

@@ -1,69 +1,64 @@
 <?php
-namespace App\Http\Controllers\Backend;
+namespace App\Http\Controllers\Frontend\Meal;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Helpers\ValidationHelper;
-use App\Helpers\ImageHelper;
-use App\Helpers\ItemHelper;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException; 
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Validation\ValidationException;
+use App\Models\CustomerMenu;
+use App\Helpers\ValidationHelper;
+use App\Helpers\ItemHelper;
 use Exception;
-use App\Models\About;
 
-class AboutController extends Controller
+class CustomerMenuController extends Controller
 {
-    public function AboutPage()
+    public function index()
     {
-        return view('backend.pages.about.index');
+        return view('frontend.pages.customer-menu.index');
     }
 
-
-    public function index(Request $request)
+    public function getList()
     {
         try {
-            $about = About::latest()->get();
+            $customerMenus = CustomerMenu::with('mealType')
+                                ->orderBy('id', 'desc')
+                                ->get();
 
             return response()->json([
                 'status' => 'success',
-                'data' => $about
-            ], 200); 
+                'data' => $customerMenus
+            ], 200);
 
         } catch (Exception $e) {
             return response()->json([
-                'status' => 'failed',
-                'message' => 'An error occurred while retrieving data',
-                'error' => $e->getMessage()
+                'status' => 'error',
+                'message' => $e->getMessage()
             ], 500);
         }
     }
 
-
     public function create()
     {
-        return view('backend.pages.about.create');
+        return view('frontend.pages.customer-menu.create');
     }
 
     public function store(Request $request)
     {
         DB::beginTransaction();
+
         try {
-            $request->validate(ValidationHelper::aboutValidationRules());
+            $request->validate(ValidationHelper::customerMenuValidationRules(false, true));
 
-            $imagePath = $request->hasFile('image')
-                ? ImageHelper::processAndSaveImage($request->file('image'), 'about')
-                : null;
-
-            $aboutData = ItemHelper::prepareAboutData($request, $imagePath);
-            $about = ItemHelper::storeOrUpdateAbout($aboutData);
+            $customerMenuData = ItemHelper::prepareCustomerMenuData($request);
+            $customerMenu = ItemHelper::storeOrUpdateCustomerMenu($customerMenuData);
 
             DB::commit();
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'About information created successfully.',
-                'data' => $about,
+                'message' => 'Menu created successfully.',
+                'data' => $customerMenu,
             ], 201);
 
         } catch (ValidationException $e) {
@@ -77,7 +72,7 @@ class AboutController extends Controller
             DB::rollBack();
             return response()->json([
                 'status' => 'failed',
-                'message' => 'About information creation failed',
+                'message' => 'Menu creation failed',
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -86,56 +81,51 @@ class AboutController extends Controller
     public function show($id)
     {
         try {
-            $about = About::find($id);
+            $customerMenu = CustomerMenu::find($id);
 
-            if (!$about) {
+            if (!$customerMenu) {
                 return response()->json([
                     'status' => 'failed',
-                    'message' => 'About info not found'
+                    'message' => 'Menu not found'
                 ], 404);
             }
 
             return response()->json([
                 'status' => 'success',
-                'data' => $about
+                'data' => $customerMenu
             ], 200);
-            
         } catch (Exception $e) {
             return response()->json([
                 'status' => 'failed',
-                'message' => 'An error occurred',
+                'message' => 'An error occurred while fetching menu data',
                 'error' => $e->getMessage()
             ], 500);
         }
     }
 
-    public function EditPage()
+    public function edit($id)
     {
-        return view('backend.pages.about.edit');
+        return view('frontend.pages.customer-menu.edit');
     }
 
     public function update(Request $request)
     {
         DB::beginTransaction();
+
         try {
             $id = $request->input('id');
-            $request->validate(ValidationHelper::aboutValidationRules(true));
+            $request->validate(ValidationHelper::customerMenuValidationRules(true, true, $id));
 
-            $about = About::findOrFail($id);
-
-            $imagePath = $request->hasFile('image')
-                ? ImageHelper::processAndSaveImage($request->file('image'), 'about', false, $about->image)
-                : $about->image;
-
-            $aboutData = ItemHelper::prepareAboutData($request, $imagePath);
-            $updatedAbout = ItemHelper::storeOrUpdateAbout($aboutData, $about);
+            $customerMenu = CustomerMenu::findOrFail($id);
+            $customerMenuData = ItemHelper::prepareCustomerMenuData($request);
+            $updatedCustomerMenu = ItemHelper::storeOrUpdateCustomerMenu($customerMenuData, $customerMenu);
 
             DB::commit();
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'About information updated successfully.',
-                'data' => $updatedAbout,
+                'message' => 'Menu updated successfully.',
+                'data' => $updatedCustomerMenu,
             ], 200);
 
         } catch (ValidationException $e) {
@@ -149,7 +139,7 @@ class AboutController extends Controller
             DB::rollBack();
             return response()->json([
                 'status' => 'failed',
-                'message' => 'About information update failed',
+                'message' => 'Menu update failed',
                 'error' => $e->getMessage(),
             ], 500);
         }
@@ -158,33 +148,26 @@ class AboutController extends Controller
     public function delete(Request $request)
     {
         try {
-            $about_id = $request->input('id');
-            $about = About::findOrFail($about_id);
-
-            if (!empty($about->image)) {
-                ImageHelper::deleteOldImages($about->image, 'about');
-            }
-
-            $about->delete();
+            $customerMenu = CustomerMenu::findOrFail($request->id);
+            $customerMenu->delete();
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'About information and related images deleted successfully.',
+                'message' => 'Meal type deleted successfully.',
             ], 200);
 
         } catch (ModelNotFoundException $e) {
             return response()->json([
                 'status' => 'failed',
-                'message' => 'About information not found.',
+                'message' => 'Menu not found.',
                 'error' => $e->getMessage(),
             ], 404);
         } catch (Exception $e) {
             return response()->json([
                 'status' => 'failed',
-                'message' => 'Deletion failed.',
+                'message' => 'Menu deletion failed.',
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
-
 }

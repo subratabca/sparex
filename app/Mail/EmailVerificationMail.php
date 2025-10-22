@@ -16,7 +16,7 @@ class EmailVerificationMail extends Mailable
     public $user;
     public $userType;
     
-    public function __construct($user, $userType = 'client')
+    public function __construct($user, $userType = 'admin')
     {
         $this->user = $user;
         $this->userType = $userType;

@@ -39,14 +39,6 @@ class ClientProductController extends Controller
                 'products'
             );
 
-            // if ($products->isEmpty()) {
-            //     ActivityLogger::log('retrieve_item_failed', 'No products found.', $request, 'products');
-            //     return response()->json([
-            //         'status' => 'failed',
-            //         'message' => 'No orders found.'
-            //     ], 404);
-            // }
-
             return response()->json([
                 'status' => 'success',
                 'data' => $products

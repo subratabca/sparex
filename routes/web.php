@@ -69,6 +69,10 @@ use App\Http\Controllers\Frontend\CheckoutController;
 use App\Http\Controllers\Frontend\PaymentController;
 use App\Http\Controllers\Frontend\CustomerOrderTermsConditionsController;
 
+use App\Http\Controllers\Frontend\Meal\MealTypeController;
+use App\Http\Controllers\Frontend\Meal\CustomerMenuController;
+use App\Http\Controllers\Frontend\Meal\MealOrderController;
+
 Route::controller(SocialShareController::class)->group(function () {
     Route::get('/social-share', 'index');
 });
@@ -116,6 +120,8 @@ Route::controller(PagesController::class)->group(function () {
     Route::get('/cities/{countyId}','getCiiesByCounty')->name('city');
 });
 
+
+
 Route::prefix('user')->group(function () {
     Route::controller(AuthController::class)->group(function () {
         Route::get('/registration/terms-conditions/{name}','registrationTermsConditionsPage');
@@ -140,6 +146,45 @@ Route::prefix('user')->group(function () {
 });
 
 Route::prefix('user')->middleware([TokenVerificationMiddleware::class])->group(function () {
+
+    Route::controller(MealOrderController::class)->group(function () {
+        Route::get('/meal-orders','index')->name('meal.orders');
+        Route::get('/get/meal-orders','getList');
+        Route::get('/get/menus/group-by-meal-type', 'groupedByMealType');
+        Route::get('/create/meal-order','create')->name('create.meal.order');
+        Route::post('/store/meal-order','store');
+        Route::get('/view/meal-order/{id}','view');
+        Route::get('/get/meal-order/details/{id}','show');
+        Route::get('/edit/meal-order/{id}','edit');
+        Route::post('/update/meal-order','update');
+        Route::post('/delete/meal-order/{id}','delete');
+    });
+
+    Route::controller(MealTypeController::class)->group(function () {
+        Route::get('/meal-types','index')->name('customer.meal.types');
+        Route::get('/get/meal-types','getList');
+        Route::get('/create/meal-type','create')->name('create.meal.type');
+        Route::post('/store/meal-type','store');
+        Route::get('/get/meal-type/details/{id}','show');
+        Route::get('/edit/meal-type/{id}','edit');
+        Route::post('/update/meal-type','update');
+        Route::post('/delete/meal-type/{id}','delete');
+    });
+
+    Route::controller(CustomerMenuController::class)->group(function () {
+        Route::get('/customer-menus','index')->name('customer.menus');
+        Route::get('/get/customer-menus','getList');
+        Route::get('/create/customer-menu','create')->name('create.customer.menu');
+        Route::post('/store/customer-menu','store');
+        Route::get('/view/customer-menu/{id}','view');
+        Route::get('/get/customer-menu/details/{id}','show');
+        Route::get('/edit/customer-menu/{id}','edit');
+        Route::post('/update/customer-menu','update');
+        Route::post('/delete/customer-menu/{id}','delete');
+    });
+
+
+
     Route::controller(ProfileController::class)->group(function () {
         Route::get('/profile','ProfilePage')->name('user.profile');
         Route::get('/profile/info','Profile');

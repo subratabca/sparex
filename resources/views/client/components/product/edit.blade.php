@@ -827,8 +827,6 @@ async function updateProduct() {
     formData.append('current_stock', qty);
   }
 
-  console.log('---------------',formData);
-
   const config = {
       headers: {'content-type': 'multipart/form-data'}
   };

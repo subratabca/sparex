@@ -13,6 +13,8 @@ use App\Models\Hero;
 use App\Models\User;
 use App\Models\Coupon;
 use App\Models\DeliveryCharge;
+use App\Models\MealType;
+use App\Models\CustomerMenu;
 
 class ItemHelper
 {
@@ -356,6 +358,46 @@ class ItemHelper
             return $deliveryCharge;
         }
         return DeliveryCharge::create($data);
+    }
+
+    public static function prepareMealTypeData($request)
+    {
+        return [
+            'name' => $request->input('name'),
+        ];
+    }
+
+    public static function storeOrUpdateMealType($data, $mealType = null)
+    {
+        if ($mealType) {
+            $mealType->update($data);
+        } else {
+            $mealType = MealType::create($data);
+        }
+        return $mealType;
+    }
+
+    public static function prepareCustomerMenuData($request)
+    {
+        $customer_id = $request->header('id');
+
+        return [
+            'customer_id' => $customer_id,
+            'meal_type_id' => $request->input('meal_type_id'),
+            'name' => $request->input('name'),
+            'description' => $request->input('description'),
+        ];
+    }
+
+    public static function storeOrUpdateCustomerMenu(array $data, CustomerMenu $customerMenu = null)
+    {
+        if ($customerMenu) {
+            $customerMenu->update($data);
+        } else {
+            $customerMenu = CustomerMenu::create($data);
+        }
+
+        return $customerMenu;
     }
 }
 
