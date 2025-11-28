@@ -68,6 +68,13 @@
       </a>
     </li>
 
+    <li class="menu-item {{ request()->routeIs('client.meal.orders*') ? 'active' : '' }}">
+      <a href="{{ route('admin.meal.orders') }}" class="menu-link">
+        <i class="menu-icon tf-icons mdi mdi-food-fork-drink"></i>
+        <div data-i18n="Meal Orders">Meal Orders</div>
+      </a>
+    </li>
+
     <li class="menu-item {{ $currentRoute == 'clients' ? 'active' : '' }}">
       <a href="{{ route('clients') }}" class="menu-link">
         <i class="menu-icon tf-icons mdi mdi-account-outline"></i>
@@ -153,7 +160,7 @@
       <span class="menu-header-text" data-i18n="Settings & Pages">Apps &amp; Pages</span>
     </li>
 
-    <li class="menu-item {{ in_array($currentRoute, ['site.settings', 'categories', 'heros', 'abouts', 'terms.conditions']) ? 'active open' : '' }}">
+    <li class="menu-item {{ in_array($currentRoute, ['site.settings', 'categories', 'heros', 'abouts', 'terms.conditions','meal.types','meal.keywords']) ? 'active open' : '' }}">
       <a href="javascript:void(0);" class="menu-link menu-toggle">
         <i class="menu-icon tf-icons mdi mdi-view-grid-outline"></i>
         <div data-i18n="Front Settings">Settings</div>
@@ -169,6 +176,22 @@
             <div data-i18n="Category">Category</div>
           </a>
         </li>
+        <li class="menu-item {{ $currentRoute == 'meal.types' ? 'active' : '' }}">
+          <a href="{{ route('meal.types') }}" class="menu-link">
+            <div data-i18n="Meal Type">Meal Type</div>
+          </a>
+        </li>
+        <li class="menu-item {{ $currentRoute == 'meal.keywords' ? 'active' : '' }}">
+          <a href="{{ route('meal.keywords') }}" class="menu-link">
+            <div data-i18n="Meal Keyword">Meal Keyword</div>
+          </a>
+        </li>
+        <li class="menu-item {{ $currentRoute == 'meal.delivery.charges' ? 'active' : '' }}">
+          <a href="{{ route('meal.delivery.charges') }}" class="menu-link">
+            <div data-i18n="Meal Delivery Charge">Meal Delivery Charge</div>
+          </a>
+        </li>
+
         <li class="menu-item {{ $currentRoute == 'heros' ? 'active' : '' }}">
           <a href="{{ route('heros') }}" class="menu-link">
             <div data-i18n="Hero">Hero</div>

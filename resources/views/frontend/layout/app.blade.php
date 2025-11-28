@@ -149,6 +149,7 @@
     <script src="{{ asset('frontend/assets/vendor/libs/quill/quill.js') }}"></script>
     <script src="{{ asset('frontend/assets/vendor/libs/datatables-bs5/datatables-bootstrap5.js') }}"></script>
 
+
     <!-- Main JS -->
     <script src="{{ asset('frontend/assets/js/front-main.js') }}"></script>
 
@@ -158,55 +159,61 @@
     <script src="{{ asset('frontend/assets/js/tables-datatables-advanced.js') }}"></script>
     <script src="{{ asset('frontend/assets/js/maps-leaflet.js') }}"></script>
 
+
   </body>
 </html>
 
+<!-- Below script code is not working for autologout.will work later on this topic -->
 <script>
-    document.addEventListener("DOMContentLoaded", function () {
-        settingInfo(); 
-    });
-
-    async function settingInfo() {
-      showLoader();
-      try {
-          const response = await axios.get('/setting-list');
-
-          if (response.status === 200) {
-              const data = response.data.data;
-
-              //header.blade.php
-              document.getElementById('logo').src = data['logo'] ? "/upload/site-setting/" + data['logo'] : "/upload/no_image.jpg";
-
-              //end header.blade.php
-
-              //footer.blade.php
-              document.getElementById('footer-logo').src = data['logo'] ? "/upload/site-setting/" + data['logo'] : "/upload/no_image.jpg";
-
-              document.getElementById('footer-description').innerHTML = data['description'];
-              document.getElementById('footer-company-name').innerText = data['name'];
-              document.getElementById('footer-company-email').innerText = data['email'];
-              document.getElementById('footer-company-phone').innerText = data['phone1'], data['phone2'];
-              // end footer.blade.php
-          }
-      } catch (error) {
-          handleError(error);
-      }finally{
-          hideLoader();
-      }
+function getTokenExpiry(token) {
+    if (!token) return 0;
+    try {
+        // Decode Base64 safely
+        const base64Payload = token.split('.')[1];
+        const payload = JSON.parse(atob(base64Payload.replace(/-/g, '+').replace(/_/g, '/')));
+        return payload.exp; // Unix timestamp
+    } catch (e) {
+        return 0;
     }
+}
 
+function startAutoLogout() {
+    // Get token from cookie
+    const tokenCookie = document.cookie
+        .split(';')
+        .map(c => c.trim())
+        .find(c => c.startsWith('token='));
 
-    function handleError(error) {
-      if (error.response) {
-          const status = error.response.status;
-          const message = error.response.data.message || 'An unexpected error occurred';
-          if (status === 500) {
-              errorToast(message || 'Server Error');
-          } else {
-              errorToast(message);
-          }
-      } 
-    }
+    if (!tokenCookie) return;
+
+    const tokenValue = decodeURIComponent(tokenCookie.split('=')[1]);
+    const expTime = getTokenExpiry(tokenValue);
+    const currentTime = Math.floor(Date.now() / 1000);
+
+    // Calculate timeout
+    let timeout = (expTime - currentTime) * 1000;
+
+    if (timeout <= 0) return; // Token already expired, middleware will handle
+
+    const logoutUser = () => {
+        if (typeof errorToast === 'function') {
+            errorToast("Session expired. Redirecting to login.");
+        } else {
+            alert("Session expired. Redirecting to login.");
+        }
+
+        // Remove token cookie
+        document.cookie = 'token=;path=/;expires=Thu, 01 Jan 1970 00:00:01 GMT';
+
+        // Redirect
+        window.location.href = '/user/login';
+    };
+
+    setTimeout(logoutUser, timeout);
+}
+
+// Initialize auto logout on page load
+startAutoLogout();
 </script>
 
 
@@ -246,3 +253,4 @@
   }
 }
 </style>
+

@@ -4,16 +4,20 @@ namespace App\Helpers;
 
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Validator;
+use App\Models\Category;
 
 class ValidationHelper
 {
     public static function itemValidationRules($isUpdate = false, $isClient = false, $productId = null)
     {
+        $clientId = request()->header('id');
         $rules = [
             'name' => ['required','string','max:50',
-                Rule::unique('products')->when($isUpdate, function ($query) use ($productId) {
+                Rule::unique('products')->where(function ($query) use ($clientId) {
+                    return $query->where('client_id', $clientId);
+                })->when($isUpdate, function ($query) use ($productId) {
                     return $query->ignore($productId);
-                })
+                }),
             ],
             'weight' => 'required|numeric|min:0.01',
             'client_id' => $isClient ? 'prohibited' : 'required|integer|exists:users,id',
@@ -89,6 +93,25 @@ class ValidationHelper
                     }
                 },
             ];
+        }
+
+        // ✅ Nutrient fields validation (only if category = Food)
+        $category = Category::find(request()->category_id);
+        if ($category && strtolower($category->name) === 'food') {
+            $rules = array_merge($rules, [
+                'nutrients.calories' => 'nullable|numeric|min:0',
+                'nutrients.protein' => 'nullable|numeric|min:0',
+                'nutrients.fat' => 'nullable|numeric|min:0',
+                'nutrients.carbohydrates' => 'nullable|numeric|min:0',
+                'nutrients.fiber' => 'nullable|numeric|min:0',
+                'nutrients.sugar' => 'nullable|numeric|min:0',
+                'nutrients.cholesterol' => 'nullable|numeric|min:0',
+                'nutrients.sodium' => 'nullable|numeric|min:0',
+                'nutrients.vitamin_a' => 'nullable|numeric|min:0',
+                'nutrients.vitamin_c' => 'nullable|numeric|min:0',
+                'nutrients.calcium' => 'nullable|numeric|min:0',
+                'nutrients.iron' => 'nullable|numeric|min:0',
+            ]);
         }
 
         return $rules;
@@ -271,34 +294,40 @@ class ValidationHelper
         ];
     }
 
-    public static function customerMenuValidationRules($isUpdate = false, $isCustomer = false, $customerMenuId = null)
+    public static function mealKeywordValidationRules($isUpdate = false)
     {
-        $customer_id = request()->header('id');
-
-        $rules = [
-            'customer_id' => $isCustomer ? 'prohibited' : 'required|integer|exists:users,id',
+        return [
             'meal_type_id' => 'required|exists:meal_types,id',
             'name' => [
                 'required',
                 'string',
-                'min:3',
-                'max:100',
-                Rule::unique('customer_menus')->where(function ($query) use ($customer_id, $isUpdate, $customerMenuId) {
-                    $query->where('customer_id', $customer_id);
-                    if ($isUpdate && $customerMenuId) {
-                        $query->where('id', '!=', $customerMenuId);
-                    }
-                }),
+                'max:255',
+                $isUpdate
+                    ? Rule::unique('meal_keywords', 'name')
+                        ->ignore(request()->id)
+                        ->where(fn($query) => $query->where('meal_type_id', request()->meal_type_id))
+                    : Rule::unique('meal_keywords', 'name')
+                        ->where(fn($query) => $query->where('meal_type_id', request()->meal_type_id)),
             ],
-            'description' => 'nullable|string|min:3',
         ];
-
-        if ($isUpdate) {
-            $rules['id'] = 'required|exists:customer_menus,id';
-        }
-
-        return $rules;
     }
 
+    public static function mealDeliveryChargeValidationRules($id = null)
+    {
+        return [
+            'client_id' => ['required', 'exists:users,id'],
+            'meal_type_id' => [
+                'required',
+                'exists:meal_types,id',
+                Rule::unique('meal_delivery_charges')
+                    ->where(fn($q) => $q->where('client_id', request()->client_id))
+                    ->ignore($id),
+            ],
 
+            'inside_city_2km' => ['required', 'numeric', 'min:0'],
+            'inside_city_5km' => ['required', 'numeric', 'min:0'],
+            'inside_city_10km' => ['required', 'numeric', 'min:0'],
+            'inside_city_above_10km' => ['required', 'numeric', 'min:0'],
+        ];
+    }
 }

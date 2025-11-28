@@ -4,9 +4,9 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-class Product extends Model
+class Product extends BaseModel
 {
-  protected $fillable = ['client_id', 'category_id', 'brand_id', 'image', 'name','weight','price','discount_price','current_stock','address1','address2','country_id','county_id','city_id','zip_code','description','expire_date','collection_date', 'start_collection_time','end_collection_time','latitude','longitude','accept_tnc','status','has_variants','has_brand', 'has_discount_price','is_free'];
+  protected $fillable = ['client_id', 'category_id', 'brand_id', 'image', 'name','weight','price','discount_price','current_stock','address1','address2','country_id','county_id','city_id','zip_code','description','expire_date','collection_date', 'start_collection_time','end_collection_time','latitude','longitude','accept_tnc','status','has_availability','has_variants','has_brand', 'has_discount_price','is_free'];
 
     public function client()
     {
@@ -62,6 +62,22 @@ class Product extends Model
     {
         return $this->belongsTo(City::class);
     }
+    
+    public function mealTypes()
+    {
+        return $this->belongsToMany(MealType::class, 'meal_type_product', 'product_id', 'meal_type_id');
+    }
+
+    public function nutrient()
+    {
+        return $this->hasOne(ProductNutrient::class);
+    }
+
+    public function mealCarts()
+    {
+        return $this->hasMany(MealCart::class, 'product_id');
+    }
+
 
 }
 

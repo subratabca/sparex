@@ -18,12 +18,12 @@ use Exception;
 
 class ProfileController extends Controller
 {
-    public function ProfilePage()
+    public function profilePage()
     {
         return view('frontend.pages.profile.profile-page');
     }
 
-    public function Profile(Request $request)
+    public function getProfile(Request $request)
     {
         try {
             $email = $request->header('email');
@@ -102,109 +102,12 @@ class ProfileController extends Controller
         }
     }
 
-    public function oldUpdateProfile(Request $request)
-    {
-        try {
-            $request->validate([
-                'firstName' => 'required|string|min:3|max:50',
-                'lastName' => 'required|string|min:3|max:50',
-                'mobile' => 'required|string|min:11|max:50',
-                'image' => 'sometimes|image|mimes:jpeg,png,jpg,gif|max:2048',
-            ]);
-
-            $email = $request->header('email');
-            $id = $request->header('id');
-
-            $user = User::find($id);
-            if (!$user) {
-                ActivityLogger::log('Profile Update Failed','User not found',$id,'user','users');
-                return response()->json([
-                    'status' => 'fail',
-                    'message' => 'User not found'
-                ], 404);
-            }
-
-            $firstName = $request->input('firstName');
-            $lastName = $request->input('lastName');
-            $mobile = $request->input('mobile');
-
-            if ($request->hasFile('image')) {
-                $large_image_path = base_path('public/upload/user-profile/large/');
-                $medium_image_path = base_path('public/upload/user-profile/medium/');
-                $small_image_path = base_path('public/upload/user-profile/small/');;
-
-                if (!empty($user->image)) {
-                    foreach (['large', 'medium', 'small'] as $size) {
-                        $path = base_path("upload/user-profile/{$size}/" . $user->image);
-                        if (file_exists($path)) {
-                            unlink($path);
-                        }
-                    }
-                }
-
-                $image = $request->file('image');
-                $manager = new ImageManager(new Driver());
-                $imageName = time() . '.' . $image->getClientOriginalExtension();
-                $img = $manager->read($image);
-
-                $img->resize(100, 100, function ($constraint) {
-                    $constraint->aspectRatio();
-                    $constraint->upsize(); 
-                })
-                ->save($large_image_path . $imageName);
-
-                $img->resize(80, 80, function ($constraint) {
-                    $constraint->aspectRatio();
-                    $constraint->upsize();
-                })
-                ->save($medium_image_path . $imageName);
-
-                $img->resize(60, 60, function ($constraint) {
-                    $constraint->aspectRatio();
-                    $constraint->upsize();
-                })
-                ->save($small_image_path . $imageName);
-
-                $uploadPath = $imageName;
-            }else {
-                $uploadPath = $user->image;
-            }
-
-            User::where('email', $email)->update([
-                'firstName' => $firstName,
-                'lastName' => $lastName,
-                'mobile' => $mobile,
-                'image' => $uploadPath
-            ]);
-
-            ActivityLogger::log('Profile Update Success','Profile updated successfully',$id,'user','users');
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Profile update successful'
-            ], 200);
-
-        } catch (ValidationException $e) {
-            ActivityLogger::log('Profile Update Failed','Validation errors while updating profile',$id,'user','users');
-            return response()->json([
-                'status' => 'fail',
-                'message' => 'Validation errors',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (Exception $e) {
-            ActivityLogger::log('Profile Update Failed','Error occurred while updating profile' . ': ' . $e->getMessage(),$id,'user','users');
-            return response()->json([
-                'status' => 'fail',
-                'message' => 'An error occurred: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    public function PasswordPage()
+    public function passwordPage()
     {
         return view('frontend.pages.profile.password-change-page');
     }
 
-    public function UpdatePassword(Request $request)
+    public function updatePassword(Request $request)
     {
         try {
             $validated = $request->validate([
@@ -284,7 +187,7 @@ class ProfileController extends Controller
         }
     }
 
-    public function DocumentPage()
+    public function documentPage()
     {
         return view('frontend.pages.profile.customer-document-page');
     }

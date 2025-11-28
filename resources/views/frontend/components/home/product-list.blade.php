@@ -70,6 +70,7 @@
             const res = await axios.get(url);
             const data = res.data;
             const paginationContainer = document.querySelector('.pagination');
+            //console.log('---------',data);
 
             if (data.status === 'success') {
                 const productData = data.products.data || [];
@@ -116,6 +117,20 @@
             const productAddress = !isProcessing ? `<span><i class="mdi mdi-map-marker me-2"></i>${product.address1}</span>` : requestBadge;
             const followText = product.isFollowing ? 'UNFOLLOW' : 'FOLLOW';
             const followClass = product.isFollowing ? 'bg-danger' : 'bg-info';
+
+            // ✅ Extract Meal Types (Availability) with badges/pills
+            let availability = '';
+            if (product.meal_types && product.meal_types.length > 0) {
+                const mealTypeBadges = product.meal_types
+                    .map(mt => `<span class="badge rounded-pill bg-success me-1">${mt.name}</span>`)
+                    .join(' ');
+
+                availability = `
+                    <p class="mt-2 mb-1">
+                        <span class="text-dark fw-bold">Available For:</span>
+                        <span>${mealTypeBadges}</span>
+                    </p>`;
+            }
             
             // Update the product template in updateProductList function
             return `
@@ -139,6 +154,8 @@
                                     `<span class="fw-bold ms-1">$${product.price}</span>`
                             }
                         </div>
+
+                        ${availability}
 
                         <p class="d-flex align-items-center mt-2">
                             <span class="me-1 text-dark">Donator:</span> ${fullName}

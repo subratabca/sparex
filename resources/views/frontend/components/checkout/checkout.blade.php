@@ -260,11 +260,11 @@ document.addEventListener("DOMContentLoaded", async function () {
   });
 
   // Main initialization logic
-  if (isTokenValid()) {
+
     try {
       showLoader();
       const [userResponse, cartResponse] = await Promise.all([
-        axios.get('/user/auth-user-info'),
+        axios.get('/user/get/profile/info'),
         axios.get('/user/get-cart-product', {
           params: {
             page: checkoutCurrentPage,
@@ -291,7 +291,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     } finally {
       hideLoader();
     }
-  }
+
 
   // Delivery option change handler
   document.querySelectorAll('input[name="deliveryOption"]').forEach(radio => {
@@ -609,7 +609,7 @@ function setupAddressCheckbox() {
           }
         }
       } else {
-        const response = await axios.get('/user/auth-user-info');
+        const response = await axios.get('/user/get/profile/info');
         populateAddressForm(response.data.data);
 
         if (document.getElementById('courier').checked) {

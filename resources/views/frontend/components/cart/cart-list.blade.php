@@ -434,7 +434,6 @@ async function removeCartItem(cartId) {
         }
     } catch (error) {
         errorToast('Failed to remove item');
-        console.error('Remove cart error:', error);
     } finally {
         hideLoader();
     }

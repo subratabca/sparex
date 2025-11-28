@@ -38,6 +38,7 @@
                 <h6>Category Name: <span id="category-name" class="text-success"></span></h6><hr class="my-3" />
                 <h6>Product Weight: <span id="product-weight" class="text-success"></span></h6><hr class="my-3" />
                 <h6 class="d-inline">Price:</h6><span id="product-price" class="ms-2"></span><hr class="my-3" />
+                <h6>Available For: <span id="meal-type-name" class="text-success"></span></h6><hr class="my-3" />
                 <h6>Provided By: <span id="client-name" class="text-success"></span></h6><hr class="my-3" />
                 <h6>Description:</h6> <span id="product-description"></span><hr class="my-3" />
                 <h6>Available Stock: <span id="current-stock" class="text-success"></span></h6><hr class="my-3" />
@@ -80,26 +81,26 @@
               </div>
             </div>
 
-<div class="d-grid">
-    <button type="button" id="add-to-cart-btn" onclick="addToCart()" class="btn btn-primary mt-2">
-        <span class="mdi mdi-cart-outline"></span> ADD TO CART
-    </button>
-    <div id="status-message" class="my-2"></div>
-    <!-- Wrapped conditional elements -->
-    <div id="post-cart-options" style="display: none;">
-        <div class="text-center my-2">OR</div>
-        
-        <a href="/" class="btn btn-outline-primary mt-2 w-100">
-            <span class="mdi mdi-plus-circle-outline"></span> ADD MORE ITEMS
-        </a>
+            <div class="d-grid">
+                <button type="button" id="add-to-cart-btn" onclick="addToCart()" class="btn btn-primary mt-2">
+                    <span class="mdi mdi-cart-outline"></span> ADD TO CART
+                </button>
+                <div id="status-message" class="my-2"></div>
+                <!-- Wrapped conditional elements -->
+                <div id="post-cart-options" style="display: none;">
+                    <div class="text-center my-2">OR</div>
+                    
+                    <a href="/" class="btn btn-outline-primary mt-2 w-100">
+                        <span class="mdi mdi-plus-circle-outline"></span> ADD MORE ITEMS
+                    </a>
 
-        <div class="text-center my-2">OR</div>
-        
-        <a href="http://127.0.0.1:8000/user/my-cart" class="btn btn-outline-success mt-2 w-100">
-            <span class="mdi mdi-cart-arrow-right"></span> CONTINUE SHOPPING
-        </a>
-    </div>
-</div>
+                    <div class="text-center my-2">OR</div>
+                    
+                    <a href="http://127.0.0.1:8000/user/my-cart" class="btn btn-outline-success mt-2 w-100">
+                        <span class="mdi mdi-cart-arrow-right"></span> CONTINUE SHOPPING
+                    </a>
+                </div>
+            </div>
           </div>
         </div>
       </div>
@@ -163,6 +164,16 @@ async function getProductDetails() {
               `;
           }
           priceElement.innerHTML = priceHTML;
+      }
+
+      const mealTypeElement = document.getElementById('meal-type-name');
+      if (data.meal_types && data.meal_types.length > 0) {
+          const mealTypeBadges = data.meal_types
+              .map(mt => `<span class="badge rounded-pill bg-danger me-1">${mt.name}</span>`)
+              .join(' ');
+          mealTypeElement.innerHTML = mealTypeBadges;
+      } else {
+          mealTypeElement.innerHTML = '<span class="text-muted">N/A</span>';
       }
 
       if (data['category']['name'] === 'Food') {

@@ -1,0 +1,207 @@
+<div class="row">
+  <div class="col-md-12">
+    <div class="card mb-4">
+      <h5 class="card-header">Update Meal Delivery Charge</h5>
+
+      <div class="card-body demo-vertical-spacing demo-only-element">
+
+        <form id="save-form">
+          <input type="hidden" id="updateID">
+
+          <div class="row">
+
+            <!-- Client Dropdown -->
+            <div class="col-md-4">
+              <div class="form-floating form-floating-outline">
+                <select id="client_id" class="form-select w-100">
+                  <option value="" disabled>Select Client</option>
+                </select>
+                <label for="client_id">Select Client<span class="text-danger">*</span></label>
+              </div>
+              <span class="error-message text-danger" id="client_id-error"></span>
+            </div>
+
+            <!-- Meal Type Dropdown -->
+            <div class="col-md-4">
+              <div class="form-floating form-floating-outline">
+                <select id="meal_type_id" class="form-select w-100">
+                  <option value="" disabled>Select Meal Type</option>
+                </select>
+                <label for="meal_type_id">Select Meal Type<span class="text-danger">*</span></label>
+              </div>
+              <span class="error-message text-danger" id="meal_type_id-error"></span>
+            </div>
+
+          </div>
+
+
+          <div class="row mt-4">
+
+            <!-- Inside 2 KM -->
+            <div class="col-md-3">
+              <div class="form-floating form-floating-outline">
+                <input type="number" step="0.01" class="form-control" id="inside_city_2km">
+                <label for="inside_city_2km">Inside City (0–2 KM)</label>
+              </div>
+              <span class="error-message text-danger" id="inside_city_2km-error"></span>
+            </div>
+
+            <!-- Inside 5 KM -->
+            <div class="col-md-3">
+              <div class="form-floating form-floating-outline">
+                <input type="number" step="0.01" class="form-control" id="inside_city_5km">
+                <label for="inside_city_5km">Inside City (2–5 KM)</label>
+              </div>
+              <span class="error-message text-danger" id="inside_city_5km-error"></span>
+            </div>
+
+            <!-- Inside 10 KM -->
+            <div class="col-md-3">
+              <div class="form-floating form-floating-outline">
+                <input type="number" step="0.01" class="form-control" id="inside_city_10km">
+                <label for="inside_city_10km">Inside City (5–10 KM)</label>
+              </div>
+              <span class="error-message text-danger" id="inside_city_10km-error"></span>
+            </div>
+
+            <!-- Above 10 KM -->
+            <div class="col-md-3">
+              <div class="form-floating form-floating-outline">
+                <input type="number" step="0.01" class="form-control" id="inside_city_above_10km">
+                <label for="inside_city_above_10km">Above 10 KM</label>
+              </div>
+              <span class="error-message text-danger" id="inside_city_above_10km-error"></span>
+            </div>
+
+          </div>
+
+        </form>
+
+        <button onclick="updateInfo()" class="btn btn-primary btn-lg mt-3">
+          <i class="mdi mdi-check me-2"></i>Update
+        </button>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", async function () {
+    await loadClients();
+    await loadMealTypes();
+    await loadExistingData();
+});
+
+function toTitleCase(str) {
+    return str.replace(/\w\S*/g, (txt) => {
+        return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+    });
+}
+
+async function loadClients() {
+    try {
+        const res = await axios.get("/clients");
+        const dropdown = document.getElementById("client_id");
+
+        res.data.data.forEach(client => {
+            let option = document.createElement("option");
+            option.value = client.id;
+            //option.text = client.firstName + " " + client.lastName;
+            let fullName = `${client.firstName} ${client.lastName}`;
+            option.text = toTitleCase(fullName); 
+            dropdown.appendChild(option);
+        });
+
+    } catch (error) {
+        errorToast("Failed to load clients");
+    }
+}
+
+async function loadMealTypes() {
+    try {
+        const res = await axios.get("/get/meal-types");
+        const dropdown = document.getElementById("meal_type_id");
+
+        res.data.data.forEach(type => {
+            let option = document.createElement("option");
+            option.value = type.id;
+            //option.text = type.name;
+            option.text = toTitleCase(type.name);
+            dropdown.appendChild(option);
+        });
+
+    } catch (error) {
+        errorToast("Failed to load meal types");
+    }
+}
+
+async function loadExistingData() {
+    showLoader();
+
+    try {
+        let url = window.location.pathname;
+        let id = url.split('/').pop();
+        document.getElementById("updateID").value = id;
+
+        let res = await axios.get("/admin/get/meal-delivery/charge/details/" + id);
+        let data = res.data.data;
+
+        document.getElementById("client_id").value = data.client_id;
+        document.getElementById("meal_type_id").value = data.meal_type_id;
+
+        document.getElementById("inside_city_2km").value = data.inside_city_2km;
+        document.getElementById("inside_city_5km").value = data.inside_city_5km;
+        document.getElementById("inside_city_10km").value = data.inside_city_10km;
+        document.getElementById("inside_city_above_10km").value = data.inside_city_above_10km;
+
+    } catch (error) {
+        errorToast("Failed to load data");
+    } finally {
+        hideLoader();
+    }
+}
+
+async function updateInfo() {
+
+    document.querySelectorAll(".error-message").forEach(span => span.innerText = "");
+
+    let id = document.getElementById("updateID").value;
+
+    const formData = new FormData();
+    formData.append("id", id);
+    formData.append("client_id", document.getElementById("client_id").value);
+    formData.append("meal_type_id", document.getElementById("meal_type_id").value);
+    formData.append("inside_city_2km", document.getElementById("inside_city_2km").value);
+    formData.append("inside_city_5km", document.getElementById("inside_city_5km").value);
+    formData.append("inside_city_10km", document.getElementById("inside_city_10km").value);
+    formData.append("inside_city_above_10km", document.getElementById("inside_city_above_10km").value);
+
+    showLoader();
+
+    try {
+        const res = await axios.post("/admin/update/meal-delivery/charge", formData);
+
+        if (res.status === 200) {
+            successToast("Delivery charge updated successfully");
+            window.location.href = "/admin/meal-delivery/charge";
+        }
+
+    } catch (error) {
+        if (error.response?.status === 422) {
+            Object.entries(error.response.data.errors).forEach(([key, val]) => {
+                let span = document.getElementById(`${key}-error`);
+                if (span) span.innerText = val[0];
+            });
+            return;
+        }
+
+        errorToast("Update failed");
+    }
+    finally {
+        hideLoader();
+    }
+}
+
+</script>

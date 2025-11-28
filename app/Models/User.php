@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-class User extends Authenticatable
+class User extends BaseUserModel
 {
     use HasFactory, Notifiable;
 
@@ -103,6 +103,26 @@ class User extends Authenticatable
     public function deliveryCharge()
     {
         return $this->hasOne(DeliveryCharge::class, 'client_id');
+    }
+
+    public function mealCarts()
+    {
+        return $this->hasMany(MealCart::class, 'customer_id');
+    }
+
+    public function providedMealCarts()
+    {
+        return $this->hasMany(MealCart::class, 'client_id');
+    }
+
+    public function mealDeliveryCharges()
+    {
+        return $this->hasMany(MealDeliveryCharge::class, 'client_id');
+    }
+
+    public function creditTransactions()
+    {
+        return $this->hasMany(CreditTransaction::class, 'customer_id');
     }
 
 }

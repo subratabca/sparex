@@ -25,9 +25,9 @@
      async function itemDelete() {
         try {
         	showLoader();
-            let id = document.getElementById('deleteID').value;
+            let orderId = document.getElementById('deleteID').value;
             $('#delete-modal').modal('hide');
-            let res = await axios.post(`/user/delete/customer-menu/${id}`);
+            const res = await axios.get(`/user/delete/meal-order/${orderId}`);
 	            if (res.status === 200 && res.data.status === 'success') {
 	                successToast(res.data.message || "Data deleted successfully");
 	                window.location.reload();

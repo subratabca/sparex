@@ -55,6 +55,10 @@ return [
 
     'tax_rate' => env('TAX_RATE'),
 
+    'google_maps' => [
+        'api_key' => env('GOOGLE_MAPS_API_KEY'),
+    ],
+
     'stripe' => [
         'secret' => env('STRIPE_SECRET'),
     ],

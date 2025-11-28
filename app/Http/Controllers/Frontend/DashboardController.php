@@ -9,13 +9,13 @@ use Exception;
 
 class DashboardController extends Controller
 {
-    public function DashboardPage()
+    public function dashboardPage()
     {
         return view('frontend.pages.dashboard.dashboard-page');
     }
 
 
-    public function TotalInfo(Request $request)
+    public function getDashboardInfo(Request $request)
     {
         try {
             $customer_id = $request->header('id');
@@ -41,7 +41,7 @@ class DashboardController extends Controller
     }
     
 
-    public function Logout()
+    public function logout()
     {
         try {
             return response()->json([

@@ -16,6 +16,7 @@
 
       <div class="card-body demo-vertical-spacing demo-only-element">
         <form id="save-form">
+          <!-- Checkbox Selection -->
           <div class="row">
             <div class="col-md-3 p-2">
               <div class="form-check">
@@ -42,6 +43,9 @@
               </div>
             </div><hr class="mt-2">
           </div>
+          <!-- End Checkbox Selection -->
+
+
           <div class="row">
             <div class="col-md-2" id="categoryContainer">
               <div class="form-floating form-floating-outline">
@@ -60,11 +64,18 @@
               </div>
               <span class="error-message text-danger" id="brand-error"></span>
             </div>
-            <div class="col-md-4" id="nameContainer">
+            <div class="col-md-3" id="nameContainer">
               <div class="form-floating form-floating-outline mb-3">
                 <input type="text" class="form-control" id="name" placeholder="Enter product name" />
                 <label for="exampleFormControlInput1">Product Name<span class="text-danger">*</span></label>
                 <span class="error-message text-danger" id="name-error"></span>
+              </div>
+            </div>
+            <div class="col-md-5" id="availabilityContainer" style="display: none;">
+              <div class="col-md-12" id="mealTypeContainer" style="display: none;">
+                <label class="form-label">Select Meal Types:</label>
+                <div id="mealTypeList" class="d-flex flex-wrap gap-2"></div>
+                <span class="error-message text-danger" id="meal-type-error"></span>
               </div>
             </div>
             <div class="col-md-2" id="weightContainer">
@@ -96,6 +107,89 @@
               </div>
             </div>
           </div>
+
+<!-- Nutrient Section (hidden by default) -->
+<div id="productNutrientSection" style="display: none;">
+  <h6 class="mt-3">Nutritional Information</h6>
+  <div class="row">
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="calories" placeholder="Calories (kcal)" />
+        <label for="calories">Calories (kcal)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="protein" placeholder="Protein (g)" />
+        <label for="protein">Protein (g)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="fat" placeholder="Fat (g)" />
+        <label for="fat">Fat (g)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="carbohydrates" placeholder="Carbohydrates (g)" />
+        <label for="carbohydrates">Carbohydrates (g)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="fiber" placeholder="Fiber (g)" />
+        <label for="fiber">Fiber (g)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="sugar" placeholder="Sugar (g)" />
+        <label for="sugar">Sugar (g)</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="cholesterol" placeholder="Cholesterol (mg)" />
+        <label for="sodium">cholesterol (mg)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="sodium" placeholder="Sodium (mg)" />
+        <label for="sodium">Sodium (mg)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="vitaminA" placeholder="Vitamin A (%)" />
+        <label for="vitaminA">Vitamin A (%)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="vitaminC" placeholder="Vitamin C (%)" />
+        <label for="vitaminC">Vitamin C (%)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="calcium" placeholder="Calcium (%)" />
+        <label for="calcium">Calcium (%)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="iron" placeholder="Iron (%)" />
+        <label for="iron">Iron (%)</label>
+      </div>
+    </div>
+  </div>
+</div>
+
           <div id="variantSection" style="display: none;">
             <div class="row variant-row">
               <div class="col-md-2">
@@ -277,6 +371,33 @@ var quill;
 document.addEventListener("DOMContentLoaded", async function() {
   let profileCityId = null;
 
+  const isFreeCheckbox = document.getElementById("isFree");
+  const hasDiscountCheckbox = document.getElementById("hasDiscountPrice");
+  const priceContainer = document.getElementById("priceContainer");
+  const discountContainer = document.getElementById("discountContainer");
+  const discountCheckboxContainer = document.getElementById("discountCheckboxContainer");
+
+  // Function to update visibility of price and discount fields
+  function updatePriceDiscountVisibility() {
+      if (isFreeCheckbox.checked) {
+          priceContainer.style.display = "none";
+          discountContainer.style.display = "none";
+          discountCheckboxContainer.style.display = "none";
+      } else {
+          priceContainer.style.display = "block";
+          discountCheckboxContainer.style.display = "block";
+          // Show discount container only if discount checkbox is checked
+          discountContainer.style.display = hasDiscountCheckbox.checked ? "block" : "none";
+      }
+  }
+
+  // Event listeners
+  isFreeCheckbox.addEventListener("change", updatePriceDiscountVisibility);
+  hasDiscountCheckbox.addEventListener("change", updatePriceDiscountVisibility);
+
+  // Initial call in case page loads with checked boxes
+  updatePriceDiscountVisibility();
+
   const categorySelect = document.querySelector('#categorySelect');
   const brandSelect = document.querySelector('#brandSelect');
   const countrySelect = document.querySelector('#countrySelect');
@@ -304,6 +425,51 @@ document.addEventListener("DOMContentLoaded", async function() {
       errorToast("Failed to load categories. Please try again later.");
     }
   }
+
+  // 🔹 When category changes, handle availability + meal types for "Food"
+  categorySelect.addEventListener('change', async function () {
+      const categoryText = this.options[this.selectedIndex].text.trim().toLowerCase();
+
+      // Hide containers by default
+      document.getElementById('availabilityContainer').style.display = 'none';
+      document.getElementById('mealTypeContainer').style.display = 'none';
+      document.getElementById('productNutrientSection').style.display = 'none';
+
+      if (categoryText === 'food') {
+          document.getElementById('availabilityContainer').style.display = 'block';
+          document.getElementById('mealTypeContainer').style.display = 'block';
+          document.getElementById('productNutrientSection').style.display = 'block';
+
+          try {
+              const response = await axios.get('/get/meal-types');
+              const mealTypes = response.data.data || response.data;
+
+              const container = document.getElementById('mealTypeList');
+              container.innerHTML = '';
+
+              if (mealTypes.length > 0) {
+                  mealTypes.forEach(meal => {
+                      const div = document.createElement('div');
+                      div.classList.add('form-check', 'me-3');
+
+                      div.innerHTML = `
+                          <input class="form-check-input" type="checkbox" id="meal_${meal.id}" name="meal_types[]" value="${meal.id}">
+                          <label class="form-check-label" for="meal_${meal.id}">
+                              ${meal.name}
+                          </label>
+                      `;
+                      container.appendChild(div);
+                  });
+              } else {
+                  container.innerHTML = `<p class="text-muted">No meal types found.</p>`;
+              }
+          } catch (error) {
+              console.error(error);
+              errorToast('Failed to load meal types');
+          }
+      }
+  });
+
 
   try {
     const response = await axios.get('/brands');
@@ -501,6 +667,20 @@ async function Save() {
   let hasDiscountPrice = document.getElementById('hasDiscountPrice').checked ? 1 : 0;
   let isFree = document.getElementById('isFree').checked ? 1 : 0;
 
+  // Meal types validation
+  let mealTypeIds = [];
+  let categorySelect = document.getElementById('categorySelect');
+  let categoryText = categorySelect.options[categorySelect.selectedIndex]?.text.trim().toLowerCase();
+
+  if (categoryText === 'food') {
+      mealTypeIds = Array.from(document.querySelectorAll('input[name="meal_types[]"]:checked')).map(el => el.value);
+      if (mealTypeIds.length === 0) {
+          document.getElementById('meal-type-error').innerText = "Must select at least one Meal Type";
+          isValid = false;
+      }
+  }
+
+
   if (!name) {
     document.getElementById('name-error').innerText = 'Product name is required!';
     isValid = false;
@@ -657,6 +837,11 @@ async function Save() {
   formData.append('is_free', isFree);
   formData.append('image', image);
 
+  // Append meal types if applicable
+  if (mealTypeIds.length > 0) {
+      mealTypeIds.forEach(id => formData.append('meal_types[]', id));
+  }
+
   if (hasBrand && brand_id) {
     formData.append('brand_id', brand_id);
   }
@@ -687,6 +872,23 @@ async function Save() {
   } else {
     formData.append('current_stock', qty);
   }
+
+// ✅ ADD NUTRIENT VALUES IF CATEGORY IS FOOD
+if (categoryText === 'food') {
+    formData.append('nutrients[calories]', document.getElementById('calories').value || '');
+    formData.append('nutrients[protein]', document.getElementById('protein').value || '');
+    formData.append('nutrients[fat]', document.getElementById('fat').value || '');
+    formData.append('nutrients[carbohydrates]', document.getElementById('carbohydrates').value || '');
+    formData.append('nutrients[fiber]', document.getElementById('fiber').value || '');
+    formData.append('nutrients[sugar]', document.getElementById('sugar').value || '');
+    formData.append('nutrients[cholesterol]', document.getElementById('cholesterol').value || '');
+    formData.append('nutrients[sodium]', document.getElementById('sodium').value || '');
+    formData.append('nutrients[vitamin_a]', document.getElementById('vitaminA').value || '');
+    formData.append('nutrients[vitamin_c]', document.getElementById('vitaminC').value || '');
+    formData.append('nutrients[calcium]', document.getElementById('calcium').value || '');
+    formData.append('nutrients[iron]', document.getElementById('iron').value || '');
+}
+
   //console.log('---------------',formData);
 
   try {
@@ -781,31 +983,6 @@ document.addEventListener("click", function (event) {
     if (allRows.length > 1) {
       event.target.closest(".variant-row").remove();
     }
-  }
-});
-
-document.getElementById("isFree").addEventListener("change", function() {
-  const priceContainer = document.getElementById("priceContainer");
-  const discountContainer = document.getElementById("discountContainer");
-  const discountCheckboxContainer = document.getElementById("discountCheckboxContainer");
-  if (this.checked) {
-    priceContainer.style.display = "none";
-    discountContainer.style.display = "none";
-    discountCheckboxContainer.style.display = "none";
-  } else {
-    priceContainer.style.display = "block";
-    discountContainer.style.display = "block";
-    discountCheckboxContainer.style.display = "block";
-  }
-});
-
-document.getElementById("hasDiscountPrice").addEventListener("change", function() {
-  const discountContainer = document.getElementById("discountContainer");
-  const freeCheckboxContainer = document.getElementById("isFree");
-  if (this.checked) {
-    discountContainer.style.display = "block";
-  } else {
-    discountContainer.style.display = "none";
   }
 });
 

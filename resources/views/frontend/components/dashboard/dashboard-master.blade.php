@@ -54,7 +54,7 @@
                       </li>
                       <li class="nav-item mb-1">
                         <a class="nav-link {{ Route::is('orders') ? 'active' : '' }}" href="{{ route('orders') }}">
-                          <i class="mdi mdi-credit-card-outline me-2"></i>
+                          <i class="mdi mdi-order-bool-descending me-2"></i>
                           <span class="align-middle">Orders</span>
                         </a>
                       </li>
@@ -81,33 +81,41 @@
                         </ul>
                       </li>
         <li class="nav-item mb-1">
-          <a class="nav-link dropdown-toggle {{ Route::is(['customer.meal.types', 'customer.menus', 'meal.orders']) ? 'active' : '' }}" 
+          <a class="nav-link dropdown-toggle {{ Route::is(['meals','meal.order','favourite.meals']) ? 'active' : '' }}" 
              href="#" id="menuTypesDropdown" role="button" data-bs-toggle="dropdown" 
              aria-expanded="false">
-            <i class="mdi mdi-cross-bolnisi me-2"></i>
+            <i class="mdi mdi-food me-2"></i>
             <span class="align-middle">Meal Settings</span>
           </a>
           <ul class="dropdown-menu" aria-labelledby="productComplaintsDropdown">
             <li>
-              <a class="dropdown-item {{ Route::is('customer.meal.types') ? 'active' : '' }}" href="{{ route('customer.meal.types') }}">
-                <i class="mdi mdi-package-variant me-2"></i>
-                <span>Meal Types</span>
+              <a class="dropdown-item {{ Route::is('favourite.meals') ? 'active' : '' }}" href="{{ route('favourite.meals') }}">
+                <i class="mdi mdi-food-fork-drink me-2"></i>
+                <span>Choose Meals</span>
               </a>
             </li>
-            <li>
-              <a class="dropdown-item {{ Route::is('customer.menus') ? 'active' : '' }}" href="{{ route('customer.menus') }}">
+<!--             <li>
+              <a class="dropdown-item {{ Route::is('meals') ? 'active' : '' }}" href="{{ route('meals') }}">
                 <i class="mdi mdi-account-outline me-2"></i>
-                <span>Menus</span>
+                <span>Set Meal</span>
               </a>
-            </li>
+            </li> -->
             <li>
-              <a class="dropdown-item {{ Route::is('meal.orders') ? 'active' : '' }}" href="{{ route('meal.orders') }}">
-                <i class="mdi mdi-account-outline me-2"></i>
-                <span>Orders</span>
+              <a class="dropdown-item {{ Route::is('meal.order') ? 'active' : '' }}" href="{{ route('meal.order') }}">
+                <i class="mdi mdi-food-takeout-box me-2"></i>
+                <span>Meal Plan</span>
               </a>
             </li>
           </ul>
         </li>
+
+                      <li class="nav-item mb-1">
+                        <a class="nav-link {{ Route::is('credit') ? 'active' : '' }}" href="{{ route('credit') }}">
+                          <i class="mdi mdi-credit-card-multiple-outline me-2"></i>
+                          <span class="align-middle">My Credit</span>
+                        </a>
+                      </li>
+
                       <li class="nav-item mb-1">
                         <a class="nav-link {{ Route::is('followers') ? 'active' : '' }}" href="{{ route('followers') }}">
                           <i class="mdi mdi mdi-alpha-f-box-outline me-2"></i>

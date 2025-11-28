@@ -87,7 +87,7 @@
 
     async function getProfile() {
         try {
-            let res = await axios.get("/user/profile/info");
+            let res = await axios.get("/user/get/profile/info");
 
             if (res.status === 200 && res.data.status === 'success') {
                 let data = res.data.data;

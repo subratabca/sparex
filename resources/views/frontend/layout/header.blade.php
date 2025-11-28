@@ -3,15 +3,9 @@
     <!-- Menu logo wrapper: Start -->
     <div class="navbar-brand app-brand demo d-flex py-0 py-lg-2 me-4">
       <!-- Mobile menu toggle: Start-->
-      <button
-        class="navbar-toggler border-0 px-0 me-2"
-        type="button"
-        data-bs-toggle="collapse"
-        data-bs-target="#navbarSupportedContent"
-        aria-controls="navbarSupportedContent"
-        aria-expanded="false"
-        aria-label="Toggle navigation">
-        <i class="tf-icons mdi mdi-menu mdi-24px align-middle"></i>
+      <button class="navbar-toggler border-0 px-0 me-2"
+        type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent"
+        aria-expanded="false" aria-label="Toggle navigation"> <i class="tf-icons mdi mdi-menu mdi-24px align-middle"></i>
       </button>
       <!-- Mobile menu toggle: End-->
       <a href="{{ route('home') }}" class="app-brand-link">
@@ -27,13 +21,7 @@
     <div class="collapse navbar-collapse landing-nav-menu" id="navbarSupportedContent">
       <button
         class="navbar-toggler border-0 text-heading position-absolute end-0 top-0 scaleX-n1-rtl"
-        type="button"
-        data-bs-toggle="collapse"
-        data-bs-target="#navbarSupportedContent"
-        aria-controls="navbarSupportedContent"
-        aria-expanded="false"
-        aria-label="Toggle navigation">
-        <i class="tf-icons mdi mdi-close"></i>
+        type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation"><i class="tf-icons mdi mdi-close"></i>
       </button>
       <ul class="navbar-nav me-auto p-3 p-lg-0">
         <li class="nav-item">
@@ -64,11 +52,19 @@
     <!-- Toolbar: Start -->
     <ul class="navbar-nav flex-row align-items-center ms-auto">
         <!-- navbar button: Start -->
+        <li class="nav-item dropdown" id="mealCartItem" style="display: none;">
+            <a class="nav-link fw-medium" title="Meal Cart" href="{{ route('meal.cart') }}"><i class="mdi mdi-cart-arrow-down mdi-24px"></i>
+            <span class="position-absolute top-0 start-50 translate-middle-y bg-danger text-white rounded-pill px-1 py-.5 small"
+      id="mealCartCount"></span>
+            </a>
+        </li>
+
         <li class="nav-item dropdown" id="cartItem" style="display: none;">
             <a class="nav-link fw-medium" title="Cartlists" href="{{ route('mycart') }}"><i class="mdi mdi-cart-outline mdi-24px"></i>
               <span class="position-absolute top-0 start-50 translate-middle-y badge badge-dot bg-danger mt-2 border" id="cartCount"></span>
             </a>
         </li>
+
         <li class="nav-item dropdown" id="wishlistItem" style="display: none;">
             <a class="nav-link fw-medium" title="Wishlists" href="{{ route('wishlists') }}"><i class="mdi mdi-heart-outline mdi-24px"></i>
             <span
@@ -142,60 +138,111 @@
   </div>
 </nav>
 
-
 <script>
 document.addEventListener("DOMContentLoaded", async function () {
-    if (isTokenValid()) {
-        // Show user account and other authenticated items
-        document.getElementById('wishlistItem').style.display = 'block';
-        document.getElementById('notificationsItem').style.display = 'block';
-        document.getElementById('userAccountItem').style.display = 'block';
-        document.getElementById('loginRegisterItem').style.display = 'none';
+    const wishlistItem = document.getElementById('wishlistItem');
+    const notificationsItem = document.getElementById('notificationsItem');
+    const userAccountItem = document.getElementById('userAccountItem');
+    const loginRegisterItem = document.getElementById('loginRegisterItem');
+    const cartItem = document.getElementById('cartItem');
+    const mealCartItem = document.getElementById('mealCartItem');
 
-        await updateCartCount(); 
-        await updateWishlistCount();
+    // Initially hide all auth-dependent UI to prevent flicker
+    [wishlistItem, notificationsItem, userAccountItem, cartItem, mealCartItem].forEach(el => el.style.display = 'none');
+    loginRegisterItem.style.display = 'none';
 
+    try {
         showLoader();
-        try {
-            const response = await axios.get('/user/limited/notification/list');
-            if (response.status === 200) {
-                const userData = response.data.data;
-                const unreadNotifications = response.data.unreadNotifications;
-                const readNotifications = response.data.readNotifications;
-                
-                const notificationCount = unreadNotifications.length || '0';
-                
-                document.getElementById('notificationCount').innerText = notificationCount;
-                document.getElementById('notificationCount1').innerText = notificationCount;
-                
-                await displayNotifications(unreadNotifications, readNotifications);
+        await settingInfo();
 
-                let fullName = userData.firstName;
-                if (userData.lastName) {
-                    fullName += ' ' + userData.lastName;
-                }
-                
-                document.getElementById('login-user-name').innerText = fullName || 'Account';
+        // ✅ Secure verification: ask server who the user is
+        const response = await axios.get('/user/get/profile/info');
 
-                //dashboard-master.blade.php
-                document.getElementById('common-image').src = userData['image'] ? "/upload/customer-profile/small/" + userData['image'] : "/upload/no_image.jpg";
+        if (response.status === 200 && response.data) {
+            const userData = response.data.data ?? response.data;
+
+            // --- Show authenticated elements ---
+            wishlistItem.style.display = 'block';
+            notificationsItem.style.display = 'block';
+            userAccountItem.style.display = 'block';
+            cartItem.style.display = 'block';
+            mealCartItem.style.display = 'block';
+            loginRegisterItem.style.display = 'none';
+
+            await updateCartCount();
+            await updateWishlistCount();
+            await updateMealCartCount();
+
+            // Load notifications
+            const notifResponse = await axios.get('/user/limited/notification/list');
+            if (notifResponse.status === 200) {
+                const unread = notifResponse.data.unreadNotifications || [];
+                const read = notifResponse.data.readNotifications || [];
+                document.getElementById('notificationCount').innerText = unread.length || '0';
+                document.getElementById('notificationCount1').innerText = unread.length || '0';
+                await displayNotifications(unread, read);
+            }
+
+            // Populate user info
+            const fullName = [userData.firstName, userData.lastName].filter(Boolean).join(' ');
+            document.getElementById('login-user-name').innerText = fullName || 'Account';
+
+            // If dashboard-master.blade.php elements exist, fill them
+            const imgEl = document.getElementById('common-image');
+            if (imgEl) {
+                imgEl.src = userData.image ? `/upload/customer-profile/small/${userData.image}` : `/upload/no_image.jpg`;
                 document.getElementById('common-userName').innerText = fullName;
                 document.getElementById('common-mobile').innerText = userData.mobile;
                 document.getElementById('common-email').innerText = userData.email;
-                //end dashboard-master.blade.php
             }
-        } catch (error) {
-            handleError(error);
-        } finally {
-            hideLoader();
+        } else {
+            showGuestUI();
         }
-    } else {
-        document.getElementById('loginRegisterItem').style.display = 'block';
-        document.getElementById('wishlistItem').style.display = 'none';
-        document.getElementById('notificationsItem').style.display = 'none';
-        document.getElementById('userAccountItem').style.display = 'none';
+    } catch (error) {
+        handleError(error);
+        showGuestUI();
+    } finally {
+        hideLoader();
+    }
+
+    function showGuestUI() {
+        loginRegisterItem.style.display = 'block';
+        wishlistItem.style.display = 'none';
+        notificationsItem.style.display = 'none';
+        userAccountItem.style.display = 'none';
+        cartItem.style.display = 'none';
+        mealCartItem.style.display = 'none';
     }
 });
+
+async function settingInfo() {
+  showLoader();
+  try {
+      const response = await axios.get('/setting-list');
+
+      if (response.status === 200) {
+          const data = response.data.data;
+
+          //header.blade.php
+          document.getElementById('logo').src = data['logo'] ? "/upload/site-setting/" + data['logo'] : "/upload/no_image.jpg";
+
+          //end header.blade.php
+
+          //footer.blade.php
+          document.getElementById('footer-logo').src = data['logo'] ? "/upload/site-setting/" + data['logo'] : "/upload/no_image.jpg";
+
+          document.getElementById('footer-description').innerHTML = data['description'];
+          document.getElementById('footer-company-name').innerText = data['name'];
+          document.getElementById('footer-company-email').innerText = data['email'];
+          document.getElementById('footer-company-phone').innerText = data['phone1'], data['phone2'];
+          // end footer.blade.php
+      }
+  } catch (error) {
+      handleError(error);
+  }finally{
+      hideLoader();
+  }
+}
 
 async function displayNotifications(unreadNotifications, readNotifications) {
     const notificationsContainer = document.querySelector('.dropdown-notifications-list ul');
@@ -310,13 +357,7 @@ async function handleLogout() {
             errorToast(res.data.message || "Request failed");
         }
     } catch (error) {
-        if (error.response) {
-            if (error.response.status === 500) {
-                errorToast(error.response.data.error || "An internal server error occurred.");
-            } else {
-                errorToast("Request failed!");
-            }
-        }
+        handleError(error);
     } finally {
         hideLoader();
     }
@@ -368,6 +409,29 @@ async function updateWishlistCount() {
     }
 }
 
+async function updateMealCartCount() {
+    try {
+        const res = await axios.get('/user/meal-cart/count');
+        if (res.status === 200) {
+            const count = res.data.count;
+            const cartCountElem = document.getElementById('mealCartCount');
+            const cartItemElem = document.getElementById('mealCartItem');
+            
+            if (count > 0) {
+                cartItemElem.style.display = 'block';
+                cartCountElem.innerText = count;
+                cartCountElem.style.display = 'inline-block';
+            } else {
+                cartItemElem.style.display = 'none';
+                cartCountElem.innerText = '0'; 
+            }
+        }
+    } catch (error) {
+        handleError(error);
+    } finally {
+        hideLoader();
+    }
+}
 
 function handleError(error) {
     if (error.response) {

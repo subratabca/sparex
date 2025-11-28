@@ -49,6 +49,15 @@
                     let hasVariants = item['has_variants'] ? 'View Variants' : 'No';
                     let fullName = `${item.client['firstName']}${item.client['lastName'] ? ' ' + item.client['lastName'] : ''}`;
 
+                    let formattedProductName = "";
+
+                    if (item['name']) {
+                        formattedProductName = item['name']
+                            .split(" ")
+                            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                            .join(" ");
+                    }
+
                     let row = `
                         <tr>
                             <td>${index + 1}</td>
@@ -56,7 +65,7 @@
                                 ${item['image'] ? `<img src="/upload/product/small/${item['image']}" width="50" height="50">` : `<img src="/upload/no_image.jpg" width="50" height="50">`}
                             </td>
                             <td>${fullName}</td>
-                            <td>${item['name']}</td>
+                            <td>${formattedProductName}</td>
                             <td>${isFree}</td>
                             <td>${hasVariants}</td>
                             <td>${item['current_stock']}</td>

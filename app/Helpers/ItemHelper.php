@@ -4,6 +4,7 @@ namespace App\Helpers;
 
 use App\Models\Product;
 use App\Models\ProductVariant;
+use App\Models\ProductNutrient;
 use App\Models\StockMovement;
 use App\Models\About;
 use App\Models\SiteSetting;
@@ -14,7 +15,8 @@ use App\Models\User;
 use App\Models\Coupon;
 use App\Models\DeliveryCharge;
 use App\Models\MealType;
-use App\Models\CustomerMenu;
+use App\Models\MealKeyword;
+use App\Models\MealDeliveryCharge;
 
 class ItemHelper
 {
@@ -65,16 +67,36 @@ class ItemHelper
         return Product::create($data);
     }
 
-    // public static function saveMultiImages($images, $productId)
-    // {
-    //     $multiImagePaths = ImageHelper::processAndSaveImage($images, 'multi_images', true);
-    //     foreach ($multiImagePaths as $imagePath) {
-    //         ProductImage::create([
-    //             'product_id' => $productId,
-    //             'image' => $imagePath,
-    //         ]);
-    //     }
-    // }
+    // ✅ Save nutrient data if category is Food and any nutrient field is filled
+    public static function saveNutrients($request, $product)
+    {
+        $nutrients = $request->input('nutrients', []);
+
+        // Check if any nutrient field is not null
+        $hasNutrients = collect($nutrients)->filter(function ($value) {
+            return !is_null($value) && $value !== '';
+        })->isNotEmpty();
+
+        if ($hasNutrients) {
+            ProductNutrient::updateOrCreate(
+                ['product_id' => $product->id],
+                [
+                    'calories' => $nutrients['calories'] ?? null,
+                    'protein' => $nutrients['protein'] ?? null,
+                    'fat' => $nutrients['fat'] ?? null,
+                    'carbohydrates' => $nutrients['carbohydrates'] ?? null,
+                    'fiber' => $nutrients['fiber'] ?? null,
+                    'sugar' => $nutrients['sugar'] ?? null,
+                    'cholesterol' => $nutrients['cholesterol'] ?? null,
+                    'sodium' => $nutrients['sodium'] ?? null,
+                    'vitamin_a' => $nutrients['vitamin_a'] ?? null,
+                    'vitamin_c' => $nutrients['vitamin_c'] ?? null,
+                    'calcium' => $nutrients['calcium'] ?? null,
+                    'iron' => $nutrients['iron'] ?? null,
+                ]
+            );
+        }
+    }
 
     public static function saveVariants($variants, $productId)
     {
@@ -360,6 +382,7 @@ class ItemHelper
         return DeliveryCharge::create($data);
     }
 
+
     public static function prepareMealTypeData($request)
     {
         return [
@@ -377,27 +400,47 @@ class ItemHelper
         return $mealType;
     }
 
-    public static function prepareCustomerMenuData($request)
+    public static function prepareMealKeywordData($request)
     {
-        $customer_id = $request->header('id');
-
         return [
-            'customer_id' => $customer_id,
             'meal_type_id' => $request->input('meal_type_id'),
             'name' => $request->input('name'),
-            'description' => $request->input('description'),
         ];
     }
 
-    public static function storeOrUpdateCustomerMenu(array $data, CustomerMenu $customerMenu = null)
+    public static function storeOrUpdateMealKeyword($data, $mealKeyword = null)
     {
-        if ($customerMenu) {
-            $customerMenu->update($data);
+        if ($mealKeyword) {
+            $mealKeyword->update($data);
         } else {
-            $customerMenu = CustomerMenu::create($data);
+            $mealKeyword = MealKeyword::create($data);
+        }
+        return $mealKeyword;
+    }
+
+
+    public static function prepareMealDeliveryChargeData($request)
+    {
+        return [
+            'client_id' => $request->input('client_id'),
+            'meal_type_id' => $request->input('meal_type_id'),
+            'inside_city_2km' => $request->input('inside_city_2km'),
+            'inside_city_5km' => $request->input('inside_city_5km'),
+            'inside_city_10km' => $request->input('inside_city_10km'),
+            'inside_city_above_10km' => $request->input('inside_city_above_10km'),
+        ];
+    }
+
+    public static function storeOrUpdateMealDeliveryCharge($data, $record = null)
+    {
+        if ($record) {
+            $record->update($data);
+        } else {
+            $record = MealDeliveryCharge::create($data);
         }
 
-        return $customerMenu;
+        return $record;
     }
+
 }
 

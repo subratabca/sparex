@@ -47,13 +47,22 @@
                     let isFree = item['is_free'] ? 'Free' : 'Paid';
                     let hasVariants = item['has_variants'] ? 'View Variants' : 'No';
 
+                    let formattedProductName = "";
+
+                    if (item['name']) {
+                        formattedProductName = item['name']
+                            .split(" ")
+                            .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                            .join(" ");
+                    }
+
                     let row = `
                         <tr>
                             <td>${index + 1}</td>
                             <td>
                             ${item['image'] ? `<img src="/upload/product/small/${item['image']}" width="50" height="50">` : `<img src="/upload/no_image.jpg" width="50" height="50">`}
                             </td>
-                            <td>${item['name']}</td>
+                            <td>${formattedProductName}</td>
                             <td>${isFree}</td>
                             <td>${hasVariants}</td>
                             <td>${item['current_stock']}</td>
@@ -67,10 +76,10 @@
                                 </span>
                             </td>
                             <td>
-                                <a  href="/client/product/details/${item['id']}" class="btn btn-sm btn-outline-primary" target="_blank" title="Product Details"><span class="mdi mdi-eye-circle"></span>
+                                <a  href="/client/product/details/${item['id']}" class="btn btn-sm btn-outline-primary" title="Product Details"><span class="mdi mdi-eye-circle"></span>
                                 </a>
 
-                                <a href="/client/edit/product/${item['id']}" class="btn btn-sm btn-outline-success"  target="_blank" title="Edit Product"><span class="mdi mdi-pencil-outline"></span>
+                                <a href="/client/edit/product/${item['id']}" class="btn btn-sm btn-outline-success" title="Edit Product"><span class="mdi mdi-pencil-outline"></span>
                                 </a>
 
                                 <a href="/client/edit/product/multi-image/${item['id']}" class="btn btn-sm btn-outline-info" target="_blank" title="Edit Multi Image"><span class="mdi mdi-image-edit-outline"></span>

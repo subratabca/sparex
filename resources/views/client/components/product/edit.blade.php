@@ -56,13 +56,22 @@
               </div>
               <span class="error-message text-danger" id="brand-error"></span>
             </div>
-            <div class="col-md-4" id="nameContainer">
+            <div class="col-md-3" id="nameContainer">
               <div class="form-floating form-floating-outline mb-3">
                 <input type="text" class="form-control" id="name" placeholder="Enter product name" />
                 <label for="exampleFormControlInput1">Product Name<span class="text-danger">*</span></label>
                 <span class="error-message text-danger" id="name-error"></span>
               </div>
             </div>
+
+            <div class="col-md-5" id="availabilityContainer" style="display: none;">
+              <div class="col-md-12" id="mealTypeContainer" style="display: none;">
+                <label class="form-label">Select Meal Types:</label>
+                <div id="mealTypeList" class="d-flex flex-wrap gap-2"></div>
+                <span class="error-message text-danger" id="meal-type-error"></span>
+              </div>
+            </div>
+
             <div class="col-md-2" id="weightContainer">
               <div class="form-floating form-floating-outline mb-4">
                 <input type="number" class="form-control" id="weight" min="0" step="0.01" placeholder="Enter product weight" />
@@ -92,6 +101,89 @@
               </div>
             </div>
           </div>
+
+<!-- Nutrient Section (hidden by default) -->
+<div id="productNutrientSection" style="display: none;">
+  <h6 class="mt-3">Nutritional Information</h6>
+  <div class="row">
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="calories" placeholder="Calories (kcal)" />
+        <label for="calories">Calories (kcal)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="protein" placeholder="Protein (g)" />
+        <label for="protein">Protein (g)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="fat" placeholder="Fat (g)" />
+        <label for="fat">Fat (g)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="carbohydrates" placeholder="Carbohydrates (g)" />
+        <label for="carbohydrates">Carbohydrates (g)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="fiber" placeholder="Fiber (g)" />
+        <label for="fiber">Fiber (g)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="sugar" placeholder="Sugar (g)" />
+        <label for="sugar">Sugar (g)</label>
+      </div>
+    </div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="cholesterol" placeholder="Cholesterol (mg)" />
+        <label for="sodium">cholesterol (mg)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="sodium" placeholder="Sodium (mg)" />
+        <label for="sodium">Sodium (mg)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="vitaminA" placeholder="Vitamin A (%)" />
+        <label for="vitaminA">Vitamin A (%)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="vitaminC" placeholder="Vitamin C (%)" />
+        <label for="vitaminC">Vitamin C (%)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="calcium" placeholder="Calcium (%)" />
+        <label for="calcium">Calcium (%)</label>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <div class="form-floating form-floating-outline mb-4">
+        <input type="number" step="0.01" class="form-control" id="iron" placeholder="Iron (%)" />
+        <label for="iron">Iron (%)</label>
+      </div>
+    </div>
+  </div>
+</div>
+
           <div id="variantSection" style="display: none;">
             <div class="row variant-row">
               <div class="col-md-2">
@@ -338,6 +430,85 @@ async function productDetailsInfo() {
       if (res.status === 200 && res.data.status === 'success') {
         const productData = res.data.data;
 
+        const categoriesResponse = await axios.get('/categories');
+        const categorySelect = document.getElementById('categorySelect');
+        categorySelect.innerHTML = '<option value="">Select Category</option>';
+        categoriesResponse.data.data.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category.id;
+            option.textContent = category.name;
+            if (productData.category_id === category.id) {
+                option.selected = true;
+            }
+            categorySelect.appendChild(option);
+        });
+
+         /* Meal types handling and Check if category is "Food"*/
+          async function handleCategoryChange(selectedCategoryId) {
+              const selectedCategory = categoriesResponse.data.data.find(c => c.id == selectedCategoryId);
+              const categoryName = selectedCategory ? selectedCategory.name.toLowerCase() : '';
+
+              if (categoryName === 'food') {
+                  availabilityContainer.style.display = 'block';
+                  mealTypeContainer.style.display = 'block';
+
+                  // Fetch and populate meal types
+                  const mealTypesResponse = await axios.get('/get/meal-types');
+                  const mealTypes = mealTypesResponse.data.data || [];
+
+                  mealTypeList.innerHTML = ''; // Clear previous
+                  const existingMealTypeIds = productData.meal_types ? productData.meal_types.map(mt => mt.id) : [];
+
+                  mealTypes.forEach(type => {
+                      const checked = existingMealTypeIds.includes(type.id) ? 'checked' : '';
+                      mealTypeList.innerHTML += `
+                          <div class="form-check form-check-inline">
+                              <input class="form-check-input" type="checkbox" id="mealType${type.id}" value="${type.id}" name="meal_types[]" ${checked}>
+                              <label class="form-check-label badge bg-label-info rounded-pill px-3" for="mealType${type.id}">
+                                  ${type.name}
+                              </label>
+                          </div>`;
+                  });
+
+                // ===== Show nutrient section only if category is Food =====
+                const nutrientSection = document.getElementById('productNutrientSection');
+                nutrientSection.style.display = 'block';
+
+                if (res.data.nutrients) {
+                    const nutrients = res.data.nutrients;
+                    document.getElementById('calories').value = nutrients.calories || '';
+                    document.getElementById('protein').value = nutrients.protein || '';
+                    document.getElementById('fat').value = nutrients.fat || '';
+                    document.getElementById('carbohydrates').value = nutrients.carbohydrates || '';
+                    document.getElementById('fiber').value = nutrients.fiber || '';
+                    document.getElementById('sugar').value = nutrients.sugar || '';
+                    document.getElementById('cholesterol').value = nutrients.cholesterol || '';
+                    document.getElementById('sodium').value = nutrients.sodium || '';
+                    document.getElementById('vitaminA').value = nutrients.vitamin_a || '';
+                    document.getElementById('vitaminC').value = nutrients.vitamin_c || '';
+                    document.getElementById('calcium').value = nutrients.calcium || '';
+                    document.getElementById('iron').value = nutrients.iron || '';
+                }
+
+              } else {
+                  availabilityContainer.style.display = 'none';
+                  mealTypeContainer.style.display = 'none';
+                  mealTypeList.innerHTML = ''; 
+                // Hide nutrient section if category is not Food
+                document.getElementById('productNutrientSection').style.display = 'none';
+              }
+          }
+
+          // Initial call based on existing product category
+          await handleCategoryChange(productData.category_id);
+
+          // Add event listener for category change
+          categorySelect.addEventListener('change', async function() {
+              await handleCategoryChange(this.value);
+          });
+
+        /* End Meal types handling and Check if category is "Food"*/
+
         const hasVariantsCheckbox = document.getElementById('hasVariants');
         const hasBrandCheckbox = document.getElementById('hasBrand');
         const hasFreeCheckbox = document.getElementById('isFree');
@@ -463,18 +634,7 @@ async function productDetailsInfo() {
         document.getElementById('address2').value = productData['address2'];
         document.getElementById('zip-code').value = productData['zip_code'];
 
-        const categoriesResponse = await axios.get('/categories');
-        const categorySelect = document.getElementById('categorySelect');
-        categorySelect.innerHTML = '<option value="">Select Category</option>';
-        categoriesResponse.data.data.forEach(category => {
-            const option = document.createElement('option');
-            option.value = category.id;
-            option.textContent = category.name;
-            if (productData.category_id === category.id) {
-                option.selected = true;
-            }
-            categorySelect.appendChild(option);
-        });
+
 
         const countriesResponse = await axios.get('/countries');
         const countrySelect = document.getElementById('countrySelect');
@@ -654,6 +814,19 @@ async function updateProduct() {
   let hasDiscountPrice = document.getElementById('hasDiscountPrice').checked ? 1 : 0;
   let isFree = document.getElementById('isFree').checked ? 1 : 0;
 
+  // Meal types validation
+  let mealTypeIds = [];
+  let categorySelect = document.getElementById('categorySelect');
+  let categoryText = categorySelect.options[categorySelect.selectedIndex]?.text.trim().toLowerCase();
+
+  if (categoryText === 'food') {
+      mealTypeIds = Array.from(document.querySelectorAll('input[name="meal_types[]"]:checked')).map(el => el.value);
+      if (mealTypeIds.length === 0) {
+          document.getElementById('meal-type-error').innerText = "Must select at least one Meal Type";
+          isValid = false;
+      }
+  }
+
   if (!name) {
     document.getElementById('name-error').innerText = 'Product name is required!';
     isValid = false;
@@ -796,6 +969,11 @@ async function updateProduct() {
   formData.append('has_discount_price', hasDiscountPrice);
   formData.append('is_free', isFree);
 
+  // Append meal types if applicable
+  if (mealTypeIds.length > 0) {
+      mealTypeIds.forEach(id => formData.append('meal_types[]', id));
+  }
+
   if (image) {
       formData.append('image', image);
   }
@@ -826,6 +1004,22 @@ async function updateProduct() {
   } else {
     formData.append('current_stock', qty);
   }
+
+// ✅ ADD NUTRIENT VALUES IF CATEGORY IS FOOD
+if (categoryText === 'food') {
+    formData.append('nutrients[calories]', document.getElementById('calories').value || '');
+    formData.append('nutrients[protein]', document.getElementById('protein').value || '');
+    formData.append('nutrients[fat]', document.getElementById('fat').value || '');
+    formData.append('nutrients[carbohydrates]', document.getElementById('carbohydrates').value || '');
+    formData.append('nutrients[fiber]', document.getElementById('fiber').value || '');
+    formData.append('nutrients[sugar]', document.getElementById('sugar').value || '');
+    formData.append('nutrients[cholesterol]', document.getElementById('cholesterol').value || '');
+    formData.append('nutrients[sodium]', document.getElementById('sodium').value || '');
+    formData.append('nutrients[vitamin_a]', document.getElementById('vitaminA').value || '');
+    formData.append('nutrients[vitamin_c]', document.getElementById('vitaminC').value || '');
+    formData.append('nutrients[calcium]', document.getElementById('calcium').value || '');
+    formData.append('nutrients[iron]', document.getElementById('iron').value || '');
+}
 
   const config = {
       headers: {'content-type': 'multipart/form-data'}

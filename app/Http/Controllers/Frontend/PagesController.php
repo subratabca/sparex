@@ -107,7 +107,7 @@ class PagesController extends Controller
     public function getProductDetails($id)
     {
         try {
-            $data = Product::with('client', 'category', 'variants', 'productImages')->findOrFail($id);
+            $data = Product::with('client', 'category', 'variants', 'productImages', 'mealTypes')->findOrFail($id);
 
             $currentDate = Carbon::now(new \DateTimeZone('Asia/Dhaka'));
             $relatedData = Product::where('expire_date', '>=', $currentDate)

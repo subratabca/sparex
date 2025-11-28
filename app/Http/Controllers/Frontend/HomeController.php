@@ -16,12 +16,12 @@ use Carbon\Carbon;
 
 class HomeController extends Controller
 {
-    public function HomePage()
+    public function homePage()
     {
         return view('frontend.pages.home-page');
     }
 
-    public function SettingList()
+    public function settingList()
     {
         try {
             $data = SiteSetting::first(); 
@@ -40,7 +40,7 @@ class HomeController extends Controller
         }
     }
 
-    public function HeroPageInfo()
+    public function heroPageInfo()
     {
         try {
             $data = Hero::first();
@@ -95,7 +95,7 @@ class HomeController extends Controller
             $radius = 10; 
 
             if ($latitude && $longitude) {
-                $locationProducts = Product::with('city', 'client.followers')->selectRaw("*, (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) AS distance", [$latitude, $longitude, $latitude])
+                $locationProducts = Product::with('city', 'client.followers', 'mealTypes')->selectRaw("*, (6371 * acos(cos(radians(?)) * cos(radians(latitude)) * cos(radians(longitude) - radians(?)) + sin(radians(?)) * sin(radians(latitude)))) AS distance", [$latitude, $longitude, $latitude])
                     ->having("distance", "<=", $radius)
                     ->where('expire_date', '>=', $currentDate)
                     ->where(function ($query) {
@@ -116,7 +116,7 @@ class HomeController extends Controller
 
                 $allProducts = $locationProducts->merge($remainingProducts);
             } else {
-                $allProducts = Product::with('city', 'client.followers')->where('expire_date', '>=', $currentDate)
+                $allProducts = Product::with('city', 'client.followers', 'mealTypes')->where('expire_date', '>=', $currentDate)
                     ->where(function ($query) {
                         $query->where('status', 'published')
                               ->orWhere('status', 'processing');
@@ -125,9 +125,25 @@ class HomeController extends Controller
                     ->get();
             }
 
-            $allProducts->each(function ($product) use ($customerId) {
-                $product->isFollowing = 
-                    $product->client->followers->firstWhere('customer_id', $customerId)->status ?? 0;
+            // $allProducts->each(function ($product) use ($customerId) {
+            //     $product->isFollowing = 
+            //         $product->client->followers->firstWhere('customer_id', $customerId)->status ?? 0;
+            // });
+
+            $allProducts->transform(function ($product) use ($customerId) {
+                $product->isFollowing = $product->client->followers
+                    ->firstWhere('customer_id', $customerId)->status ?? 0;
+
+                // Map meal types for cleaner frontend use
+                $product->meal_types = $product->mealTypes->map(function ($mealType) {
+                    return [
+                        'id' => $mealType->id,
+                        'name' => $mealType->name,
+                    ];
+                });
+
+                unset($product->mealTypes); // optional cleanup
+                return $product;
             });
 
             $page = LengthAwarePaginator::resolveCurrentPage();

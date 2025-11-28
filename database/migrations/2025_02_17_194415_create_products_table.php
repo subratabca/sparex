@@ -17,7 +17,7 @@ return new class extends Migration
             $table->foreignId('category_id')->constrained('categories')->onDelete('restrict')->onUpdate('cascade');
             $table->foreignId('brand_id')->nullable()->constrained('brands')->onDelete('restrict')->onUpdate('cascade');
             $table->string('image', 255);
-            $table->string('name', 50)->unique();
+            $table->string('name', 50);
             $table->decimal('weight', 10, 2)->default(0)->comment('Weight in kilograms (kg)');
             $table->decimal('price', 10, 2)->default(0);
             $table->decimal('discount_price', 10, 2)->default(0);
@@ -37,10 +37,12 @@ return new class extends Migration
             $table->decimal('longitude', 11, 8)->nullable(); 
             $table->boolean('accept_tnc')->default(0); 
             $table->enum('status', ['pending', 'published', 'processing', 'completed'])->default('pending'); 
+            $table->boolean('has_availability')->default(0);
             $table->boolean('has_variants')->default(0);
             $table->boolean('has_brand')->default(0);
             $table->boolean('is_free')->default(false); 
             $table->boolean('has_discount_price')->default(0);
+            $table->unique(['client_id', 'name']);
             $table->timestamps();
         });
     }

@@ -215,7 +215,7 @@ class AdminProductController extends Controller
     public function show(Request $request,$id)
     {
         try {
-            $product = Product::with('productImages','client','variants','category', 'brand', 'country','county','city')->find($id);
+            $product = Product::with('productImages','client','variants','category', 'brand', 'country','county','city','nutrient')->find($id);
 
             if (!$product) {
                 ActivityLogger::log(
@@ -236,9 +236,31 @@ class AdminProductController extends Controller
                 $request,
                 'products'
             );
+
+            // ✅ Prepare nutrient data for frontend
+            $nutrientData = null;
+            if ($product->nutrient) {
+                $nutrientData = $product->nutrient->only([
+                    'calories', 'calories_unit',
+                    'protein', 'protein_unit',
+                    'fat', 'fat_unit',
+                    'carbohydrates', 'carbohydrates_unit',
+                    'fiber', 'fiber_unit',
+                    'sugar', 'sugar_unit',
+                    'cholesterol', 'cholesterol_unit',
+                    'sodium', 'sodium_unit',
+                    'vitamin_a', 'vitamin_a_unit',
+                    'vitamin_c', 'vitamin_c_unit',
+                    'calcium', 'calcium_unit',
+                    'iron', 'iron_unit'
+                ]);
+            }
+
+
             return response()->json([
                 'status' => 'success',
-                'data' => $product
+                'data' => $product,
+                'nutrients' => $nutrientData,
             ], 200);
 
         } catch (Exception $e) {

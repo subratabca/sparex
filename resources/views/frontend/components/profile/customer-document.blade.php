@@ -172,7 +172,7 @@ document.addEventListener("DOMContentLoaded", async function() {
 async function DocDetailsInfo() {
   showLoader();
   try {
-      const response = await axios.get('/user/profile/info');
+      const response = await axios.get('/user/get/profile/info');
 
       if (response.status === 200) {
           const userData = response.data.data;

@@ -5,8 +5,8 @@
     <div class="card-header header-elements">
         <span class="me-2"><h5>Meal Orders</h5></span>
         <div class="card-header-elements ms-auto">
-            <a href="{{ route('create.meal.order')}}" type="button" class="btn btn-primary waves-effect waves-light">
-                <span class="tf-icon mdi mdi-plus me-1"></span>Add New
+            <a href="{{ route('favourite.meals')}}" type="button" class="btn btn-primary waves-effect waves-light">
+                <span class="tf-icon mdi mdi-plus me-1"></span>Add New Meal Plan
             </a>
         </div>
     </div>
@@ -16,9 +16,10 @@
             <thead>
                 <tr>
                     <th>Sl</th>
-                    <th>Customer Name</th>
-                    <th>Order Date</th>
+                    <th>Meal Date</th>
                     <th>Meal Type</th>
+                    <th>Calories</th>
+                    <th>Suggested Meal Type</th>
                     <th>Action</th>
                 </tr>
             </thead>
@@ -33,24 +34,83 @@ document.addEventListener("DOMContentLoaded", function () {
     getList(); 
 });
 
+let allMealTypes = [];
+
+async function getAllMealTypes() {
+    showLoader();
+    try {
+        const res = await axios.get("/get/meal-types");
+
+        if (res.status === 200 && res.data.status === "success" && Array.isArray(res.data.data)) {
+            allMealTypes = res.data.data.map(item => item.name);
+        } else {
+            errorToast(res.data.message || "Failed to load meal types.");
+            allMealTypes = []; 
+        }
+    } catch (error) {
+        handleError(error);
+        allMealTypes = []; 
+    } finally {
+        hideLoader();
+    }
+}
+
+
+
 async function getList() {
     showLoader();
     try {
-        let res = await axios.get("/user/get/meal-orders");
+        await getAllMealTypes();
+
+        let res = await axios.get("/user/get/meal-order");
         if (res.status === 200 && res.data.status === 'success') {
             let tableList = $("#tableList");
             tableList.empty();
 
+            const today = new Date().toISOString().split("T")[0];
+
             res.data.data.forEach(function (item, index) {
+                const existingMealTypes = item.meal_types ? item.meal_types.split(",").map(t => t.trim()) : [];
+                const remainingMealTypes = allMealTypes.filter(t => !existingMealTypes.includes(t));
+
+                let formattedMealTypes = "";
+
+                if (item.meal_types) {
+                    formattedMealTypes = item.meal_types
+                        .split(",")
+                        .map(t => t.trim())
+                        .map(t => t.charAt(0).toUpperCase() + t.slice(1))
+                        .join(", ");
+                }
+
+                // Build suggested meal buttons
+                let suggestedHTML = '';
+                if (item.meal_date > today) {
+                    if (remainingMealTypes.length > 0) {
+                        remainingMealTypes.forEach(type => {
+                            suggestedHTML += `<button class="btn btn-sm btn-outline-success suggest-btn me-1" 
+                                                data-id="${item.id}" 
+                                                data-type="${type}" 
+                                                data-date="${item.meal_date}">
+                                                ${type}
+                                              </button>`;
+                        });
+                    } else {
+                        suggestedHTML = `<span class="text-muted">All added</span>`;
+                    }
+                } else {
+                    suggestedHTML = `<span class="text-muted">N/A</span>`;
+                }
+
                 let row = `
                     <tr>
                         <td>${index + 1}</td>
-                        <td>${item.customer_name}</td>
-                        <td>${item.order_date}</td>
-                        <td>${item.meal_types}</td>
+                        <td>${item.meal_date}</td>
+                        <td>${formattedMealTypes}</td>
+                        <td>${item.calories ?? 0} kcal</td>
+                        <td>${suggestedHTML}</td> 
                         <td>
-                            <a href="/user/edit/meal-order/${item.id}" class="btn btn-sm btn-outline-success" title="Edit Order">
-                                <span class="mdi mdi-pencil-outline"></span>
+                            <a  href="/user/meal-order/details/${item['id']}" class="btn btn-sm btn-outline-primary" title="Order Details"><span class="mdi mdi-eye-circle"></span>
                             </a>
                             <button data-id="${item.id}" class="btn deleteBtn btn-sm btn-outline-danger" title="Delete">
                                 <span class="mdi mdi-trash-can-outline"></span>
@@ -93,6 +153,14 @@ function attachEventListeners() {
         let id = $(this).data('id');
         $("#deleteID").val(id);
         $("#delete-modal").modal('show');
+    });
+
+    $('.suggest-btn').on('click', function () {
+        let type = $(this).data('type');
+        let date = $(this).data('date'); 
+        window.location.href = "{{ route('favourite.meals') }}" 
+                               + "?meal_type=" + encodeURIComponent(type) 
+                               + "&meal_date=" + encodeURIComponent(date);
     });
 }
 

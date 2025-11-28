@@ -54,11 +54,10 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/user/total/information");
+            let res = await axios.get("/user/get/dashboard/info");
             if (res.status === 200 && res.data.status === 'success') {
                 document.getElementById('total-orders').innerText = res.data.totalOrders;
                 document.getElementById('total-complaints').innerText = res.data.totalComplaints;
-                //successToast(res.data.message || "Fetch orders and complaints count successfully.");
             } else {
                 errorToast(res.data.message || "Failed to fetch information count.");
             }

@@ -18,7 +18,7 @@ use App\Models\Product;
 use App\Models\ProductImage;
 use App\Models\ProductVariant;
 use App\Models\StockMovement;
-
+use App\Models\Category;
 
 class ClientProductController extends Controller
 {
@@ -118,29 +118,39 @@ class ClientProductController extends Controller
     {
         DB::beginTransaction();
         try {
+            // Validate base product data
             $request->validate(ValidationHelper::itemValidationRules(false, true));
+
             $geoData = $this->formatAndFetchCoordinates($request);
 
+            // Handle main product image
             $imagePath = $request->hasFile('image')
                 ? ImageHelper::processAndSaveImage($request->file('image'), 'item')
                 : null;
 
+            // Prepare and store product data
             $productData = ItemHelper::prepareItemData($request, $imagePath);
             $productData['latitude'] = $geoData['latitude'];
             $productData['longitude'] = $geoData['longitude'];
+
             $product = ItemHelper::storeOrUpdateItem($productData);
 
-            // Record initial stock movement for variant products
+            // ✅ Attach meal types (pivot table)
+            if ($request->has('meal_types') && is_array($request->meal_types)) {
+                $product->mealTypes()->sync($request->meal_types);
+            }
+
+            // Handle product variants
             if ($request->has_variants && $request->variants) {
                 ItemHelper::saveVariants($request->variants, $product->id);
 
-                // Update product stock from variants
+                // Update total stock
                 $product->refresh();
                 $product->current_stock = $product->variants->sum('current_stock');
                 $product->save();
             }
 
-            // Record initial stock movement for non-variant products
+            // Handle non-variant product stock movement
             if (!$request->has_variants) {
                 StockMovement::create([
                     'product_id' => $product->id,
@@ -151,25 +161,30 @@ class ClientProductController extends Controller
                 ]);
             }
 
+            // Save multiple product images
             if ($request->hasFile('multi_images') && count($request->file('multi_images')) > 0) {
                 ImageHelper::saveMultiImages($request->file('multi_images'), $product->id);
             }
 
-            ActivityLogger::log(
-                'item_creation_success',
-                'Product created successfully.',
-                $request,
-                'products'
-            );
+            // ✅ Save nutrients if category is "Food"
+            $category = Category::find($request->category_id);
+            if ($category && strtolower($category->name) === 'food') {
+                ItemHelper::saveNutrients($request, $product);
+            }
+
+            // Log and notify
+            ActivityLogger::log('item_creation_success', 'Product created successfully.', $request, 'products');
 
             DB::commit();
+
+            // Notify admin
             $user = User::where('role', 'admin')->first();
-            $user->notify(new ProductUploadNotification($product));
+            $user?->notify(new ProductUploadNotification($product));
 
             return response()->json([
                 'status' => 'success',
                 'message' => 'Product created successfully.',
-                'data' => $product
+                'data' => $product->load('mealTypes') // Return with meal types if you like
             ], 201);
 
         } catch (ValidationException $e) {
@@ -218,10 +233,10 @@ class ClientProductController extends Controller
         return view('client.pages.product.product-details');
     }
 
-    public function show(Request $request,$id)
+    public function show(Request $request, $id)
     {
         try {
-            $product = Product::with('productImages','client','variants','category', 'brand', 'country','county','city')->find($id);
+            $product = Product::with('productImages', 'mealTypes', 'client', 'variants', 'category', 'brand', 'country', 'county', 'city','nutrient')->find($id);
 
             if (!$product) {
                 ActivityLogger::log(
@@ -242,9 +257,43 @@ class ClientProductController extends Controller
                 $request,
                 'products'
             );
+
+            // Determine if meal types section should be shown
+            $showAvailability = false;
+            if (
+                $product->category &&
+                strtolower($product->category->name) === 'food' &&
+                !$product->is_free &&
+                $product->mealTypes &&
+                $product->mealTypes->count() > 0
+            ) {
+                $showAvailability = true;
+            }
+
+            // ✅ Prepare nutrient data for frontend
+            $nutrientData = null;
+            if ($product->nutrient) {
+                $nutrientData = $product->nutrient->only([
+                    'calories', 'calories_unit',
+                    'protein', 'protein_unit',
+                    'fat', 'fat_unit',
+                    'carbohydrates', 'carbohydrates_unit',
+                    'fiber', 'fiber_unit',
+                    'sugar', 'sugar_unit',
+                    'cholesterol', 'cholesterol_unit',
+                    'sodium', 'sodium_unit',
+                    'vitamin_a', 'vitamin_a_unit',
+                    'vitamin_c', 'vitamin_c_unit',
+                    'calcium', 'calcium_unit',
+                    'iron', 'iron_unit'
+                ]);
+            }
+
             return response()->json([
                 'status' => 'success',
-                'data' => $product
+                'data' => $product,
+                'nutrients' => $nutrientData, 
+                'showAvailability' => $showAvailability
             ], 200);
 
         } catch (Exception $e) {
@@ -287,6 +336,10 @@ class ClientProductController extends Controller
             $productData['longitude'] = $geoData['longitude'];
             $updatedProduct = ItemHelper::storeOrUpdateItem($productData, $product);
 
+            if ($request->has('meal_types') && is_array($request->meal_types)) {
+                $product->mealTypes()->sync($request->meal_types);
+            }
+
             // Handle stock movement for non-variant products
             if ($request->has_variants && $request->variants) {
                 ItemHelper::saveVariants($request->variants, $product->id);
@@ -311,6 +364,12 @@ class ClientProductController extends Controller
                         'notes' => 'Stock adjustment during update'
                     ]);
                 }
+            }
+
+            // ✅ Save nutrients if category is "Food"
+            $category = Category::find($request->category_id);
+            if ($category && strtolower($category->name) === 'food') {
+                ItemHelper::saveNutrients($request, $product);
             }
             
             ActivityLogger::log(

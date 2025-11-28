@@ -80,6 +80,13 @@
       </a>
     </li>
 
+    <li class="menu-item {{ request()->routeIs('client.meal.orders*') ? 'active' : '' }}">
+      <a href="{{ route('client.meal.orders') }}" class="menu-link">
+        <i class="menu-icon tf-icons mdi mdi-food-fork-drink"></i>
+        <div data-i18n="Meal Orders">Meal Orders</div>
+      </a>
+    </li>
+
     <li class="menu-item {{ request()->routeIs(['client.customers', 'client.banned.customers']) ? 'active open' : '' }}">
       <a href="javascript:void(0);" class="menu-link menu-toggle">
         <i class="menu-icon mdi mdi-account-group"></i>

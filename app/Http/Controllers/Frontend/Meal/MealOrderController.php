@@ -4,39 +4,741 @@ namespace App\Http\Controllers\Frontend\Meal;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
-use Illuminate\Validation\ValidationException;
-use App\Models\CustomerMenu;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use App\Models\Product;
+use App\Models\MealType;
 use App\Models\MealOrder;
 use App\Models\MealOrderItem;
-use App\Helpers\ValidationHelper;
-use App\Helpers\ItemHelper;
+use App\Models\ClientMealOrder;
+use App\Models\MealShippingAddress;
+use App\Models\MealDeliveryCharge;
+use App\Models\User;
+use Carbon\Carbon;
 use Exception;
 
 class MealOrderController extends Controller
 {
+    public function storeByCash(Request $request)
+    {
+        $request->validate([
+            'meal_orders' => 'required|array|min:1',
+            'meal_orders.*.meal_date' => 'required|date',
+            'meal_orders.*.meal_type_id' => 'required|integer|exists:meal_types,id',
+            'meal_orders.*.product_id' => 'required|integer|exists:products,id',
+            'meal_orders.*.quantity' => 'required|integer|min:1',
+            'meal_orders.*.unit_price' => 'required|numeric|min:0',
+            'meal_orders.*.total_price' => 'required|numeric|min:0',
+            'name' => 'required|string|max:255',
+            'email' => 'required|email',
+            'phone' => 'required|string|max:20',
+            'address1' => 'required|string|max:255',
+            'address2' => 'nullable|string|max:255',
+            'zip_code' => 'required|string|max:20',
+            'country_id' => 'required|integer|exists:countries,id',
+            'county_id' => 'required|integer|exists:counties,id',
+            'city_id' => 'required|integer|exists:cities,id',
+            'delivery_option' => 'required|in:self_pickup,courier',
+            'subtotal' => 'required|numeric|min:0',
+            'tax' => 'required|numeric|min:0',
+            'delivery_charge' => 'required|numeric|min:0',
+            'total_amount' => 'required|numeric|min:0',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $customerId = $request->header('id');
+            $mealOrders = $request->meal_orders;
+            
+            // Get TAX_RATE from config
+            $taxRate = (float) config('services.tax_rate', 0.10);
+
+            // Calculate overall totals
+            $overallSubtotal = 0;
+            foreach ($mealOrders as $item) {
+                $overallSubtotal += $item['total_price'];
+            }
+            $overallTax = $overallSubtotal * $taxRate;
+
+            // Generate order numbers
+            $orderNumber = 'MO-' . Str::upper(Str::random(8)) . '-' . time();
+            $invoiceNo = 'INV-' . Str::upper(Str::random(6)) . '-' . time();
+
+            // ✅ Prepare customer shipping address for distance calculation
+            $customerShippingAddress = [
+                'city_id'  => $request->city_id,
+                'address1' => $request->address1,
+                'zip_code' => $request->zip_code,
+            ];
+
+            // ✅ FIXED: Use EXACT same grouping logic as MealCartController
+            $totalCalculatedDeliveryCharge = 0;
+            $chargesPerDate = [];
+            
+            // Group by meal_date first (EXACTLY like MealCartController)
+            $mealOrdersByDate = [];
+            foreach ($mealOrders as $item) {
+                $date = $item['meal_date'];
+                if (!isset($mealOrdersByDate[$date])) {
+                    $mealOrdersByDate[$date] = [];
+                }
+                $mealOrdersByDate[$date][] = $item;
+            }
+
+            // Calculate delivery charges per date (EXACTLY like MealCartController)
+            foreach ($mealOrdersByDate as $date => $itemsForDate) {
+                $chargesPerClientMealType = [];
+                $dateCharge = 0;
+
+                foreach ($itemsForDate as $item) {
+                    $product = Product::find($item['product_id']);
+                    if (!$product) continue;
+
+                    $client = User::find($product->client_id);
+                    $mealType = MealType::find($item['meal_type_id']);
+                    
+                    if (!$client || !$mealType) continue;
+
+                    // Key: client_id + meal_type_id to avoid double counting (EXACTLY like MealCartController)
+                    $key = $client->id . '_' . $mealType->id;
+
+                    if (isset($chargesPerClientMealType[$key])) {
+                        // Already counted this client + meal type for this date
+                        continue;
+                    }
+
+                    // Ensure client has valid address
+                    if (!$client->city_id || !$client->address1 || !$client->zip_code) continue;
+
+                    $clientAddress = [
+                        'city_id'  => $client->city_id,
+                        'address1' => $client->address1,
+                        'zip_code' => $client->zip_code,
+                    ];
+
+                    // Calculate distance
+                    $distance = $this->getDistanceBetweenLocations($clientAddress, $customerShippingAddress);
+                    if ($distance === null) continue;
+
+                    // Get delivery charge for this client + meal type
+                    $deliveryCharge = MealDeliveryCharge::where('client_id', $client->id)
+                        ->where('meal_type_id', $mealType->id)
+                        ->first();
+
+                    if (!$deliveryCharge) continue;
+
+                    // Determine charge based on distance (EXACTLY like MealCartController)
+                    if ($distance <= 2) {
+                        $charge = $deliveryCharge->inside_city_2km;
+                    } elseif ($distance <= 5) {
+                        $charge = $deliveryCharge->inside_city_5km;
+                    } elseif ($distance <= 10) {
+                        $charge = $deliveryCharge->inside_city_10km;
+                    } else {
+                        $charge = $deliveryCharge->inside_city_above_10km;
+                    }
+
+                    // Store charge for this client + meal type (counted once)
+                    $chargesPerClientMealType[$key] = $charge;
+                    $dateCharge += $charge;
+                }
+
+                $chargesPerDate[$date] = $dateCharge;
+                $totalCalculatedDeliveryCharge += $dateCharge;
+            }
+
+            // ✅ Use the CALCULATED delivery charge instead of frontend provided charge
+            $calculatedDeliveryCharge = $totalCalculatedDeliveryCharge;
+            $overallTotal = $overallSubtotal + $overallTax + $calculatedDeliveryCharge;
+
+            // Create main meal order with CALCULATED delivery charge
+            $mealOrder = MealOrder::create([
+                'customer_id' => $customerId,
+                'order_number' => $orderNumber,
+                'invoice_no' => $invoiceNo,
+                'status' => 'pending',
+                'delivery_type' => $request->delivery_option,
+                'delivery_fee' => $calculatedDeliveryCharge, // ✅ Use calculated charge
+                'subtotal' => $overallSubtotal,
+                'tax' => $overallTax,
+                'payable_amount' => $overallTotal,
+                'paid_amount' => 0,
+                'payment_type' => 'cash',
+                'payment_method' => 'cash',
+                'payment_status' => 'due',
+                'currency' => 'USD',
+                'transaction_id' => null,
+            ]);
+
+            // Create shipping address
+            MealShippingAddress::create([
+                'meal_order_id' => $mealOrder->id,
+                'name' => $request->name,
+                'email' => $request->email,
+                'phone' => $request->phone,
+                'address1' => $request->address1,
+                'address2' => $request->address2,
+                'zip_code' => $request->zip_code,
+                'country_id' => $request->country_id,
+                'county_id' => $request->county_id,
+                'city_id' => $request->city_id,
+                'latitude' => null,
+                'longitude' => null,
+            ]);
+
+            $allOrderItems = [];
+
+            // ✅ FIXED: Calculate client delivery fees using the SAME logic
+            $clientDeliveryFees = [];
+            $clientSubtotals = [];
+            $clientTaxes = [];
+
+            // Re-calculate delivery fees per client using the same grouping logic
+            foreach ($mealOrdersByDate as $date => $itemsForDate) {
+                $calculatedClientsForDate = []; // Track which clients we've calculated for this date
+                
+                foreach ($itemsForDate as $item) {
+                    $product = Product::find($item['product_id']);
+                    if (!$product) continue;
+
+                    $clientId = $product->client_id;
+                    $mealTypeId = $item['meal_type_id'];
+                    
+                    $key = $clientId . '_' . $mealTypeId;
+
+                    // Skip if already calculated this client+meal_type for this date
+                    if (isset($calculatedClientsForDate[$key])) {
+                        continue;
+                    }
+
+                    $client = User::find($clientId);
+                    $mealType = MealType::find($mealTypeId);
+                    
+                    if (!$client || !$mealType) continue;
+
+                    // Ensure client has valid address
+                    if (!$client->city_id || !$client->address1 || !$client->zip_code) continue;
+
+                    $clientAddress = [
+                        'city_id'  => $client->city_id,
+                        'address1' => $client->address1,
+                        'zip_code' => $client->zip_code,
+                    ];
+
+                    // Calculate distance
+                    $distance = $this->getDistanceBetweenLocations($clientAddress, $customerShippingAddress);
+                    if ($distance === null) continue;
+
+                    // Get delivery charge
+                    $deliveryCharge = MealDeliveryCharge::where('client_id', $clientId)
+                        ->where('meal_type_id', $mealTypeId)
+                        ->first();
+
+                    if (!$deliveryCharge) continue;
+
+                    // Determine charge based on distance
+                    if ($distance <= 2) {
+                        $charge = $deliveryCharge->inside_city_2km;
+                    } elseif ($distance <= 5) {
+                        $charge = $deliveryCharge->inside_city_5km;
+                    } elseif ($distance <= 10) {
+                        $charge = $deliveryCharge->inside_city_10km;
+                    } else {
+                        $charge = $deliveryCharge->inside_city_above_10km;
+                    }
+
+                    // Add to client delivery fees
+                    if (!isset($clientDeliveryFees[$clientId])) {
+                        $clientDeliveryFees[$clientId] = 0;
+                    }
+                    $clientDeliveryFees[$clientId] += $charge;
+                    
+                    // Mark as calculated for this date
+                    $calculatedClientsForDate[$key] = true;
+                }
+            }
+
+            // Process meal items and calculate subtotals/taxes per client
+            foreach ($mealOrders as $item) {
+                $product = Product::find($item['product_id']);
+                if (!$product) continue;
+
+                $clientId = $product->client_id;
+
+                // Initialize client data if not exists
+                if (!isset($clientSubtotals[$clientId])) {
+                    $clientSubtotals[$clientId] = 0;
+                    $clientTaxes[$clientId] = 0;
+                }
+
+                // Add to subtotal and tax
+                $clientSubtotals[$clientId] += $item['total_price'];
+                $clientTaxes[$clientId] += $item['total_price'] * $taxRate;
+
+                // Create order item
+                $orderItem = MealOrderItem::create([
+                    'meal_order_id' => $mealOrder->id,
+                    'client_id' => $clientId,
+                    'meal_type_id' => $item['meal_type_id'],
+                    'product_id' => $item['product_id'],
+                    'meal_date' => $item['meal_date'],
+                    'quantity' => $item['quantity'],
+                    'unit_price' => $item['unit_price'],
+                    'total_price' => $item['total_price'],
+                    'status' => 'pending',
+                ]);
+
+                $allOrderItems[] = $orderItem;
+            }
+
+            // ✅ Create ClientMealOrder records with PROPER delivery fees
+            foreach ($clientSubtotals as $clientId => $subtotal) {
+                $deliveryFee = $clientDeliveryFees[$clientId] ?? 0;
+                $tax = $clientTaxes[$clientId] ?? 0;
+                $total = $subtotal + $tax + $deliveryFee;
+
+                ClientMealOrder::create([
+                    'meal_order_id' => $mealOrder->id,
+                    'client_id' => $clientId,
+                    'subtotal' => $subtotal,
+                    'tax' => $tax,
+                    'delivery_fee' => $deliveryFee,
+                    'payable_amount' => $total,
+                    'paid_amount' => 0,
+                    'payment_status' => 'due',
+                    'status' => 'pending',
+                ]);
+            }
+
+            DB::commit();
+
+            // Load relationships for the response
+            $mealOrder->load(['items', 'clientMealOrders', 'mealShippingAddress']);
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Cash meal order placed successfully!',
+                'data' => [
+                    'meal_order' => $mealOrder,
+                    'order_items' => $allOrderItems,
+                    'total_items' => count($allOrderItems),
+                    'total_clients' => count($clientSubtotals),
+                    'tax_rate_used' => $taxRate,
+                    'delivery_calculation' => [
+                        'calculated_total' => $calculatedDeliveryCharge,
+                        'frontend_provided' => $request->delivery_charge,
+                        'details_per_date' => $chargesPerDate,
+                    ],
+                ],
+                'redirect_url' => '/user/meal-order'
+            ], 201);
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            \Log::error('Meal Order Cash Error: ' . $e->getMessage());
+            \Log::error('Stack Trace: ' . $e->getTraceAsString());
+            
+            return response()->json([
+                'status' => 'failed',
+                'message' => 'Unable to place cash meal order.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Calculate delivery charge based on distance between client address and customer shipping address
+     * Using Google Distance Matrix API for accurate route-based calculation
+     */
+    private function calculateDistanceBasedDeliveryCharge($clientId, $mealTypeId, $customerShippingAddress)
+    {
+        try {
+            // Get client from User model
+            $client = User::where('id', $clientId)->where('role', 'client')->first();
+            if (!$client) {
+                \Log::warning("Client not found or not a client: {$clientId}");
+                return [
+                    'charge' => 5.00,
+                    'distance' => null
+                ];
+            }
+
+            // Ensure client has valid address
+            if (!$client->city_id || !$client->address1 || !$client->zip_code) {
+                \Log::warning("Client address incomplete for client: {$clientId}");
+                return [
+                    'charge' => 5.00,
+                    'distance' => null
+                ];
+            }
+
+            $clientAddress = [
+                'city_id'  => $client->city_id,
+                'address1' => $client->address1,
+                'zip_code' => $client->zip_code,
+            ];
+
+            // Calculate distance using Google Distance Matrix API
+            $distance = $this->getDistanceBetweenLocations($clientAddress, $customerShippingAddress);
+            
+            if ($distance === null) {
+                \Log::warning("Distance calculation failed for client: {$clientId}");
+                return [
+                    'charge' => 5.00,
+                    'distance' => null
+                ];
+            }
+
+            // Get delivery charge for this client + meal type
+            $deliveryCharge = MealDeliveryCharge::where('client_id', $client->id)
+                ->where('meal_type_id', $mealTypeId)
+                ->first();
+
+            if (!$deliveryCharge) {
+                \Log::info("No specific delivery charge found for client {$clientId}, meal type {$mealTypeId}, using default");
+                $charge = $this->getDefaultDeliveryCharge($distance);
+                return [
+                    'charge' => $charge,
+                    'distance' => $distance
+                ];
+            }
+
+            // Determine charge based on distance
+            if ($distance <= 2) {
+                $charge = $deliveryCharge->inside_city_2km;
+            } elseif ($distance <= 5) {
+                $charge = $deliveryCharge->inside_city_5km;
+            } elseif ($distance <= 10) {
+                $charge = $deliveryCharge->inside_city_10km;
+            } else {
+                $charge = $deliveryCharge->inside_city_above_10km;
+            }
+
+            \Log::info("Delivery charge for client {$clientId}: \${$charge} for {$distance} km");
+
+            return [
+                'charge' => $charge,
+                'distance' => $distance
+            ];
+
+        } catch (Exception $e) {
+            \Log::error('Delivery charge calculation error: ' . $e->getMessage());
+            return [
+                'charge' => 5.00,
+                'distance' => null
+            ];
+        }
+    }
+
+    /**
+     * Calculate distance between locations using Google Distance Matrix API
+     */
+    private function getDistanceBetweenLocations($clientAddress, $shippingAddress)
+    {
+        // Google API key from config
+        $apiKey = config('services.google_maps.api_key');
+
+        if (!$apiKey) {
+            \Log::error('Google Maps API key not configured');
+            return null;
+        }
+
+        try {
+            // Construct origin & destination with full addresses
+            $origin = urlencode("{$clientAddress['address1']}, {$clientAddress['zip_code']}");
+            $destination = urlencode("{$shippingAddress['address1']}, {$shippingAddress['zip_code']}");
+
+            // Build URL for Google Distance Matrix API
+            $url = "https://maps.googleapis.com/maps/api/distancematrix/json?origins={$origin}&destinations={$destination}&mode=driving&units=metric&key={$apiKey}";
+
+            $response = Http::timeout(10)->get($url);
+            $data = $response->json();
+
+            \Log::info("Distance API Response for client {$clientAddress['address1']} to customer {$shippingAddress['address1']}:", $data);
+
+            if (isset($data['rows'][0]['elements'][0]['status']) && 
+                $data['rows'][0]['elements'][0]['status'] === 'OK') {
+                
+                // Distance in meters
+                $distanceMeters = $data['rows'][0]['elements'][0]['distance']['value'];
+                // Convert to KM
+                $distanceKm = $distanceMeters / 1000;
+                
+                \Log::info("Distance calculated: {$distanceKm} km");
+                return round($distanceKm, 2);
+            }
+
+            \Log::warning("Distance API returned status: " . ($data['rows'][0]['elements'][0]['status'] ?? 'UNKNOWN'));
+            return null;
+
+        } catch (\Exception $e) {
+            \Log::error("Distance calculation error: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Get default delivery charge based on distance
+     */
+    private function getDefaultDeliveryCharge($distance)
+    {
+        if ($distance <= 2) {
+            return 5.00;
+        } elseif ($distance <= 5) {
+            return 8.00;
+        } elseif ($distance <= 10) {
+            return 12.00;
+        } else {
+            return 15.00 + (ceil($distance - 10) * 2); // $2 per km after 10km
+        }
+    }
+
+    /**
+     * Get coordinates from address using Geocoding API
+     * (Kept for backward compatibility if needed elsewhere)
+     */
+    private function getCoordinates($address)
+    {
+        try {
+            // Use Google Maps Geocoding API or similar service
+            $apiKey = config('services.google_maps.api_key');
+            if (!$apiKey) {
+                \Log::warning('Google Maps API key not configured');
+                return null;
+            }
+
+            $address = urlencode($address);
+            $url = "https://maps.googleapis.com/maps/api/geocode/json?address={$address}&key={$apiKey}";
+            
+            $response = file_get_contents($url);
+            $data = json_decode($response, true);
+
+            if ($data['status'] === 'OK' && !empty($data['results'][0]['geometry']['location'])) {
+                $coords = [
+                    'lat' => $data['results'][0]['geometry']['location']['lat'],
+                    'lng' => $data['results'][0]['geometry']['location']['lng']
+                ];
+                \Log::info("Coordinates found for address: {$address} - Lat: {$coords['lat']}, Lng: {$coords['lng']}");
+                return $coords;
+            }
+
+            \Log::warning('Geocoding failed for address: ' . $address . ' - Status: ' . ($data['status'] ?? 'UNKNOWN'));
+            return null;
+
+        } catch (Exception $e) {
+            \Log::error('Geocoding error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+
+
+
+    public function storeByCash11(Request $request)
+    {
+        $request->validate([
+            'meal_orders' => 'required|array|min:1',
+            'meal_orders.*.meal_date' => 'required|date',
+            'meal_orders.*.meal_type_id' => 'required|integer|exists:meal_types,id',
+            'meal_orders.*.product_id' => 'required|integer|exists:products,id',
+            'meal_orders.*.quantity' => 'required|integer|min:1',
+            'meal_orders.*.unit_price' => 'required|numeric|min:0',
+            'meal_orders.*.total_price' => 'required|numeric|min:0',
+            'name' => 'required|string|max:255',
+            'email' => 'required|email',
+            'phone' => 'required|string|max:20',
+            'address1' => 'required|string|max:255',
+            'address2' => 'nullable|string|max:255',
+            'zip_code' => 'required|string|max:20',
+            'country_id' => 'required|integer|exists:countries,id',
+            'county_id' => 'required|integer|exists:counties,id',
+            'city_id' => 'required|integer|exists:cities,id',
+            'delivery_option' => 'required|in:self_pickup,courier',
+            'subtotal' => 'required|numeric|min:0',
+            'tax' => 'required|numeric|min:0',
+            'delivery_charge' => 'required|numeric|min:0',
+            'total_amount' => 'required|numeric|min:0',
+        ]);
+
+        DB::beginTransaction();
+
+        try {
+            $customerId = $request->header('id');
+            $mealOrders = $request->meal_orders;
+            
+            // Group meal items by date
+            $ordersByDate = [];
+            foreach ($mealOrders as $mealOrder) {
+                $mealDate = $mealOrder['meal_date'];
+                if (!isset($ordersByDate[$mealDate])) {
+                    $ordersByDate[$mealDate] = [];
+                }
+                $ordersByDate[$mealDate][] = $mealOrder;
+            }
+
+            $allOrderItems = [];
+            $createdMealOrders = [];
+
+            // Process each date group
+            foreach ($ordersByDate as $mealDate => $dateItems) {
+                // Calculate totals for this date
+                $dateSubtotal = 0;
+                $dateItemsCount = 0;
+                
+                foreach ($dateItems as $item) {
+                    $dateSubtotal += $item['total_price'];
+                    $dateItemsCount++;
+                }
+                
+                $dateTax = $dateSubtotal * 0.1; // 10% tax
+                $dateTotal = $dateSubtotal + $dateTax + $request->delivery_charge;
+
+                // ✅ Create meal order for this date
+                $mealOrder = MealOrder::create([
+                    'customer_id' => $customerId,
+                    'meal_date' => $mealDate,
+                    'order_number' => 'MO-' . Str::upper(Str::random(8)) . '-' . time(),
+                    'status' => 'pending',
+                    'delivery_type' => $request->delivery_option,
+                    'delivery_fee' => $request->delivery_charge,
+                    'subtotal' => $dateSubtotal,
+                    'tax' => $dateTax,
+                    'payable_amount' => $dateTotal,
+                    'paid_amount' => 0, // Cash payment - paid on delivery
+                    'payment_type' => 'cash',
+                    'payment_method' => 'cash',
+                    'payment_status' => 'pending',
+                    'currency' => 'USD',
+                ]);
+
+                $createdMealOrders[] = $mealOrder;
+
+                // ✅ Create shipping address
+                MealShippingAddress::create([
+                    'meal_order_id' => $mealOrder->id,
+                    'name' => $request->name,
+                    'email' => $request->email,
+                    'phone' => $request->phone,
+                    'address1' => $request->address1,
+                    'address2' => $request->address2,
+                    'zip_code' => $request->zip_code,
+                    'country_id' => $request->country_id,
+                    'county_id' => $request->county_id,
+                    'city_id' => $request->city_id,
+                ]);
+
+                $clientOrders = [];
+
+                // ✅ Process each item in this date
+                foreach ($dateItems as $item) {
+                    $product = Product::findOrFail($item['product_id']);
+                    $mealType = MealType::findOrFail($item['meal_type_id']);
+
+                    // ✅ Create MealOrderItem
+                    $orderItem = MealOrderItem::create([
+                        'meal_order_id' => $mealOrder->id,
+                        'client_id' => $product->client_id,
+                        'meal_type_id' => $item['meal_type_id'],
+                        'product_id' => $item['product_id'],
+                        'quantity' => $item['quantity'],
+                        'unit_price' => $item['unit_price'],
+                        'total_price' => $item['total_price'],
+                        'status' => 'pending',
+                    ]);
+
+                    $allOrderItems[] = $orderItem;
+
+                    // Track client orders for ClientMealOrder creation
+                    if (!isset($clientOrders[$product->client_id])) {
+                        $clientOrders[$product->client_id] = [
+                            'subtotal' => 0,
+                            'tax' => 0,
+                        ];
+                    }
+                    $clientOrders[$product->client_id]['subtotal'] += $item['total_price'];
+                    $clientOrders[$product->client_id]['tax'] += $item['total_price'] * 0.1;
+                }
+
+                // ✅ Create ClientMealOrder records for each client
+                foreach ($clientOrders as $clientId => $clientData) {
+                    $clientSubtotal = $clientData['subtotal'];
+                    $clientTax = $clientData['tax'];
+                    $clientTotal = $clientSubtotal + $clientTax;
+
+                    ClientMealOrder::create([
+                        'meal_order_id' => $mealOrder->id,
+                        'client_id' => $clientId,
+                        'subtotal' => $clientSubtotal,
+                        'tax' => $clientTax,
+                        'delivery_fee' => $request->delivery_charge,
+                        'payable_amount' => $clientTotal,
+                        'paid_amount' => 0,
+                        'payment_status' => 'due',
+                        'status' => 'pending',
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Cash meal order placed successfully! Payment will be collected on delivery.',
+                'data' => [
+                    'meal_orders' => $createdMealOrders,
+                    'order_items' => $allOrderItems,
+                    'total_orders' => count($createdMealOrders),
+                    'total_items' => count($allOrderItems),
+                ],
+                'redirect_url' => '/user/meal-order'
+            ], 201);
+
+        } catch (Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'status' => 'failed',
+                'message' => 'Unable to place cash meal order.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function index()
     {
         return view('frontend.pages.meal-order.index');
     }
 
-    public function getList()
+    public function getMealOrders(Request $request)
     {
         try {
-            // Get all meal orders with customer and meal items
+            $customer_id = $request->header('id');
+
             $mealOrders = MealOrder::with(['customer', 'items.mealType'])
-                ->orderBy('order_date', 'desc')
+                ->where('customer_id', $customer_id)
+                ->latest()
                 ->get();
 
-            // Format the data
             $data = $mealOrders->map(function ($order) {
-                $mealTypes = $order->items->pluck('mealType.name')->unique()->implode(', ');
+                $mealTypes = $order->items
+                    ->map(fn($item) => $item->mealType->name ?? null)
+                    ->filter()
+                    ->unique()
+                    ->implode(', ');
+
+                // Total calories for this meal_date
+                $totalCalories = $order->items->sum(function ($item) {
+                    $cal = $item->product->nutrient->calories ?? 0;
+                    return $cal * $item->quantity;
+                });
 
                 return [
                     'id' => $order->id,
                     'customer_name' => trim(($order->customer->firstName ?? '') . ' ' . ($order->customer->lastName ?? '')) ?: '-',
-                    'order_date' => $order->order_date,
-                    'meal_types' => $mealTypes ?: '-',
+                    'meal_date' => $order->meal_date,
+                    'meal_types' => $mealTypes ?: '-', 
+                    'calories' => $totalCalories,  
                 ];
             });
 
@@ -53,250 +755,213 @@ class MealOrderController extends Controller
         }
     }
 
-    public function groupedByMealType(Request $request)
+    public function view()
+    {
+        return view('frontend.pages.meal-order.view');
+    }
+
+    public function getMealOrderDetails($id)
     {
         try {
-            $menus = CustomerMenu::with('mealType')
-                ->orderBy('meal_type_id')
+            $order = MealOrder::with(['items.mealType', 'items.product'])->find($id);
+
+            if (!$order) {
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'Meal order not found.',
+                ], 404);
+            }
+
+            // Total calories
+            $totalCalories = $order->items->sum(function ($item) {
+                return ($item->product->calories ?? 0) * $item->quantity;
+            });
+
+            // Calories by meal type
+            $caloriesByMealType = $order->items->groupBy(function ($item) {
+                return $item->mealType->name ?? 'Other';
+            })->map(function ($group) {
+                return $group->sum(function ($item) {
+                    return ($item->product->calories ?? 0) * $item->quantity;
+                });
+            });
+
+            return response()->json([
+                'status' => 'success',
+                'order' => $order,
+                'total_calories' => $totalCalories,
+                'calories_by_meal_type' => $caloriesByMealType,
+            ], 200);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getDailyCalories(Request $request)
+    {
+        try {
+            $range = $request->range ?? '7days';
+
+            switch ($range) {
+
+                case 'today':
+                    $start = Carbon::today()->startOfDay();
+                    $end = Carbon::today()->endOfDay();
+                    break;
+
+                case 'yesterday':
+                    $start = Carbon::yesterday()->startOfDay();
+                    $end = Carbon::yesterday()->endOfDay();
+                    break;
+
+                case '7days':
+                    $start = Carbon::now()->subDays(6)->startOfDay();
+                    $end = Carbon::now()->endOfDay();
+                    break;
+
+                case '30days':
+                    $start = Carbon::now()->subDays(29)->startOfDay();
+                    $end = Carbon::now()->endOfDay();
+                    break;
+
+                case 'current_month':
+                    $start = Carbon::now()->startOfMonth()->startOfDay();
+                    $end = Carbon::now()->endOfDay();
+                    break;
+
+                case 'last_month':
+                    $start = Carbon::now()->subMonth()->startOfMonth()->startOfDay();
+                    $end = Carbon::now()->subMonth()->endOfMonth()->endOfDay();
+                    break;
+
+                default:
+                    return response()->json([
+                        'status' => 'failed',
+                        'message' => 'Invalid range'
+                    ], 400);
+            }
+
+            $orders = MealOrder::with('items.product')
+                ->whereDate('meal_date', '>=', $start)
+                ->whereDate('meal_date', '<=', $end)
+                ->orderBy('meal_date', 'ASC')
                 ->get();
 
-            // Group menus by meal type
-            $groupedMenus = [];
-            foreach ($menus as $menu) {
-                $groupedMenus[$menu->meal_type_id][] = [
-                    'id' => $menu->id,
-                    'name' => $menu->name,
-                    'description' => $menu->description,
-                ];
+
+            $caloriesUnit = optional(optional($orders->first()->items->first())->product->nutrient)->calories_unit ?? 'kcal';
+
+            $dailyTotals = $orders->groupBy(function ($order) {
+                return Carbon::parse($order->meal_date)->format('Y-m-d');
+            })->map(function ($ordersOnDay) {
+                return $ordersOnDay->sum(function ($order) {
+                    return $order->items->sum(function ($item) {
+                        $cal = $item->product->nutrient->calories ?? 0;
+                        return $cal * $item->quantity;
+                    });
+                });
+            });
+
+            $mealTypeBreakdown = [];
+
+            foreach ($orders as $order) {
+                $date = Carbon::parse($order->meal_date)->format('Y-m-d');
+
+                if (!isset($mealTypeBreakdown[$date])) {
+                    $mealTypeBreakdown[$date] = [];
+                }
+
+                foreach ($order->items as $item) {
+                    $mealType = $item->mealType->name ?? 'Other';
+                    $cal = ($item->product->nutrient->calories ?? 0) * $item->quantity;
+
+                    if (!isset($mealTypeBreakdown[$date][$mealType])) {
+                        $mealTypeBreakdown[$date][$mealType] = 0;
+                    }
+
+                    $mealTypeBreakdown[$date][$mealType] += $cal;
+                }
             }
 
-            return response()->json([
-                'status' => 'success',
-                'data' => $groupedMenus
-            ], 200);
-        } catch (Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    public function create()
-    {
-        return view('frontend.pages.meal-order.create');
-    }
-
-    public function store(Request $request)
-    {
-        // Validate the incoming request
-        $request->validate([
-            'date' => 'required|date',
-            'items' => 'required|array|min:1',
-            'items.*.meal_type_id' => 'required|integer|exists:meal_types,id',
-            'items.*.menu_id' => 'required|integer|exists:customer_menus,id',
-            'items.*.quantity' => 'required|integer|min:1',
-            'items.*.unit_price' => 'nullable|numeric|min:0',
-            'items.*.total_price' => 'nullable|numeric|min:0',
-        ]);
-
-        DB::beginTransaction();
-
-        try {
-            $customerId = $request->header('id'); 
-            $orderDate = $request->date;
-
-            // Check if the customer already has an order for this date
-            $mealOrder = MealOrder::firstOrCreate(
-                ['customer_id' => $customerId, 'order_date' => $orderDate],
-                ['status' => 'pending']
-            );
-
-            // Clear existing items if customer is updating the order
-            //$mealOrder->items()->delete();
-
-            // Prepare items data
-            $itemsData = collect($request->items)->map(function ($item) use ($mealOrder) {
-                $quantity = $item['quantity'] ?? 1;
-                $unitPrice = $item['unit_price'] ?? 0;
-                $totalPrice = $item['total_price'] ?? $quantity * $unitPrice;
-
-                return [
-                    'meal_order_id' => $mealOrder->id,
-                    'meal_type_id' => $item['meal_type_id'],
-                    'menu_id' => $item['menu_id'],
-                    'quantity' => $quantity,
-                    'unit_price' => $unitPrice,
-                    'total_price' => $totalPrice,
-                    'status' => 'pending',
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
-            })->toArray();
-
-            // Insert all items at once
-            MealOrderItem::insert($itemsData);
-
-            DB::commit();
+            $totalCaloriesSum = $dailyTotals->sum();
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Meal order placed successfully.',
-                'data' => $mealOrder->load('items')
-            ], 201);
-
-        } catch (ValidationException $e) {
-            DB::rollBack();
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'Validation Failed',
-                'errors' => $e->errors(),
-            ], 422);
-
-        } catch (Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'Meal order creation failed',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    public function show($id)
-    {
-        try {
-            $order = MealOrder::with(['items', 'items.menu', 'items.mealType', 'customer'])
-                ->findOrFail($id);
-
-            $orderData = [
-                'id' => $order->id,
-                'customer_name' => trim(($order->customer->firstName ?? '') . ' ' . ($order->customer->lastName ?? '')) ?: '-',
-                'order_date' => $order->order_date,
-                'items' => $order->items->map(function ($item) {
-                    return [
-                        'meal_type_id' => $item->meal_type_id,
-                        'menu_id' => $item->menu_id,
-                    ];
-                }),
-            ];
-
-            return response()->json([
-                'status' => 'success',
-                'data' => $orderData
+                'dates' => $dailyTotals->keys()->values(),
+                'calories' => $dailyTotals->values(),
+                'calories_unit' => $caloriesUnit,
+                'total_calories_sum' => $totalCaloriesSum,
+                'meal_type_breakdown' => $mealTypeBreakdown,
             ], 200);
 
         } catch (Exception $e) {
             return response()->json([
                 'status' => 'error',
-                'message' => $e->getMessage()
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
 
-
-    public function edit($id)
+    public function deleteMealOrderItem($itemId)
     {
-        return view('frontend.pages.meal-order.edit');
+        try {
+            $item = MealOrderItem::find($itemId);
+
+            if (!$item) {
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'Meal order item not found.',
+                ], 404);
+            }
+
+            $item->delete();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Meal order item deleted successfully.',
+            ], 200);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
     }
 
-    public function update(Request $request)
+    public function deleteMealOrder($id)
     {
         DB::beginTransaction();
 
         try {
-            // Basic validation
-            $id = $request->input('id');
-            $validated = $request->validate([
-                'date' => 'required|date',
-                'items' => 'required|array|min:1',
-                'items.*.meal_type_id' => 'required|integer|exists:meal_types,id',
-                'items.*.menu_id' => 'required|integer|exists:customer_menus,id',
-                'items.*.quantity' => 'nullable|integer|min:1',
-                'items.*.unit_price' => 'nullable|numeric|min:0',
-                'items.*.total_price' => 'nullable|numeric|min:0',
-            ]);
+            $mealOrder = MealOrder::find($id);
 
-            // Find existing order
-            $order = MealOrder::findOrFail($id);
-
-            // Update order info
-            $order->order_date = $validated['date'];
-            $order->save();
-
-            // Delete old items before inserting updated ones
-            MealOrderItem::where('meal_order_id', $order->id)->delete();
-
-            // Reinsert all new order items
-            foreach ($validated['items'] as $item) {
-                MealOrderItem::create([
-                    'meal_order_id' => $order->id,
-                    'meal_type_id' => $item['meal_type_id'],
-                    'menu_id' => $item['menu_id'],
-                    'quantity' => $item['quantity'] ?? 1,
-                    'unit_price' => $item['unit_price'] ?? 0,
-                    'total_price' => $item['total_price'] ?? 0,
-                ]);
+            if (!$mealOrder) {
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'Meal order not found.',
+                ], 404);
             }
+
+            $mealOrder->items()->delete();
+            $mealOrder->delete();
 
             DB::commit();
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Meal order updated successfully.',
-                'data' => [
-                    'order_id' => $order->id,
-                    'order_date' => $order->order_date,
-                    'items_count' => count($validated['items']),
-                ]
+                'message' => 'Meal order and related items deleted successfully.',
             ], 200);
-
-        } catch (ValidationException $e) {
-            DB::rollBack();
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'Validation failed.',
-                'errors' => $e->errors(),
-            ], 422);
-
-        } catch (ModelNotFoundException $e) {
-            DB::rollBack();
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'Meal order not found.',
-            ], 404);
 
         } catch (Exception $e) {
             DB::rollBack();
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'Meal order update failed.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    public function delete(Request $request)
-    {
-        try {
-            $mealType = MealType::findOrFail($request->id);
-            $mealType->delete();
 
             return response()->json([
-                'status' => 'success',
-                'message' => 'Meal type deleted successfully.',
-            ], 200);
-
-        } catch (ModelNotFoundException $e) {
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'Meal type not found.',
-                'error' => $e->getMessage(),
-            ], 404);
-        } catch (Exception $e) {
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'Meal type deletion failed.',
+                'status' => 'error',
+                'message' => 'Failed to delete meal order.',
                 'error' => $e->getMessage(),
             ], 500);
         }

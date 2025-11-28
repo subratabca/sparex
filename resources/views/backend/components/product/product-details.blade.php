@@ -35,7 +35,8 @@ async function productDetailsInfo() {
         let res = await axios.get("/admin/product/info/" + id);
         if (res.status === 200 && res.data.status === 'success') {
             let product = res.data.data;
-
+            let formattedProductName = product.name.replace(/\b\w/g, c => c.toUpperCase());
+            const nutrients = res.data.nutrients;
             const publishBtn = document.getElementById('status-update-btn');
             if (publishBtn) {
                 if (product.status === 'pending') {
@@ -65,7 +66,7 @@ async function productDetailsInfo() {
                             <div class="card-body">
                                 <div class="text-center mb-4">
                                     <img src="${imagePath}" alt="${product.name}" class="w-px-150 mb-3 rounded" />
-                                    <h4 class="mb-2">${product.name}</h4>
+                                    <h4 class="mb-2">${formattedProductName}</h4>
                                     <div class="fs-3 ${hasDiscount ? 'text-danger' : 'text-primary'}">
                                         £${hasDiscount ? discountPrice : price}
                                         ${hasDiscount ? `<small class="text-muted text-decoration-line-through ms-2 fs-6">£${price}</small>` : ''}
@@ -112,7 +113,7 @@ async function productDetailsInfo() {
                             <h5>Description:</h5>
                             ${product.description}
                         </div><hr>
-                        ${product.category.name === 'Food' ? `
+                        ${product.category.name === 'food' ? `
                         <div class="mb-3">
                             <h5>Collection Information:</h5>
                             <p class="mb-1">Date: ${new Date(product.collection_date).toLocaleDateString()}</p>
@@ -126,6 +127,36 @@ async function productDetailsInfo() {
                             <p class="mb-1">${product.city.name}, ${product.county.name}, ${product.country.name}</p>
                             <p class="mb-1">Postcode: ${product.zip_code}</p>
                         </div><hr>
+
+                        ${nutrients ? `
+                        <div class="mb-3">
+                            <h5>Nutrient Information:</h5>
+                            <table class="table table-bordered">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Nutrient</th>
+                                        <th>Value</th>
+                                        <th>Unit</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${nutrients.calories ? `<tr><td>Calories</td><td>${nutrients.calories}</td><td>${nutrients.calories_unit}</td></tr>` : ''}
+                                    ${nutrients.protein ? `<tr><td>Protein</td><td>${nutrients.protein}</td><td>${nutrients.protein_unit}</td></tr>` : ''}
+                                    ${nutrients.fat ? `<tr><td>Fat</td><td>${nutrients.fat}</td><td>${nutrients.fat_unit}</td></tr>` : ''}
+                                    ${nutrients.carbohydrates ? `<tr><td>Carbohydrates</td><td>${nutrients.carbohydrates}</td><td>${nutrients.carbohydrates_unit}</td></tr>` : ''}
+                                    ${nutrients.fiber ? `<tr><td>Fiber</td><td>${nutrients.fiber}</td><td>${nutrients.fiber_unit}</td></tr>` : ''}
+                                    ${nutrients.sugar ? `<tr><td>Sugar</td><td>${nutrients.sugar}</td><td>${nutrients.sugar_unit}</td></tr>` : ''}
+                                    ${nutrients.cholesterol ? `<tr><td>Cholesterol</td><td>${nutrients.cholesterol}</td><td>${nutrients.cholesterol_unit}</td></tr>` : ''}
+                                    ${nutrients.sodium ? `<tr><td>Sodium</td><td>${nutrients.sodium}</td><td>${nutrients.sodium_unit}</td></tr>` : ''}
+                                    ${nutrients.vitamin_a ? `<tr><td>Vitamin A</td><td>${nutrients.vitamin_a}</td><td>${nutrients.vitamin_a_unit}</td></tr>` : ''}
+                                    ${nutrients.vitamin_c ? `<tr><td>Vitamin C</td><td>${nutrients.vitamin_c}</td><td>${nutrients.vitamin_c_unit}</td></tr>` : ''}
+                                    ${nutrients.calcium ? `<tr><td>Calcium</td><td>${nutrients.calcium}</td><td>${nutrients.calcium_unit}</td></tr>` : ''}
+                                    ${nutrients.iron ? `<tr><td>Iron</td><td>${nutrients.iron}</td><td>${nutrients.iron_unit}</td></tr>` : ''}
+                                </tbody>
+                            </table>
+                        </div><hr>
+                        ` : ''}
+
                         ${product.has_variants ? `
                         <div class="mb-3">
                             <h5>Variants:</h5>

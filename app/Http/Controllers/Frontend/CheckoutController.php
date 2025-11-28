@@ -21,33 +21,6 @@ class CheckoutController extends Controller
         return view('frontend.pages.checkout.checkout-page');
     }
 
-    public function getAuthUserInfo(Request $request)
-    {
-        try {
-            $email = $request->header('email');
-
-            if (!$email) {
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'Unauthorized! Need to login.'
-                ], 400);
-            }
-
-            $user = User::where('email', $email)->first();
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Request Successful',
-                'data' => $user,
-            ], 200);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'status' => 'failed',
-                'message' => $e->getMessage()
-            ], 500);
-        }
-    }
-
     public function getShippingAddressInfo(Request $request)
     {
         try {
