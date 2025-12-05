@@ -203,12 +203,18 @@ Route::prefix('user')->middleware([TokenVerificationMiddleware::class])->group(f
     Route::controller(MealOrderController::class)->group(function () {
         Route::post('/store/meal-order/by/cash','storeByCash');
         Route::post('/store/meal-order/by/credit','storeByCredit');
-        Route::post('/store/meal-order/by/stripe','store');
+        Route::post('/store/meal-order/by/stripe','storeByStripe');
+
+        Route::post('/create-payment-intent', 'createPaymentIntent');
+        //Route::post('/stripe/webhook', 'handleStripeWebhook')->withoutMiddleware([TokenVerificationMiddleware::class]);
         
         Route::get('/meal-order','index')->name('meal.order');
         Route::get('/get/meal-order','getMealOrders');
         Route::get('/meal-order/details/{meal_order_id}','view');
         Route::get('/get/meal-order/details/{meal_order_id}','getMealOrderDetails');
+
+        Route::get('/meal-order/{order_id}/date/{date}', 'viewOrderDetailsByDate');
+        Route::get('/get/meal-order/{order_id}/date/{date}', 'getMealOrderDetailsByDate');
 
         Route::get('/get/calories/history', 'getDailyCalories');
 
@@ -256,7 +262,7 @@ Route::prefix('user')->middleware([TokenVerificationMiddleware::class])->group(f
 
     Route::controller(PaymentController::class)->group(function () {
         Route::post('/stripe/order','stripeOrder')->name('stripe.order');
-        Route::post('/create-payment-intent', 'createPaymentIntent');
+        //Route::post('/create-payment-intent', 'createPaymentIntent');
         Route::post('/cash/order', 'cashOrder')->name('cash.order');
 
         Route::get('/order-confirmation/{orderId}', 'orderConfirmationPage')->name('order.confirmation');

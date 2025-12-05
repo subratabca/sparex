@@ -4,7 +4,7 @@
         <div class="modal-content border-0 shadow-lg">
             
             <div class="modal-header bg-info text-white">
-                <h5 class="modal-title fw-semibold" id="creditLimitModalLabel">Add Credit Limit</h5>
+                <h5 class="modal-title fw-semibold" id="creditLimitModalLabel">Add Credit Limit2222</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
 

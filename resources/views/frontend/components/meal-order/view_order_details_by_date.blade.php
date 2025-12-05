@@ -3,20 +3,20 @@
 <div class="container">
     <div class="card shadow-sm border-0 mt-3">
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-            <h5 class="mb-0"><i class="mdi mdi-silverware-fork-knife me-2"></i>Meal Order Details</h5>
+            <h5 class="mb-0"><i class="mdi mdi-silverware-fork-knife me-2"></i>Meal Order Date Details</h5>
             <a href="{{ url()->previous() }}" class="btn btn-light btn-sm">
                 <i class="mdi mdi-arrow-left me-1"></i> Back
             </a>
         </div>
         <div class="card-body">
-            <!-- Order Header -->
+            <!-- Date Header -->
             <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
                 <div>
-                    <h4 class="mb-1" id="mealPlanTitle">Order Details</h4>
-                    <p class="mb-0 text-muted" id="orderNumberText"></p>
+                    <h4 class="mb-1" id="datePlanTitle">Date Details</h4>
+                    <p class="mb-0 text-muted" id="dateNumberText"></p>
                 </div>
                 <div>
-                    <span class="badge bg-success fs-6" id="orderStatusText"></span>
+                    <span class="badge bg-info fs-6" id="selectedDateText"></span>
                 </div>
             </div>
 <!-- Calories Statistics Card -->
@@ -49,11 +49,10 @@
         </div>
     </div>
 </div>
-
             <div class="row">
-                <!-- Order Items (Left) -->
+                <!-- Date Items (Left) -->
                 <div class="col-lg-8 mb-4">
-                    <div class="accordion" id="mealOrderAccordion"></div>
+                    <div class="accordion" id="mealDateAccordion"></div>
                 </div>
 
                 <!-- Summary & Address (Right) -->
@@ -74,15 +73,18 @@ let mealTypeBreakdown = {};
 let currentRange = '7days';
 
 document.addEventListener('DOMContentLoaded', async function() {
-    await loadMealOrderDetails();
+    await loadMealOrderDetailsByDate();
     await loadDailyCalories("7days");
 });
 
-async function loadMealOrderDetails() {
+async function loadMealOrderDetailsByDate() {
     try {
         showLoader();
-        const orderId = window.location.pathname.split('/').pop();
-        const response = await axios.get(`/user/get/meal-order/details/${orderId}`);
+        const pathSegments = window.location.pathname.split('/');
+        const orderId = pathSegments[pathSegments.length - 3];
+        const date = pathSegments[pathSegments.length - 1];
+        
+        const response = await axios.get(`/user/get/meal-order/${orderId}/date/${date}`);
 
         if (response.status === 200 && response.data.status === 'success') {
             const mealCart = response.data.data.meal_cart;
@@ -90,91 +92,87 @@ async function loadMealOrderDetails() {
             const nutrition = response.data.data.nutrition;
             const shippingAddress = response.data.data.shipping_address;
             const order = response.data.data.order;
+            const selectedDate = response.data.data.selected_date;
+
+            // Format date for display
+            const formattedDate = new Date(selectedDate).toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
 
             // Update header information
-            document.getElementById('mealPlanTitle').textContent = `Order #${order.order_number}`;
-            document.getElementById('orderNumberText').textContent = `${summary.total_items} items • ${order.status}`;
-            document.getElementById('orderStatusText').textContent = order.status;
+            document.getElementById('datePlanTitle').textContent = `Order #${order.order_number} - ${formattedDate}`;
+            document.getElementById('dateNumberText').textContent = `${summary.total_items} items`;
+            document.getElementById('selectedDateText').textContent = formattedDate;
 
-            renderMealOrderItems(mealCart);
+            renderMealDateItems(mealCart);
             renderMealSummary(summary);
             renderNutritionSummary(nutrition);
             renderShippingAddress(shippingAddress);
         } else {
-            document.getElementById('mealOrderAccordion').innerHTML = `<div class="alert alert-info">Order not found.</div>`;
+            document.getElementById('mealDateAccordion').innerHTML = `<div class="alert alert-info">Date details not found.</div>`;
         }
     } catch (error) {
         console.error(error);
-        errorToast('Failed to load order details');
+        errorToast('Failed to load date details');
     } finally {
         hideLoader();
     }
 }
 
-function renderMealOrderItems(mealCart) {
-    const container = document.getElementById('mealOrderAccordion');
+function renderMealDateItems(mealCart) {
+    const container = document.getElementById('mealDateAccordion');
     container.innerHTML = '';
 
-    const dates = Object.keys(mealCart);
-    if (dates.length === 0) {
-        container.innerHTML = `<div class="alert alert-info">No items found in this order.</div>`;
+    const mealTypes = Object.keys(mealCart);
+    if (mealTypes.length === 0) {
+        container.innerHTML = `<div class="alert alert-info">No items found for this date.</div>`;
         return;
     }
 
-    dates.forEach((date, index) => {
-        const dayItems = mealCart[date];
-        const collapseId = `mealDay${index}`;
+    mealTypes.forEach((mealType, index) => {
+        const items = mealCart[mealType];
+        const collapseId = `mealType${index}`;
 
-        const formattedDate = new Date(date).toLocaleDateString('en-US', {
-            weekday: 'long',
-            month: 'short',
-            day: 'numeric'
-        });
-
-        const mealTypes = Object.keys(dayItems);
-        let mealTypeHtml = '';
-
-        mealTypes.forEach(type => {
-            const typeTitle = toTitleCase(type);
-            const items = dayItems[type];
-
-            mealTypeHtml += `<h6 class="mt-3 text-primary">${typeTitle} (${items.length} items)</h6><ul class="list-group mb-3">`;
-
-            items.forEach(item => {
-                const productName = toTitleCase(item.product?.name || '');
-                const img = item.product?.image ? `/upload/product/small/${item.product.image}` : '/upload/no_image.jpg';
-                const clientName = item.client ? `${item.client.firstName} ${item.client.lastName}` : 'Unknown Provider';
-
-                mealTypeHtml += `
-                    <li class="list-group-item">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div class="d-flex align-items-center gap-3">
-                                <img src="${img}" alt="${productName}" class="rounded" style="width:60px;height:60px;object-fit:cover;">
-                                <div>
-                                    <strong>${productName}</strong><br>
-                                    <small class="text-muted">$${parseFloat(item.unit_price || 0).toFixed(2)} each × ${item.quantity || 0}</small><br>
-                                    <small class="text-info">Provider: ${clientName}</small>
+        const mealTypeHtml = `
+            <h6 class="text-primary mb-3">${toTitleCase(mealType)} (${items.length} items)</h6>
+            <ul class="list-group mb-3">
+                ${items.map(item => {
+                    const productName = toTitleCase(item.product?.name || '');
+                    const img = item.product?.image ? `/upload/product/small/${item.product.image}` : '/upload/no_image.jpg';
+                    const clientName = item.client ? `${item.client.firstName} ${item.client.lastName}` : 'Unknown Provider';
+                    
+                    return `
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <div class="d-flex align-items-center gap-3">
+                                    <img src="${img}" alt="${productName}" class="rounded" style="width:60px;height:60px;object-fit:cover;">
+                                    <div>
+                                        <strong>${productName}</strong><br>
+                                        <small class="text-muted">$${parseFloat(item.unit_price || 0).toFixed(2)} each × ${item.quantity || 0}</small><br>
+                                        <small class="text-info">Provider: ${clientName}</small>
+                                    </div>
+                                </div>
+                                <div class="text-end">
+                                    <strong>$${parseFloat(item.total_price || 0).toFixed(2)}</strong>
                                 </div>
                             </div>
-                            <div class="text-end">
-                                <strong>$${parseFloat(item.total_price || 0).toFixed(2)}</strong>
-                            </div>
-                        </div>
-                    </li>
-                `;
-            });
-
-            mealTypeHtml += '</ul>';
-        });
+                        </li>
+                    `;
+                }).join('')}
+            </ul>
+        `;
 
         const block = `
             <div class="accordion-item shadow-sm mb-3">
                 <h2 class="accordion-header">
                     <button class="accordion-button ${index !== 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
-                        ${formattedDate}
+                        ${toTitleCase(mealType)}
                     </button>
                 </h2>
-                <div id="${collapseId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#mealOrderAccordion">
+                <div id="${collapseId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#mealDateAccordion">
                     <div class="accordion-body">${mealTypeHtml}</div>
                 </div>
             </div>
@@ -184,6 +182,7 @@ function renderMealOrderItems(mealCart) {
     });
 }
 
+// Reuse the same render functions from your main order details page
 function renderMealSummary(summary) {
     const container = document.getElementById('meal-summary');
     if (!summary) {
@@ -191,10 +190,10 @@ function renderMealSummary(summary) {
         return;
     }
     
-    // Convert to numbers to ensure toFixed works
     const subtotal = parseFloat(summary.subtotal || 0);
     const tax = parseFloat(summary.tax || 0);
-    const deliveryFee = parseFloat(summary.delivery_fee || 0);
+    const taxRate = parseFloat(summary.tax_rate || 20); // Default to 20% if not provided
+    const deliveryCharge = parseFloat(summary.delivery_charge || 0);
     const total = parseFloat(summary.total || 0);
     
     container.innerHTML = `
@@ -203,13 +202,11 @@ function renderMealSummary(summary) {
             <li class="list-group-item d-flex justify-content-between">
                 Subtotal: <span>$${subtotal.toFixed(2)}</span>
             </li>
-            ${deliveryFee > 0 ? `
             <li class="list-group-item d-flex justify-content-between">
-                Delivery Fee: <span>$${deliveryFee.toFixed(2)}</span>
+                Delivery Charge: <span>$${deliveryCharge.toFixed(2)}</span>
             </li>
-            ` : ''}
             <li class="list-group-item d-flex justify-content-between">
-                Tax: <span>$${tax.toFixed(2)}</span>
+                Tax (${taxRate}%): <span>$${tax.toFixed(2)}</span>
             </li>
             <li class="list-group-item d-flex justify-content-between fw-bold">
                 Total: <span>$${total.toFixed(2)}</span>
@@ -470,22 +467,6 @@ function toTitleCase(str) {
     if (!str) return "";
     return str.trim().toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
 }
-
-// Utility functions (make sure these exist in your global scope)
-function showLoader() {
-    // Implement your loader show logic
-    console.log('Loading...');
-}
-
-function hideLoader() {
-    // Implement your loader hide logic
-    console.log('Loading complete');
-}
-
-function errorToast(message) {
-    // Implement your toast notification
-    alert('Error: ' + message);
-}
 </script>
 
 <style>
@@ -499,6 +480,15 @@ function errorToast(message) {
 .accordion-button:not(.collapsed) {
     background-color: #e3f2fd;
     color: #0d6efd;
+}
+.date-link {
+    color: #0d6efd;
+    text-decoration: none;
+    font-weight: 500;
+}
+.date-link:hover {
+    color: #0a58ca;
+    text-decoration: underline;
 }
 </style>
 @endsection

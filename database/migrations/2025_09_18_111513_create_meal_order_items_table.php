@@ -21,7 +21,6 @@ return new class extends Migration
             $table->integer('quantity')->unsigned()->default(1);
             $table->decimal('unit_price', 10, 2);
             $table->decimal('total_price', 10, 2);
-            $table->enum('status', ['pending','approved','delivered','canceled','returned'])->default('pending');
             $table->timestamps();
         });
     }

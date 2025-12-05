@@ -258,6 +258,10 @@ let summary = {};
 let deliveryCharge = 0; 
 let userEmail = "";
 let userCreditBalance = 0;
+let stripe = null;
+let cardElement = null;
+let elements = null;
+let countryCodeMap = {}; // Store country codes
 
 function toTitleCase(str) {
     if (!str) return "";
@@ -265,6 +269,41 @@ function toTitleCase(str) {
 }
 
 document.addEventListener("DOMContentLoaded", async function () {
+    // Initialize Stripe with your publishable key
+    stripe = Stripe('pk_test_51JHjNRSDYO1wlylS2t9Mdffvf6gXo7BhEkupXMj17tAoMteZHKKlP1ZooX6eaEZjOf6SHp8rJ2141rsuapAFLB3i00vysBKwyd');
+    
+    // Create Stripe Elements
+    elements = stripe.elements();
+    const style = {
+        base: {
+            color: '#32325d',
+            fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
+            fontSmoothing: 'antialiased',
+            fontSize: '16px',
+            '::placeholder': { color: '#aab7c4' }
+        },
+        invalid: { color: '#fa755a', iconColor: '#fa755a' }
+    };
+
+    cardElement = elements.create('card', { 
+        style: style,
+        hidePostalCode: true
+    });
+    
+    cardElement.mount('#card-element');
+
+    // Handle real-time validation errors
+    cardElement.on('change', (event) => {
+        const displayError = document.getElementById('card-errors');
+        if (event.error) {
+            displayError.textContent = event.error.message;
+            displayError.style.color = '#dc3545';
+            displayError.style.display = 'block';
+        } else {
+            displayError.textContent = '';
+            displayError.style.display = 'none';
+        }
+    });
 
     try {
         showLoader();
@@ -317,6 +356,221 @@ async function loadMealCart() {
     }
 }
 
+// Function to get country code from country name
+function getCountryCode(countryName) {
+    const countryCodes = {
+        'United States': 'US',
+        'United Kingdom': 'GB',
+        'Canada': 'CA',
+        'Australia': 'AU',
+        'Germany': 'DE',
+        'France': 'FR',
+        'Spain': 'ES',
+        'Italy': 'IT',
+        'Japan': 'JP',
+        'China': 'CN',
+        'India': 'IN',
+        'Brazil': 'BR',
+        'Mexico': 'MX',
+        'Russia': 'RU',
+        'South Korea': 'KR',
+        'Netherlands': 'NL',
+        'Switzerland': 'CH',
+        'Sweden': 'SE',
+        'Norway': 'NO',
+        'Denmark': 'DK',
+        'Finland': 'FI',
+        'Ireland': 'IE',
+        'Poland': 'PL',
+        'Portugal': 'PT',
+        'Austria': 'AT',
+        'Belgium': 'BE',
+        'Greece': 'GR',
+        'Turkey': 'TR',
+        'Saudi Arabia': 'SA',
+        'United Arab Emirates': 'AE',
+        'South Africa': 'ZA',
+        'Egypt': 'EG',
+        'Nigeria': 'NG',
+        'Kenya': 'KE',
+        'Argentina': 'AR',
+        'Chile': 'CL',
+        'Colombia': 'CO',
+        'Peru': 'PE',
+        'Venezuela': 'VE',
+        'New Zealand': 'NZ',
+        'Singapore': 'SG',
+        'Malaysia': 'MY',
+        'Thailand': 'TH',
+        'Vietnam': 'VN',
+        'Philippines': 'PH',
+        'Indonesia': 'ID',
+        'Pakistan': 'PK',
+        'Bangladesh': 'BD',
+        'Sri Lanka': 'LK',
+        'Israel': 'IL',
+        'Iran': 'IR',
+        'Iraq': 'IQ',
+        'Afghanistan': 'AF',
+        'England': 'GB', // England is part of United Kingdom
+        'Scotland': 'GB', // Scotland is part of United Kingdom
+        'Wales': 'GB', // Wales is part of United Kingdom
+        'Northern Ireland': 'GB' // Northern Ireland is part of United Kingdom
+    };
+    
+    return countryCodes[countryName] || '';
+}
+
+async function loadCountries(selectedId = '') {
+    const response = await axios.get('/countries');
+    const dropdown = document.getElementById('country');
+    dropdown.innerHTML = '<option value="" disabled>Select Country</option>';
+    
+    response.data.data.forEach(country => {
+        const option = new Option(country.name, country.id);
+        option.selected = country.id === selectedId;
+        option.dataset.countryCode = country.country_code || getCountryCode(country.name);
+        dropdown.add(option);
+        countryCodeMap[country.id] = country.country_code || getCountryCode(country.name);
+    });
+}
+
+async function loadCounties(countryId, selectedId = '') {
+    const dropdown = document.getElementById('county');
+    dropdown.innerHTML = '<option value="" disabled>Select County</option>';
+    
+    if (countryId) {
+        const response = await axios.get(`/counties/${countryId}`);
+        response.data.data.forEach(county => {
+            const option = new Option(county.name, county.id);
+            option.selected = county.id === selectedId;
+            dropdown.add(option);
+        });
+    }
+}
+
+async function loadCities(countyId, selectedId = '') {
+    const dropdown = document.getElementById('city');
+    dropdown.innerHTML = '<option value="" disabled>Select City</option>';
+    
+    if (countyId) {
+        const response = await axios.get(`/cities/${countyId}`);
+        response.data.data.forEach(city => {
+            const option = new Option(city.name, city.id);
+            option.selected = city.id === selectedId;
+            dropdown.add(option);
+        });
+    }
+}
+
+async function checkExistingAddresses(email) {
+    try {
+        const response = await axios.get('/user/meal/shipping-addresses', {
+            headers: { 'email': email }
+        });
+        
+        if (response.data.data.length > 0) {
+            setupAddressCheckbox();
+        }
+    } catch (error) {
+        console.error('Error checking addresses:', error);
+    }
+}
+
+function setupAddressCheckbox() {
+    const checkbox = document.getElementById('existingAddress');
+    
+    checkbox.addEventListener('change', async function() {
+        try {
+            if (this.checked) {
+                const response = await axios.get('/user/meal/shipping-addresses');
+                if (response.data.data.length > 0) {
+                    const latestAddress = response.data.data[0];
+                    populateAddressForm(latestAddress);
+
+                    if (document.getElementById('courier').checked) {
+                        await recalcDeliveryCharge(latestAddress.city_id);
+                    }
+                }
+            } else {
+                const response = await axios.get('/user/get/profile/info');
+                populateAddressForm(response.data.data);
+
+                if (document.getElementById('courier').checked) {
+                    await recalcDeliveryCharge(response.data.data.city_id);
+                }
+            }
+        } catch (error) {
+            console.error("Error toggling address:", error);
+        }
+    });
+}
+
+function populateAddressForm(address) {
+    document.getElementById('billings-name').value = address.name;
+    document.getElementById('billings-email').value = address.email;
+    document.getElementById('billings-phone').value = address.phone;
+    document.getElementById('billings-address1').value = address.address1;
+    document.getElementById('billings-address2').value = address.address2;
+    document.getElementById('billings-zip_code').value = address.zip_code;
+
+    // Update geographical dropdowns
+    loadCountries(address.country_id).then(() => {
+        loadCounties(address.country_id, address.county_id).then(() => {
+            loadCities(address.county_id, address.city_id);
+        });
+    });
+}
+
+async function initializeAddressForm(userData) {
+    document.getElementById('billings-name').value = `${userData.firstName} ${userData.lastName}`;
+    document.getElementById('billings-email').value = userData.email;
+    document.getElementById('billings-phone').value = userData.mobile;
+    document.getElementById('billings-address1').value = userData.address1;
+    document.getElementById('billings-address2').value = userData.address2;
+    document.getElementById('billings-zip_code').value = userData.zip_code;
+
+    await loadCountries(userData.country_id);
+    await loadCounties(userData.country_id, userData.county_id);
+    await loadCities(userData.county_id, userData.city_id);
+
+    // 👇 Country change
+    document.getElementById('country').addEventListener('change', async function () {
+        await loadCounties(this.value);
+        document.getElementById('city').innerHTML = '<option value="">Select City</option>';
+        await recalcCourierChargeIfNeeded();
+        updateCourierAvailability();
+    });
+
+    // 👇 County change
+    document.getElementById('county').addEventListener('change', async function () {
+        await loadCities(this.value);
+        await recalcCourierChargeIfNeeded();
+        updateCourierAvailability();
+    });
+
+    // 👇 City change
+    document.getElementById('city').addEventListener('change', () => {
+        recalcCourierChargeIfNeeded();
+        updateCourierAvailability();
+    });
+
+    // 👇 Address1 required for enabling courier
+    document.getElementById('billings-address1').addEventListener('input', () => {
+        recalcCourierChargeIfNeeded();
+        updateCourierAvailability();
+    });
+
+    // 👇 Zip code required for enabling courier
+    document.getElementById('billings-zip_code').addEventListener('input', () => {
+        recalcCourierChargeIfNeeded();
+        updateCourierAvailability();
+    });
+
+    // Initial check when page loads
+    updateCourierAvailability();
+}
+
 function renderMealCart(mealCart) {
     const container = document.getElementById('mealCartAccordion');
     container.innerHTML = '';
@@ -365,32 +619,31 @@ function renderMealCart(mealCart) {
                       )
                     : "";
 
-                    // In renderMealCart function, update the meal item HTML to include data attributes:
-                    mealTypeHtml += `
-                        <li class="list-group-item d-flex justify-content-between align-items-center"
-                            data-product-id="${item.product?.id}"
-                            data-meal-type-id="${item.meal_type?.id}"
-                            data-client-id="${item.client?.id || ''}">
-                            <div class="d-flex align-items-center gap-3">
-                                <img src="${img}" alt="${productName}"
-                                    class="rounded" style="width:60px;height:60px;object-fit:cover;">
-                                <div>
-                                    <strong>${productName}</strong><br>
-                                    $${parseFloat(item.unit_price).toFixed(2)}<br>
-                                    ${clientName ? `<small class="text-muted">Provider: ${clientName}</small>` : ''}
-                                </div>
+                mealTypeHtml += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center"
+                        data-product-id="${item.product?.id}"
+                        data-meal-type-id="${item.meal_type?.id}"
+                        data-client-id="${item.client?.id || ''}">
+                        <div class="d-flex align-items-center gap-3">
+                            <img src="${img}" alt="${productName}"
+                                class="rounded" style="width:60px;height:60px;object-fit:cover;">
+                            <div>
+                                <strong>${productName}</strong><br>
+                                $${parseFloat(item.unit_price).toFixed(2)}<br>
+                                ${clientName ? `<small class="text-muted">Provider: ${clientName}</small>` : ''}
                             </div>
+                        </div>
 
-                            <div class="d-flex align-items-center gap-2">
-                                <input type="number"
-                                    class="form-control form-control-sm w-25"
-                                    value="${item.quantity}" min="1"
-                                    onchange="updateMealItem(${item.id}, this.value)">
-                                <button class="btn btn-sm btn-outline-danger"
-                                    onclick="removeMealItem(${item.id})">&times;</button>
-                            </div>
-                        </li>
-                    `;
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="number"
+                                class="form-control form-control-sm w-25"
+                                value="${item.quantity}" min="1"
+                                onchange="updateMealItem(${item.id}, this.value)">
+                            <button class="btn btn-sm btn-outline-danger"
+                                onclick="removeMealItem(${item.id})">&times;</button>
+                        </div>
+                    </li>
+                `;
             });
 
             mealTypeHtml += `</ul>`;
@@ -445,154 +698,6 @@ async function removeMealItem(id) {
     } catch (error) {
         errorToast('Failed to remove item');
     }
-}
-
-async function initializeAddressForm(userData) {
-    document.getElementById('billings-name').value = `${userData.firstName} ${userData.lastName}`;
-    document.getElementById('billings-email').value = userData.email;
-    document.getElementById('billings-phone').value = userData.mobile;
-    document.getElementById('billings-address1').value = userData.address1;
-    document.getElementById('billings-address2').value = userData.address2;
-    document.getElementById('billings-zip_code').value = userData.zip_code;
-
-    await loadCountries(userData.country_id);
-    await loadCounties(userData.country_id, userData.county_id);
-    await loadCities(userData.county_id, userData.city_id);
-
-    // 👇 Country change
-    document.getElementById('country').addEventListener('change', async function () {
-        await loadCounties(this.value);
-        document.getElementById('city').innerHTML = '<option value="">Select City</option>';
-        await recalcCourierChargeIfNeeded();
-        updateCourierAvailability();
-    });
-
-    // 👇 County change
-    document.getElementById('county').addEventListener('change', async function () {
-        await loadCities(this.value);
-        await recalcCourierChargeIfNeeded();
-        updateCourierAvailability();
-    });
-
-    // 👇 City change
-    document.getElementById('city').addEventListener('change', () => {
-        recalcCourierChargeIfNeeded();
-        updateCourierAvailability();
-    });
-
-    // 👇 Address1 required for enabling courier
-    document.getElementById('billings-address1').addEventListener('input', () => {
-        recalcCourierChargeIfNeeded();
-        updateCourierAvailability();
-    });
-
-    // 👇 Zip code required for enabling courier
-    document.getElementById('billings-zip_code').addEventListener('input', () => {
-        recalcCourierChargeIfNeeded();
-        updateCourierAvailability();
-    });
-
-    // Initial check when page loads
-    updateCourierAvailability();
-}
-
-async function loadCountries(selectedId = '') {
-  const response = await axios.get('/countries');
-  const dropdown = document.getElementById('country');
-  dropdown.innerHTML = '<option value="" disabled>Select Country</option>';
-  
-  response.data.data.forEach(country => {
-    const option = new Option(country.name, country.id);
-    option.selected = country.id === selectedId;
-    dropdown.add(option);
-  });
-}
-
-async function loadCounties(countryId, selectedId = '') {
-  const dropdown = document.getElementById('county');
-  dropdown.innerHTML = '<option value="" disabled>Select County</option>';
-  
-  if (countryId) {
-    const response = await axios.get(`/counties/${countryId}`);
-    response.data.data.forEach(county => {
-      const option = new Option(county.name, county.id);
-      option.selected = county.id === selectedId;
-      dropdown.add(option);
-    });
-  }
-}
-
-async function loadCities(countyId, selectedId = '') {
-  const dropdown = document.getElementById('city');
-  dropdown.innerHTML = '<option value="" disabled>Select City</option>';
-  
-  if (countyId) {
-    const response = await axios.get(`/cities/${countyId}`);
-    response.data.data.forEach(city => {
-      const option = new Option(city.name, city.id);
-      option.selected = city.id === selectedId;
-      dropdown.add(option);
-    });
-  }
-}
-
-async function checkExistingAddresses(email) {
-  try {
-    const response = await axios.get('/user/meal/shipping-addresses', {
-      headers: { 'email': email }
-    });
-    
-    if (response.data.data.length > 0) {
-      setupAddressCheckbox();
-    }
-  } catch (error) {
-    console.error('Error checking addresses:', error);
-  }
-}
-
-function setupAddressCheckbox() {
-  const checkbox = document.getElementById('existingAddress');
-  
-  checkbox.addEventListener('change', async function() {
-    try {
-      if (this.checked) {
-        const response = await axios.get('/user/meal/shipping-addresses');
-        if (response.data.data.length > 0) {
-          const latestAddress = response.data.data[0];
-          populateAddressForm(latestAddress);
-
-          if (document.getElementById('courier').checked) {
-            await recalcDeliveryCharge(latestAddress.city_id);
-          }
-        }
-      } else {
-        const response = await axios.get('/user/get/profile/info');
-        populateAddressForm(response.data.data);
-
-        if (document.getElementById('courier').checked) {
-          await recalcDeliveryCharge(response.data.data.city_id);
-        }
-      }
-    } catch (error) {
-      console.error("Error toggling address:", error);
-    }
-  });
-}
-
-function populateAddressForm(address) {
-  document.getElementById('billings-name').value = address.name;
-  document.getElementById('billings-email').value = address.email;
-  document.getElementById('billings-phone').value = address.phone;
-  document.getElementById('billings-address1').value = address.address1;
-  document.getElementById('billings-address2').value = address.address2;
-  document.getElementById('billings-zip_code').value = address.zip_code;
-
-  // Update geographical dropdowns
-  loadCountries(address.country_id).then(() => {
-    loadCounties(address.country_id, address.county_id).then(() => {
-      loadCities(address.county_id, address.city_id);
-    });
-  });
 }
 
 function initializeDeliveryOptionHandler() {
@@ -751,7 +856,6 @@ async function checkCreditEligibility(total) {
     }
 }
 
-
 function togglePaymentForms(total = 0) {
     const stripeRadio = document.getElementById("stripe");
     const cashRadio = document.getElementById("cash");
@@ -771,7 +875,6 @@ function togglePaymentForms(total = 0) {
         cashForm.style.display = "block";
     } else if (creditRadio.checked) {
         creditForm.style.display = "block";
-        // ✅ Always update credit message when showing the form
         updateCreditMessage(total);
     }
 }
@@ -780,7 +883,6 @@ function updateCreditMessage(total) {
     const messageEl = document.getElementById("credit-message");
     if (!messageEl) return;
 
-    // Case 1: User has enough credit to cover total
     if (total > 0 && total <= userCreditBalance) {
         messageEl.innerHTML = `
             <p>
@@ -802,9 +904,13 @@ function updateCreditMessage(total) {
                 Your current credit balance is <strong>$${userCreditBalance.toFixed(2)}</strong>.
                 This is not sufficient to cover the total payment of <strong>$${total.toFixed(2)}</strong>.
             </p>
+
+            <button type="button" class="btn btn-success waves-effect waves-light"
+                    data-bs-toggle="modal" data-bs-target="#creditLimitModal">
+                <span class="tf-icon mdi mdi-cash-plus me-1"></span>Add Credit Limit
+            </button>
         `;
     } 
-
 }
 
 function initializePaymentToggleHandler() {
@@ -816,19 +922,16 @@ function initializePaymentToggleHandler() {
 
     radios.forEach(radio => {
         radio.addEventListener("change", async () => {
-            // Refresh the total calculation when switching payment methods
             const total = getCurrentTotal();
-            
             togglePaymentForms(total);
             togglePaymentButton(total);
 
             if (creditRadio.checked) {
-                await checkCreditEligibility(total); // This will refresh all data
+                await checkCreditEligibility(total);
             }
         });
     });
 }
-
 
 function togglePaymentButton(total = 0) {
     const submitButton = document.querySelector('button[type="submit"]');
@@ -838,20 +941,17 @@ function togglePaymentButton(total = 0) {
     
     if (creditRadio && creditRadio.checked) {
         if (total > 0 && total <= userCreditBalance) {
-            // User has enough credit - enable button
             submitButton.disabled = false;
             submitButton.textContent = 'Pay with Credit';
             submitButton.classList.remove('btn-secondary');
             submitButton.classList.add('btn-success');
         } else {
-            // User doesn't have enough credit - disable button
             submitButton.disabled = true;
             submitButton.textContent = 'Insufficient Credit';
             submitButton.classList.remove('btn-success');
             submitButton.classList.add('btn-secondary');
         }
     } else {
-        // For other payment methods - enable button
         submitButton.disabled = false;
         submitButton.textContent = 'Proceed with Payment';
         submitButton.classList.remove('btn-secondary');
@@ -861,209 +961,428 @@ function togglePaymentButton(total = 0) {
 
 // Helper functions
 function getCurrentTotal() {
-    // Try to get the total from the displayed summary first
-    const summaryElement = document.getElementById('meal-summary');
-    if (summaryElement) {
-        const totalElement = summaryElement.querySelector('.fw-bold span');
-        if (totalElement) {
-            const totalText = totalElement.textContent.replace('$', '');
-            return parseFloat(totalText) || 0;
-        }
+    const totalElement = document.querySelector('#meal-summary .fw-bold span');
+    if (totalElement) {
+        return parseFloat(totalElement.textContent.replace('$', '')) || 0;
     }
-    
-    // Fallback to calculated total
-    const subtotal = parseFloat(summary.subtotal || 0);
-    const tax = parseFloat(summary.tax || 0);
-    const total = subtotal + tax + parseFloat(deliveryCharge || 0);
-    return total;
+    return (summary.subtotal || 0) + (summary.tax || 0) + deliveryCharge;
 }
 
 function getSelectedPaymentMethod() {
-  if (document.getElementById('stripe').checked) return 'stripe';
-  if (document.getElementById('cash').checked) return 'cash';
-  if (document.getElementById('credit').checked) return 'credit';
-  return null;
+    const selectedRadio = document.querySelector('input[name="paymentMethod"]:checked');
+    return selectedRadio ? selectedRadio.value : null;
 }
 
 async function processPayment(event) {
     event.preventDefault();
-    let submitBtn = null;
+    
     let isValid = true;
+    const submitBtn = document.querySelector('button[type="submit"]');
+    const originalBtnText = submitBtn.innerHTML;
+    
+    // Clear previous errors
     document.querySelectorAll('.error-message').forEach(span => span.textContent = '');
+    document.getElementById('card-errors').textContent = '';
+    document.getElementById('card-errors').style.display = 'none';
 
-    // Collect form data
-    const formData = {
+    try {
+        // Step 1: Collect and validate form data
+        const billingFormData = collectBillingFormData();
+        isValid = validateBillingForm(billingFormData);
+        
+        if (!isValid) {
+            errorToast('Please fill in all required fields correctly.');
+            return;
+        }
+
+        // Step 2: Show loading state
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<span class="me-2">Processing...</span><i class="mdi mdi-loading mdi-spin"></i>';
+        showLoader();
+
+        // Step 3: Extract meal orders from checkout page
+        const mealOrders = extractMealOrdersFromCheckout();
+
+        if (mealOrders.length === 0) {
+            errorToast('Your meal cart is empty');
+            hideLoader();
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+            return;
+        }
+
+        // Step 4: Get payment method and total amount
+        const paymentMethod = getSelectedPaymentMethod();
+        const totalAmount = getCurrentTotal();
+        
+        console.log('Processing payment:', {
+            paymentMethod,
+            totalAmount,
+            mealOrdersCount: mealOrders.length
+        });
+
+        // Step 5: Prepare base request data
+        let requestData = {
+            meal_orders: mealOrders,
+            subtotal: summary.subtotal || 0,
+            tax: summary.tax || 0,
+            delivery_charge: deliveryCharge,
+            total_amount: totalAmount,
+            customer_email: userEmail,
+            payment_method: paymentMethod,
+            ...billingFormData
+        };
+
+        let response = null;
+        let endpoint = '';
+
+        // Step 6: Handle different payment methods
+        switch (paymentMethod) {
+            case 'stripe':
+                // ✅ FIXED STRIPE PAYMENT HANDLING WITH COUNTRY CODE
+                endpoint = '/user/store/meal-order/by/stripe';
+                
+                try {
+                    // Validate Stripe initialization
+                    if (!stripe || !cardElement) {
+                        throw new Error('Stripe not properly initialized. Please refresh the page.');
+                    }
+
+                    // Create Payment Intent
+                    console.log('Creating payment intent for amount:', totalAmount);
+                    const paymentIntentResponse = await axios.post('/user/create-payment-intent', {
+                        amount: Math.round(totalAmount * 100), // Convert to cents
+                        currency: 'usd',
+                        description: `Meal Order - ${mealOrders.length} items`,
+                        metadata: {
+                            customer_email: userEmail,
+                            customer_name: billingFormData.name,
+                            order_type: 'meal_order'
+                        }
+                    });
+
+                    console.log('Payment Intent Response:', paymentIntentResponse.data);
+                    
+                    // Handle response structure
+                    const responseData = paymentIntentResponse.data;
+                    
+                    if (responseData.status !== 'success') {
+                        throw new Error(responseData.message || 'Failed to create payment intent');
+                    }
+
+                    // Extract client_secret and payment_intent_id from response
+                    let client_secret, payment_intent_id;
+                    
+                    if (responseData.data) {
+                        client_secret = responseData.data.client_secret;
+                        payment_intent_id = responseData.data.payment_intent_id || responseData.data.id;
+                    } else {
+                        client_secret = responseData.client_secret;
+                        payment_intent_id = responseData.payment_intent_id || responseData.id;
+                    }
+                    
+                    if (!client_secret) {
+                        throw new Error('Payment server error: Missing client secret');
+                    }
+
+                    if (!payment_intent_id) {
+                        throw new Error('Payment server error: Missing payment intent ID');
+                    }
+
+                    // ✅ FIXED: Get country code instead of country name
+                    const countrySelect = document.getElementById('country');
+                    const selectedCountryOption = countrySelect.options[countrySelect.selectedIndex];
+                    const countryName = selectedCountryOption ? selectedCountryOption.text : '';
+                    const countryCode = getCountryCode(countryName);
+                    
+                    console.log('Country details:', {
+                        name: countryName,
+                        code: countryCode,
+                        id: billingFormData.country_id
+                    });
+
+                    // ✅ FIXED: Use country code, not country name
+                    console.log('Confirming card payment...');
+                    const { error, paymentIntent } = await stripe.confirmCardPayment(client_secret, {
+                        payment_method: {
+                            card: cardElement,
+                            billing_details: {
+                                name: billingFormData.name,
+                                email: billingFormData.email,
+                                phone: billingFormData.phone,
+                                address: {
+                                    line1: billingFormData.address1,
+                                    line2: billingFormData.address2 || '',
+                                    city: document.getElementById('city').options[document.getElementById('city').selectedIndex]?.text || '',
+                                    state: document.getElementById('county').options[document.getElementById('county').selectedIndex]?.text || '',
+                                    country: countryCode || '', // ✅ Use 2-letter country code
+                                    postal_code: billingFormData.zip_code
+                                }
+                            }
+                        },
+                        return_url: window.location.origin + '/user/meal-order'
+                    });
+
+                    // Handle payment result
+                    if (error) {
+                        console.error('Stripe payment error:', error);
+                        
+                        let errorMessage = 'Payment failed. Please try again.';
+                        if (error.code === 'card_declined') {
+                            errorMessage = 'Your card was declined. Please try a different card.';
+                        } else if (error.code === 'expired_card') {
+                            errorMessage = 'Your card has expired. Please use a different card.';
+                        } else if (error.code === 'insufficient_funds') {
+                            errorMessage = 'Insufficient funds. Please use a different card or payment method.';
+                        } else if (error.code === 'incorrect_cvc' || error.code === 'invalid_cvc') {
+                            errorMessage = 'The CVC code is incorrect. Please check and try again.';
+                        } else if (error.code === 'incorrect_number' || error.code === 'invalid_number') {
+                            errorMessage = 'The card number is invalid. Please check and try again.';
+                        } else if (error.message.includes('Country')) {
+                            errorMessage = 'Invalid country format. Please select a valid country.';
+                        }
+                        
+                        document.getElementById('card-errors').textContent = errorMessage;
+                        document.getElementById('card-errors').style.color = '#dc3545';
+                        document.getElementById('card-errors').style.display = 'block';
+                        throw new Error(errorMessage);
+                    }
+
+                    if (paymentIntent && paymentIntent.status === 'succeeded') {
+                        console.log('✅ Payment successful! Payment Intent ID:', paymentIntent.id);
+                        
+                        // Add Stripe details to request data
+                        requestData.payment_intent_id = payment_intent_id;
+                        requestData.stripe_payment_id = paymentIntent.id;
+                        requestData.stripe_payment_method = paymentIntent.payment_method;
+                        
+                        // Submit the order
+                        console.log('Submitting order to backend...');
+                        response = await axios.post(endpoint, requestData);
+                        
+                    } else if (paymentIntent && (paymentIntent.status === 'requires_action' || paymentIntent.status === 'requires_confirmation')) {
+                        console.log('Payment requires 3D Secure authentication');
+                        return;
+                    } else {
+                        throw new Error('Payment not completed successfully. Status: ' + (paymentIntent?.status || 'unknown'));
+                    }
+                    
+                } catch (stripeError) {
+                    console.error('❌ Stripe processing error:', stripeError);
+                    
+                    if (stripeError.response?.data?.message) {
+                        errorToast('Payment Error: ' + stripeError.response.data.message);
+                    } else if (stripeError.message) {
+                        errorToast(stripeError.message);
+                    } else {
+                        errorToast('Stripe payment failed. Please try again.');
+                    }
+                    
+                    hideLoader();
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                    return;
+                }
+                break;
+                
+            case 'credit':
+                endpoint = '/user/store/meal-order/by/credit';
+                
+                try {
+                    const creditResponse = await axios.get('/user/credit-balance');
+                    const currentBalance = parseFloat(creditResponse.data.balance || 0);
+                    
+                    if (totalAmount > currentBalance) {
+                        throw new Error(`Insufficient credit balance. You have $${currentBalance.toFixed(2)} but need $${totalAmount.toFixed(2)}`);
+                    }
+
+                    requestData.credit_amount_used = totalAmount;
+                    requestData.user_credit_balance = currentBalance;
+
+                    response = await axios.post(endpoint, requestData);
+                    
+                } catch (creditError) {
+                    console.error('❌ Credit payment error:', creditError);
+                    errorToast(creditError.message || 'Credit payment failed');
+                    hideLoader();
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                    return;
+                }
+                break;
+                
+            case 'cash':
+                endpoint = '/user/store/meal-order/by/cash';
+                
+                try {
+                    response = await axios.post(endpoint, requestData);
+                } catch (cashError) {
+                    console.error('❌ Cash payment error:', cashError);
+                    errorToast(cashError.message || 'Cash payment failed');
+                    hideLoader();
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                    return;
+                }
+                break;
+                
+            default:
+                errorToast('Please select a valid payment method');
+                hideLoader();
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+                return;
+        }
+
+        // Step 7: Handle successful response
+        if (response && response.data.status === 'success') {
+            console.log('✅ Order placed successfully:', response.data);
+            
+            try {
+                await axios.post('/user/meal-cart/clear');
+                console.log('✅ Meal cart cleared');
+            } catch (clearError) {
+                console.log('⚠️ Cart clear failed (order still placed):', clearError.message);
+            }
+            
+            if (response.data.data && response.data.data.meal_order) {
+                localStorage.setItem('lastOrderId', response.data.data.meal_order.id);
+                localStorage.setItem('lastOrderNumber', response.data.data.meal_order.order_number);
+            }
+            
+            successToast('Payment successful! Your order has been placed.');
+            
+            setTimeout(() => {
+                window.location.href = response.data.redirect_url || '/user/meal-order';
+            }, 2000);
+            
+        } else if (response) {
+            throw new Error(response.data.message || 'Failed to place order');
+        }
+
+    } catch (error) {
+        console.error('❌ Payment processing error:', error);
+        
+        if (error.response?.data?.errors) {
+            const errors = error.response.data.errors;
+            Object.keys(errors).forEach(field => {
+                const errorElement = document.getElementById(`${field}-error`);
+                if (errorElement) {
+                    errorElement.textContent = errors[field][0];
+                    errorElement.style.color = '#dc3545';
+                }
+            });
+            errorToast('Please check the form for errors');
+        } else if (error.response?.data?.message) {
+            errorToast('Server Error: ' + error.response.data.message);
+        } else if (error.message) {
+            errorToast(error.message);
+        } else {
+            errorToast('Payment processing failed. Please try again.');
+        }
+    } finally {
+        hideLoader();
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = originalBtnText;
+        }
+    }
+}
+
+// Helper function to collect billing form data
+function collectBillingFormData() {
+    const countrySelect = document.getElementById('country');
+    const countySelect = document.getElementById('county');
+    const citySelect = document.getElementById('city');
+    
+    return {
         name: document.getElementById('billings-name').value.trim(),
         email: document.getElementById('billings-email').value.trim(),
         phone: document.getElementById('billings-phone').value.trim(),
         address1: document.getElementById('billings-address1').value.trim(),
         address2: document.getElementById('billings-address2').value.trim(),
         zip_code: document.getElementById('billings-zip_code').value.trim(),
-        country_id: document.getElementById('country').value,
-        county_id: document.getElementById('county').value,
-        city_id: document.getElementById('city').value,
-        delivery_option: document.querySelector('input[name="deliveryOption"]:checked')?.value || null,
-        payment_method: getSelectedPaymentMethod()
+        country_id: countrySelect ? countrySelect.value : '',
+        county_id: countySelect ? countySelect.value : '',
+        city_id: citySelect ? citySelect.value : '',
+        delivery_option: document.querySelector('input[name="deliveryOption"]:checked')?.value || null
     };
+}
 
-    // Validation
-    if (!formData.name) { showError('name-error', 'Name is required'); isValid = false; }
-    if (!formData.email) { 
-        showError('email-error', 'Email is required'); isValid = false; 
-    } else if (!isValidEmail(formData.email)) { 
-        showError('email-error', 'Invalid email format'); isValid = false;
+// Helper function to validate billing form
+function validateBillingForm(formData) {
+    let isValid = true;
+    
+    document.querySelectorAll('.error-message').forEach(span => span.textContent = '');
+    
+    if (!formData.name) { 
+        showError('name-error', 'Name is required'); 
+        isValid = false; 
     }
-    if (!formData.phone) { showError('phone-error', 'Phone is required'); isValid = false; }
-    if (!formData.address1) { showError('address1-error', 'Address1 is required'); isValid = false; }
-    if (!formData.zip_code) { showError('zip_code-error', 'Zip Code is required'); isValid = false; }
-    if (!formData.country_id) { showError('country-error', 'Country is required'); isValid = false; }
-    if (!formData.county_id) { showError('county-error', 'County is required'); isValid = false; }
-    if (!formData.city_id) { showError('city-error', 'City is required'); isValid = false; }
+    
+    if (!formData.email) { 
+        showError('email-error', 'Email is required'); 
+        isValid = false; 
+    } else if (!isValidEmail(formData.email)) { 
+        showError('email-error', 'Please enter a valid email address'); 
+        isValid = false;
+    }
+    
+    if (!formData.phone) { 
+        showError('phone-error', 'Phone number is required'); 
+        isValid = false; 
+    } else if (formData.phone.length < 10) {
+        showError('phone-error', 'Please enter a valid phone number');
+        isValid = false;
+    }
+    
+    if (!formData.address1) { 
+        showError('address1-error', 'Address is required'); 
+        isValid = false; 
+    }
+    
+    if (!formData.zip_code) { 
+        showError('zip_code-error', 'Zip/Postal code is required'); 
+        isValid = false; 
+    }
+    
+    if (!formData.country_id) { 
+        showError('country-error', 'Please select a country'); 
+        isValid = false; 
+    }
+    
+    if (!formData.county_id) { 
+        showError('county-error', 'Please select a county/state'); 
+        isValid = false; 
+    }
+    
+    if (!formData.city_id) { 
+        showError('city-error', 'Please select a city'); 
+        isValid = false; 
+    }
+    
+    if (!formData.delivery_option) { 
+        errorToast('Please select a delivery option'); 
+        isValid = false; 
+    }
+    
+    const paymentMethod = getSelectedPaymentMethod();
+    if (!paymentMethod) {
+        errorToast('Please select a payment method');
+        isValid = false;
+    }
+    
+    return isValid;
+}
 
-    if (!isValid) return;
-
-    try {
-        showLoader();
-        submitBtn = document.querySelector('#checkout-form button[type="submit"]');
-        submitBtn.disabled = true;
-
-        // Extract meal orders data from the rendered checkout page
-        const mealOrders = extractMealOrdersFromCheckout();
-
-        if (mealOrders.length === 0) {
-            errorToast('Your meal cart is empty');
-            return;
-        }
-
-        // Prepare final request data
-        const requestData = {
-            ...formData,
-            meal_orders: mealOrders,
-            subtotal: summary.subtotal || 0,
-            tax: summary.tax || 0,
-            delivery_charge: deliveryCharge,
-            total_amount: getCurrentTotal()
-        };
-
-        let endpoint = '';
-        let response;
-
-        // Handle different payment methods with correct endpoints
-        if (formData.payment_method === 'stripe') {
-            // Stripe payment handling
-            endpoint = '/user/store/meal-order/by/stripe';
-            
-            // Create Payment Intent
-            const { data: intentData } = await axios.post('/user/create-payment-intent', {
-                amount: Math.round(getCurrentTotal() * 100) // Convert to cents
-            });
-            
-            // Confirm Card Payment
-            const { paymentIntent, error } = await stripe.confirmCardPayment(
-                intentData.client_secret, 
-                {
-                    payment_method: {
-                        card: card,
-                        billing_details: {
-                            name: formData.name,
-                            email: formData.email,
-                            address: {
-                                line1: formData.address1,
-                                line2: formData.address2,
-                                postal_code: formData.zip_code
-                            }
-                        }
-                    }
-                }
-            );
-
-            if (error) {
-                if (error.code === 'card_declined') {
-                    throw new Error(`Card declined: ${error.message}`);
-                }
-                throw error;
-            }
-
-            if (!paymentIntent || paymentIntent.status !== 'succeeded') {
-                throw new Error('Payment authorization failed');
-            }
-
-            requestData.payment_intent_id = paymentIntent.id;
-            
-            // Submit stripe order
-            response = await axios.post(endpoint, requestData);
-            
-        } else if (formData.payment_method === 'credit') {
-            // ✅ CREDIT PAYMENT HANDLING
-            endpoint = '/user/store/meal-order/by/credit';
-            
-            const totalAmount = getCurrentTotal();
-            
-            // Double-check credit balance before proceeding
-            const creditResponse = await axios.get('/user/credit-balance');
-            const currentBalance = parseFloat(creditResponse.data.balance || 0);
-            
-            if (totalAmount > currentBalance) {
-                throw new Error(`Insufficient credit balance. You have $${currentBalance.toFixed(2)} but need $${totalAmount.toFixed(2)}`);
-            }
-
-            requestData.credit_amount_used = totalAmount;
-            requestData.user_credit_balance = currentBalance;
-
-            // Submit credit order
-            response = await axios.post(endpoint, requestData);
-            
-        } else if (formData.payment_method === 'cash') {
-            // ✅ CASH PAYMENT HANDLING
-            endpoint = '/user/store/meal-order/by/cash';
-            
-            // Submit cash order
-            response = await axios.post(endpoint, requestData);
-        }
-
-        // Handle successful response
-        if (response.data.status === 'success') {
-            successToast('Meal order placed successfully!');
-            
-            // Clear meal cart after successful order
-            try {
-                await axios.post('/user/meal-cart/clear');
-            } catch (clearError) {
-                console.log('Note: Meal cart clear failed, but order was placed successfully');
-            }
-            
-            // Redirect to order confirmation
-            window.location.href = response.data.redirect_url || '/user/meal-order';
-        } else {
-            throw new Error(response.data.message || 'Failed to place order');
-        }
-
-    } catch (error) {
-        console.error('Payment processing error:', error);
-        
-        // Enhanced error handling
-        if (error.response?.data?.errors) {
-            // Handle validation errors from Laravel
-            const errors = error.response.data.errors;
-            Object.keys(errors).forEach(field => {
-                const errorElement = document.getElementById(`${field}-error`);
-                if (errorElement) errorElement.textContent = errors[field][0];
-            });
-        } else if (error.message.includes('Card declined')) {
-            document.getElementById('card-errors').textContent = error.message;
-        } else if (error.message.includes('Insufficient credit')) {
-            errorToast(error.message);
-            // Update credit message to reflect the error
-            const creditRadio = document.getElementById('credit');
-            if (creditRadio.checked) {
-                updateCreditMessage(getCurrentTotal());
-            }
-        } else {
-            errorToast(error.response?.data?.message || error.message || 'Payment processing failed');
-        }
-    } finally {
-        hideLoader();
-        if (submitBtn) submitBtn.disabled = false;
+// Helper function to display error messages
+function showError(elementId, message) {
+    const element = document.getElementById(elementId);
+    if (element) {
+        element.textContent = message;
+        element.style.color = '#dc3545';
+        element.style.fontSize = '0.875rem';
+        element.style.marginTop = '0.25rem';
     }
 }
 
@@ -1073,42 +1392,32 @@ function extractMealOrdersFromCheckout() {
     const accordionItems = document.querySelectorAll('#mealCartAccordion .accordion-item');
 
     accordionItems.forEach(accordionItem => {
-        // Extract date from accordion header
         const headerButton = accordionItem.querySelector('.accordion-button');
         const dateText = headerButton.textContent.trim();
-        
-        // Parse the date (format: "Wednesday, Jan 15")
         const mealDate = parseDateFromHeader(dateText);
         
         if (!mealDate) return;
 
-        // Find all meal items in this accordion
         const mealItems = accordionItem.querySelectorAll('.list-group-item');
         
         mealItems.forEach(mealItem => {
-            // Extract product name
             const productNameElement = mealItem.querySelector('strong');
             const productName = productNameElement ? productNameElement.textContent.trim() : '';
             
-            // Extract price - FIXED SELECTOR (removed space after colon)
             const priceText = mealItem.querySelector('div > div:nth-child(2)')?.textContent || '';
             const unitPriceMatch = priceText.match(/\$([0-9.]+)/);
             const unitPrice = unitPriceMatch ? parseFloat(unitPriceMatch[1]) : 0;
             
-            // Extract quantity
             const quantityInput = mealItem.querySelector('input[type="number"]');
             const quantity = quantityInput ? parseInt(quantityInput.value) : 1;
             
-            // Extract meal type from the section header
             const sectionHeader = mealItem.closest('.accordion-body').querySelector('h6');
             const mealTypeText = sectionHeader ? sectionHeader.textContent.trim() : '';
-            const mealTypeName = mealTypeText.split(' (')[0]; // Extract "Breakfast" from "Breakfast (2 items)"
+            const mealTypeName = mealTypeText.split(' (')[0];
             
-            // Extract client/provider name
             const providerText = mealItem.querySelector('small.text-muted')?.textContent || '';
             const clientName = providerText.replace('Provider: ', '').trim();
             
-            // Get meal_type_id and product_id from data attributes
             const productId = mealItem.dataset.productId;
             const mealTypeId = mealItem.dataset.mealTypeId;
             const clientId = mealItem.dataset.clientId;
@@ -1136,13 +1445,12 @@ function extractMealOrdersFromCheckout() {
 // Helper function to parse date from accordion header
 function parseDateFromHeader(dateText) {
     try {
-        // Format: "Wednesday, Jan 15" - convert to YYYY-MM-DD
         const currentYear = new Date().getFullYear();
         const dateParts = dateText.split(', ');
         if (dateParts.length === 2) {
-            const monthDay = dateParts[1]; // "Jan 15"
+            const monthDay = dateParts[1];
             const date = new Date(`${monthDay}, ${currentYear}`);
-            return date.toISOString().split('T')[0]; // Return YYYY-MM-DD
+            return date.toISOString().split('T')[0];
         }
     } catch (error) {
         console.error('Error parsing date:', error);
@@ -1150,30 +1458,33 @@ function parseDateFromHeader(dateText) {
     return null;
 }
 
+// Helper function to check if email is valid
 function isValidEmail(email) {
-  const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return re.test(email);
-}
-
-function showError(elementId, message) {
-  const element = document.getElementById(elementId);
-  if (element) element.textContent = message;
-}
-
-function handleApiError(error) {
-  if (error.response?.status === 422) {
-    const errors = error.response.data.errors;
-    Object.keys(errors).forEach(field => {
-      const errorElement = document.getElementById(`${field}-error`);
-      if (errorElement) errorElement.textContent = errors[field][0];
-    });
-  } else {
-    errorToast(error.response?.data?.message || 'Payment processing failed');
-  }
+    const re = /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+    return re.test(String(email).toLowerCase());
 }
 </script>
 
+<style>
+#card-errors {
+    padding: 10px;
+    margin: 10px 0;
+    border-radius: 4px;
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+    display: none;
+}
+
+.error-message {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+    display: block;
+}
+</style>
 @endsection
 
 
-<!-- Remember above checkout.blade.php code.Nothing to do anything now. -->
+
+

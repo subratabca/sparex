@@ -802,9 +802,13 @@ function updateCreditMessage(total) {
                 Your current credit balance is <strong>$${userCreditBalance.toFixed(2)}</strong>.
                 This is not sufficient to cover the total payment of <strong>$${total.toFixed(2)}</strong>.
             </p>
+
+            <button type="button" class="btn btn-success waves-effect waves-light"
+                    data-bs-toggle="modal" data-bs-target="#creditLimitModal">
+                <span class="tf-icon mdi mdi-cash-plus me-1"></span>Add Credit Limit
+            </button>
         `;
     } 
-
 }
 
 function initializePaymentToggleHandler() {
@@ -945,13 +949,13 @@ async function processPayment(event) {
             total_amount: getCurrentTotal()
         };
 
-        let endpoint = '/user/store/meal-order';
+        let endpoint = '';
         let response;
 
-        // Handle different payment methods
+        // Handle different payment methods with correct endpoints
         if (formData.payment_method === 'stripe') {
             // Stripe payment handling
-            endpoint = '/user/store/meal-order';
+            endpoint = '/user/store/meal-order/by/stripe';
             
             // Create Payment Intent
             const { data: intentData } = await axios.post('/user/create-payment-intent', {
@@ -989,13 +993,14 @@ async function processPayment(event) {
             }
 
             requestData.payment_intent_id = paymentIntent.id;
-            requestData.payment_method = 'stripe';
             
             // Submit stripe order
             response = await axios.post(endpoint, requestData);
             
         } else if (formData.payment_method === 'credit') {
             // ✅ CREDIT PAYMENT HANDLING
+            endpoint = '/user/store/meal-order/by/credit';
+            
             const totalAmount = getCurrentTotal();
             
             // Double-check credit balance before proceeding
@@ -1006,7 +1011,6 @@ async function processPayment(event) {
                 throw new Error(`Insufficient credit balance. You have $${currentBalance.toFixed(2)} but need $${totalAmount.toFixed(2)}`);
             }
 
-            requestData.payment_method = 'credit';
             requestData.credit_amount_used = totalAmount;
             requestData.user_credit_balance = currentBalance;
 
@@ -1015,7 +1019,7 @@ async function processPayment(event) {
             
         } else if (formData.payment_method === 'cash') {
             // ✅ CASH PAYMENT HANDLING
-            requestData.payment_method = 'cash';
+            endpoint = '/user/store/meal-order/by/cash';
             
             // Submit cash order
             response = await axios.post(endpoint, requestData);
@@ -1090,8 +1094,8 @@ function extractMealOrdersFromCheckout() {
             const productNameElement = mealItem.querySelector('strong');
             const productName = productNameElement ? productNameElement.textContent.trim() : '';
             
-            // Extract price
-            const priceText = mealItem.querySelector('div > div: nth-child(2)')?.textContent || '';
+            // Extract price - FIXED SELECTOR (removed space after colon)
+            const priceText = mealItem.querySelector('div > div:nth-child(2)')?.textContent || '';
             const unitPriceMatch = priceText.match(/\$([0-9.]+)/);
             const unitPrice = unitPriceMatch ? parseFloat(unitPriceMatch[1]) : 0;
             
@@ -1108,8 +1112,7 @@ function extractMealOrdersFromCheckout() {
             const providerText = mealItem.querySelector('small.text-muted')?.textContent || '';
             const clientName = providerText.replace('Provider: ', '').trim();
             
-            // We need to get meal_type_id and product_id from data attributes
-            // Add these data attributes to your HTML in renderMealCart function
+            // Get meal_type_id and product_id from data attributes
             const productId = mealItem.dataset.productId;
             const mealTypeId = mealItem.dataset.mealTypeId;
             const clientId = mealItem.dataset.clientId;
@@ -1175,3 +1178,6 @@ function handleApiError(error) {
 </script>
 
 @endsection
+
+
+<!-- Remember above checkout.blade.php code.Nothing to do anything now. -->

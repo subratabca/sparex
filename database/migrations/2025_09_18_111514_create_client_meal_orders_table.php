@@ -21,7 +21,6 @@ return new class extends Migration
             $table->decimal('payable_amount', 10, 2);
             $table->decimal('paid_amount', 10, 2);
             $table->enum('payment_status', ['due', 'paid'])->default('due');
-            $table->enum('status', ['pending','approved','delivered','canceled','partially_approved','partially_delivered'])->default('pending');
             $table->timestamps();
         });
     }
