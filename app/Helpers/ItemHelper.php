@@ -17,6 +17,7 @@ use App\Models\DeliveryCharge;
 use App\Models\MealType;
 use App\Models\MealKeyword;
 use App\Models\MealDeliveryCharge;
+use App\Models\DeliveryVehicle;
 
 class ItemHelper
 {
@@ -440,6 +441,49 @@ class ItemHelper
         }
 
         return $record;
+    }
+
+    public static function prepareDeliveryVehicleData($request, $deliveryId, $imagePath = null)
+    {
+        return [
+            'delivery_id' => $deliveryId,
+            'vehicle_type' => $request->input('vehicle_type'),
+            'registration_number' => $request->input('registration_number'),
+            'vehicle_brand' => $request->input('vehicle_brand'),
+            'vehicle_model' => $request->input('vehicle_model'),
+            'vehicle_color' => $request->input('vehicle_color'),
+            'image' => $imagePath,
+            'is_active' => $request->boolean('is_active', true),
+        ];
+    }
+
+    public static function storeOrUpdateDeliveryVehicle($data, $vehicle = null)
+    {
+        if ($vehicle) {
+            $vehicle->update($data);
+            return $vehicle;
+        } else {
+            return DeliveryVehicle::create($data);
+        }
+    }
+
+    public static function formatVehicleResponse($vehicle)
+    {
+        return [
+            'id' => $vehicle->id,
+            'delivery_id' => $vehicle->delivery_id,
+            'vehicle_type' => $vehicle->vehicle_type,
+            'vehicle_type_label' => $vehicle->vehicle_type_label,
+            'registration_number' => $vehicle->registration_number,
+            'vehicle_brand' => $vehicle->vehicle_brand,
+            'vehicle_model' => $vehicle->vehicle_model,
+            'vehicle_color' => $vehicle->vehicle_color,
+            'image' => $vehicle->image,
+            'is_active' => $vehicle->is_active,
+            'created_at' => $vehicle->created_at,
+            'updated_at' => $vehicle->updated_at,
+            'vehicle_info' => $vehicle->vehicle_info,
+        ];
     }
 
 }

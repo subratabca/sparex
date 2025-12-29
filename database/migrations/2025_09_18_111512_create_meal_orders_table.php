@@ -27,7 +27,7 @@ return new class extends Migration
             $table->string('currency', 10)->nullable();  
             $table->string('order_number', 50)->unique(); 
             $table->string('invoice_no', 50)->unique(); 
-            $table->enum('payment_status', ['due', 'paid'])->default('due');
+            $table->enum('payment_status', ['due','paid','partially_paid'])->default('due');
             $table->timestamps();
         });
     }

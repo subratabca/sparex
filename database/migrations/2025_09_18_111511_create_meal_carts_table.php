@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('meal_carts', function (Blueprint $table) {
             $table->id();
             $table->date('meal_date');
+            $table->time('meal_time')->nullable();
             $table->foreignId('client_id')->constrained('users')->onDelete('cascade'); 
             $table->foreignId('customer_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('meal_type_id')->constrained('meal_types')->onDelete('cascade'); 

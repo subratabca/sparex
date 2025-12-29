@@ -330,4 +330,30 @@ class ValidationHelper
             'inside_city_above_10km' => ['required', 'numeric', 'min:0'],
         ];
     }
+
+    public static function deliveryVehicleValidationRules($isUpdate = false, $deliveryId = null, $vehicleId = null)
+    {
+        $rules = [
+            'vehicle_type' => 'required|in:bike,scooter,car,bicycle,walking',
+            'registration_number' => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::unique('delivery_vehicles', 'registration_number')
+                    ->where(function ($query) use ($deliveryId) {
+                        if ($deliveryId) {
+                            $query->where('delivery_id', '!=', $deliveryId);
+                        }
+                    })
+                    ->ignore($vehicleId)
+            ],
+            'vehicle_brand' => 'nullable|string|max:50',
+            'vehicle_model' => 'nullable|string|max:50',
+            'vehicle_color' => 'nullable|string|max:30',
+            'vehicle_image' => $isUpdate ? 'sometimes|image|mimes:jpeg,png,jpg|max:2048' : 'nullable|image|mimes:jpeg,png,jpg|max:2048',
+            'is_active' => 'boolean'
+        ];
+
+        return $rules;
+    }
 }

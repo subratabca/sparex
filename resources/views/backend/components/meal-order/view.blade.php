@@ -1,155 +1,279 @@
-<div class="container-fluid py-3">
-    <div class="card shadow-sm">
-        <div class="card-header d-flex justify-content-between align-items-center bg-primary text-white">
-            <h5 class="mb-0">Meal Details For - <span id="mealDate"></span></h5>
-            <a href="{{ route('admin.meal.orders') }}" class="btn btn-light btn-sm">Back To Meal Orders</a>
+<div class="container">
+    <div class="card shadow-sm border-0 mt-3">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="mdi mdi-silverware-fork-knife me-2"></i>Meal Order Details</h5>
+            <a href="{{ url()->previous() }}" class="btn btn-light btn-sm">
+                <i class="mdi mdi-arrow-left me-1"></i> Back
+            </a>
         </div>
-
         <div class="card-body">
-            <div class="mb-3">
-                <h6>Customer: <span id="customerName">Loading...</span></h6>
+            <!-- Order Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+                <div>
+                    <h4 class="mb-1" id="mealPlanTitle">Order Details</h4>
+                    <p class="mb-0 text-muted" id="orderNumberText"></p>
+                </div>
+                <div>
+                    <span class="badge bg-success fs-6" id="orderStatusText"></span>
+                </div>
             </div>
 
-            <div class="table-responsive">
-                <table class="table table-striped table-bordered align-middle" id="mealOrderDetailsTable">
-                    <thead class="table-dark text-center">
-                        <tr>
-                            <th>Sl</th>
-                            <th>Meal Type</th>
-                            <th>Meal Name</th>
-                            <th>Provided By</th>
-                            <th>Quantity</th>
-                            <th>Unit Price</th>
-                            <th>Total Price</th>
-                        </tr>
-                    </thead>
-                    <tbody id="mealOrderDetailsBody">
-                        <tr>
-                            <td colspan="6" class="text-center">Loading...</td>
-                        </tr>
-                    </tbody>
-                </table>
-            </div>
+            <div class="row">
+                <!-- Order Items (Left) -->
+                <div class="col-lg-8 mb-4">
+                    <div class="accordion" id="mealOrderAccordion"></div>
+                </div>
 
-            <div class="mt-4 text-end">
-                <p><strong>Subtotal:</strong> $<span id="subtotal">0.00</span></p>
-                <p><strong>Tax:</strong> $<span id="tax">0.00</span></p>
-                <p><strong>Total:</strong> $<span id="total">0.00</span></p>
+                <!-- Summary & Address (Right) -->
+                <div class="col-lg-4">
+                    <div class="border rounded p-3 shadow-sm mb-4" id="meal-summary"></div>
+                    <div class="border rounded p-3 shadow-sm mb-4" id="nutrition-summary"></div>
+                    <div class="border rounded p-3 shadow-sm" id="shipping-address"></div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    fetchOrderDetails();
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadMealOrderDetails();
 });
 
-async function fetchOrderDetails() {
-    let url = window.location.pathname;
-    let segments = url.split('/');
-    let orderId = segments[segments.length - 1];
-
-    showLoader();
+async function loadMealOrderDetails() {
     try {
-        let res = await axios.get("/admin/get/meal-order/details/" + orderId);
-        const tbody = document.getElementById("mealOrderDetailsBody");
-        const mealDateSpan = document.getElementById("mealDate");
-        const customerNameSpan = document.getElementById("customerName");
+        showLoader();
+        const orderId = window.location.pathname.split('/').pop();
+        const response = await axios.get(`/admin/get/meal-order/details/${orderId}`);
 
-        tbody.innerHTML = "";
+        if (response.status === 200 && response.data.status === 'success') {
+            const mealCart = response.data.data.meal_cart;
+            const summary = response.data.data.summary;
+            const nutrition = response.data.data.nutrition;
+            const shippingAddress = response.data.data.shipping_address;
+            const order = response.data.data.order;
 
-        if(res.status === 200 && res.data.status === 'success') {
-            const data = res.data.data;
-            mealDateSpan.textContent = data.meal_date;
-            customerNameSpan.textContent = data.customer_name || 'N/A';
+            // Update header information
+            document.getElementById('mealPlanTitle').textContent = `Order #${order.order_number}`;
+            document.getElementById('orderNumberText').textContent = `${summary.total_items} items • ${order.status}`;
+            document.getElementById('orderStatusText').textContent = order.status;
 
-            let index = 1;
-            data.meals.forEach(meal => {
-
-                let mealTypeName = meal.meal_type_name
-                    ? meal.meal_type_name.charAt(0).toUpperCase() + meal.meal_type_name.slice(1)
-                    : 'N/A';
-
-                meal.products.forEach(product => {
-                    let productName = (product.name ?? '').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-
-                    let row = `
-                        <tr>
-                            <td>${index}</td>
-                            <td>${mealTypeName}</td>
-                            <td class="text-start">
-                                <img src="${product.image ?? '/upload/no_image.jpg'}" alt="${product.name}" class="img-thumbnail" style="width:50px; height:50px; object-fit:cover; margin-right:10px;">
-                                ${productName}
-                            </td>
-                            <td>${product.client_name}</td>
-                            <td>${product.quantity ?? 1}</td>
-                            <td>$${parseFloat(product.unit_price ?? 0).toFixed(2)}</td>
-                            <td>$${parseFloat(product.total_price ?? 0).toFixed(2)}</td>
-                        </tr>
-                    `;
-                    tbody.innerHTML += row;
-                    index++;
-                });
-            });
-
-            // Payment summary
-            document.getElementById('subtotal').textContent = parseFloat(data.subtotal ?? 0).toFixed(2);
-            document.getElementById('tax').textContent = parseFloat(data.tax ?? 0).toFixed(2);
-            document.getElementById('total').textContent = parseFloat(data.payable_amount ?? 0).toFixed(2);
-
+            renderMealOrderItems(mealCart);
+            renderMealSummary(summary);
+            renderNutritionSummary(nutrition);
+            renderShippingAddress(shippingAddress);
         } else {
-            tbody.innerHTML = `<tr><td colspan="6" class="text-center text-danger">${res.data.message || 'No details found.'}</td></tr>`;
+            document.getElementById('mealOrderAccordion').innerHTML = `<div class="alert alert-info">Order not found.</div>`;
         }
     } catch (error) {
-        handleError(error);
+        console.error(error);
+        errorToast('Failed to load order details');
     } finally {
         hideLoader();
     }
 }
 
-function handleError(error) {
-    let message = "An unexpected error occurred.";
-    if (error.response) {
-        const { status, data } = error.response;
-        switch (status) {
-        case 500:
-            message = data?.error || "Internal server error. Please try again later.";
-            break;
-        case 404:
-            message = data?.message || "Data not found.";
-            break;
-        default:
-            message = data?.message || "Something went wrong.";
-        }
-    } else if (error.request) {
-        message = "No response from the server. Please check your internet connection.";
-    } else {
-        message = error.message;
+function renderMealOrderItems(mealCart) {
+    const container = document.getElementById('mealOrderAccordion');
+    container.innerHTML = '';
+
+    const dates = Object.keys(mealCart);
+    if (dates.length === 0) {
+        container.innerHTML = `<div class="alert alert-info">No items found in this order.</div>`;
+        return;
     }
 
-    errorToast(message);
+    dates.forEach((date, index) => {
+        const dayItems = mealCart[date];
+        const collapseId = `mealDay${index}`;
+
+        const formattedDate = new Date(date).toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric'
+        });
+
+        const mealTypes = Object.keys(dayItems);
+        let mealTypeHtml = '';
+
+        mealTypes.forEach(type => {
+            const typeTitle = toTitleCase(type);
+            const items = dayItems[type];
+
+            mealTypeHtml += `<h6 class="mt-3 text-primary">${typeTitle} (${items.length} items)</h6><ul class="list-group mb-3">`;
+
+            items.forEach(item => {
+                const productName = toTitleCase(item.product?.name || '');
+                const img = item.product?.image ? `/upload/product/small/${item.product.image}` : '/upload/no_image.jpg';
+                const clientName = item.client ? `${item.client.firstName} ${item.client.lastName}` : 'Unknown Provider';
+
+                mealTypeHtml += `
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="d-flex align-items-center gap-3">
+                                <img src="${img}" alt="${productName}" class="rounded" style="width:60px;height:60px;object-fit:cover;">
+                                <div>
+                                    <strong>${productName}</strong><br>
+                                    <small class="text-muted">$${parseFloat(item.unit_price || 0).toFixed(2)} each × ${item.quantity || 0}</small><br>
+                                    <small class="text-info">Provider: ${clientName}</small>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <strong>$${parseFloat(item.total_price || 0).toFixed(2)}</strong>
+                            </div>
+                        </div>
+                    </li>
+                `;
+            });
+
+            mealTypeHtml += '</ul>';
+        });
+
+        const block = `
+            <div class="accordion-item shadow-sm mb-3">
+                <h2 class="accordion-header">
+                    <button class="accordion-button ${index !== 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                        ${formattedDate}
+                    </button>
+                </h2>
+                <div id="${collapseId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#mealOrderAccordion">
+                    <div class="accordion-body">${mealTypeHtml}</div>
+                </div>
+            </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', block);
+    });
+}
+
+function renderMealSummary(summary) {
+    const container = document.getElementById('meal-summary');
+    if (!summary) {
+        container.innerHTML = `<div class="alert alert-warning">No summary data available.</div>`;
+        return;
+    }
+    
+    // Convert to numbers to ensure toFixed works
+    const subtotal = parseFloat(summary.subtotal || 0);
+    const tax = parseFloat(summary.tax || 0);
+    const deliveryFee = parseFloat(summary.delivery_fee || 0);
+    const total = parseFloat(summary.total || 0);
+    
+    container.innerHTML = `
+        <h5 class="mb-3">Price Summary</h5>
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item d-flex justify-content-between">
+                Subtotal: <span>$${subtotal.toFixed(2)}</span>
+            </li>
+            ${deliveryFee > 0 ? `
+            <li class="list-group-item d-flex justify-content-between">
+                Delivery Fee: <span>$${deliveryFee.toFixed(2)}</span>
+            </li>
+            ` : ''}
+            <li class="list-group-item d-flex justify-content-between">
+                Tax: <span>$${tax.toFixed(2)}</span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between fw-bold">
+                Total: <span>$${total.toFixed(2)}</span>
+            </li>
+        </ul>
+    `;
+}
+
+function renderNutritionSummary(nutrition) {
+    const container = document.getElementById('nutrition-summary');
+    if (!nutrition) {
+        container.innerHTML = `<div class="alert alert-warning">No nutrition data available.</div>`;
+        return;
+    }
+    
+    let caloriesByTypeHtml = '';
+    
+    if (nutrition.calories_by_meal_type) {
+        Object.entries(nutrition.calories_by_meal_type).forEach(([mealType, calories]) => {
+            const caloriesValue = parseInt(calories || 0);
+            caloriesByTypeHtml += `
+                <li class="list-group-item d-flex justify-content-between">
+                    ${toTitleCase(mealType)}: <span>${caloriesValue} cal</span>
+                </li>
+            `;
+        });
+    }
+
+    const totalCalories = parseInt(nutrition.total_calories || 0);
+    
+    container.innerHTML = `
+        <h5 class="mb-3">Nutrition Summary</h5>
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item d-flex justify-content-between fw-bold">
+                Total Calories: <span>${totalCalories} cal</span>
+            </li>
+            ${caloriesByTypeHtml}
+        </ul>
+    `;
+}
+
+function renderShippingAddress(shippingAddress) {
+    const container = document.getElementById('shipping-address');
+    
+    if (!shippingAddress) {
+        container.innerHTML = `
+            <h5 class="mb-3">Shipping Address</h5>
+            <p class="text-muted">No shipping address provided.</p>
+        `;
+        return;
+    }
+
+    const addressLines = [
+        shippingAddress.name,
+        shippingAddress.email,
+        shippingAddress.phone,
+        shippingAddress.address1,
+        shippingAddress.address2,
+        `${shippingAddress.city?.name || ''}${shippingAddress.county?.name ? ', ' + shippingAddress.county.name : ''}${shippingAddress.country?.name ? ', ' + shippingAddress.country.name : ''}`,
+        shippingAddress.zip_code
+    ].filter(Boolean);
+
+    container.innerHTML = `
+        <h5 class="mb-3">Shipping Address</h5>
+        <address class="mb-0">
+            ${addressLines.map(line => `<p class="mb-1">${line}</p>`).join('')}
+        </address>
+    `;
+}
+
+function toTitleCase(str) {
+    if (!str) return "";
+    return str.trim().toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+}
+
+// Utility functions (make sure these exist in your global scope)
+function showLoader() {
+    // Implement your loader show logic
+    console.log('Loading...');
+}
+
+function hideLoader() {
+    // Implement your loader hide logic
+    console.log('Loading complete');
+}
+
+function errorToast(message) {
+    // Implement your toast notification
+    alert('Error: ' + message);
 }
 </script>
 
 <style>
-#mealOrderDetailsTable tbody tr:hover {
-    background-color: #f1f1f1;
-    transition: background-color 0.3s ease;
+.hover-card {
+    transition: all 0.3s ease;
 }
-
-#mealOrderDetailsTable th {
-    text-align: center;
+.hover-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
 }
-
-#mealOrderDetailsTable td {
-    vertical-align: middle;
-    text-align: center;
-}
-
-#mealOrderDetailsTable td.text-start {
-    text-align: left;
-    display: flex;
-    align-items: center;
+.accordion-button:not(.collapsed) {
+    background-color: #e3f2fd;
+    color: #0d6efd;
 }
 </style>

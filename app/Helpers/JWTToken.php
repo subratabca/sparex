@@ -9,13 +9,27 @@ use Firebase\JWT\Key;
 class JWTToken
 {
 
+    // public static function CreateToken($userEmail,$userID,$userRole):string
+    // {
+    //     $key = env('JWT_KEY');
+    //     $payload = [
+    //         'iss'=>'laravel-token',
+    //         'iat'=>time(),
+    //         'exp'=>time() + 60*60, //for 1 hour = 60 sec * 60 min
+    //         'userEmail'=>$userEmail,
+    //         'userID'=>$userID,
+    //         'userRole'=>$userRole
+    //     ];
+    //     return JWT::encode($payload,$key,'HS256');
+    // }
+
     public static function CreateToken($userEmail,$userID,$userRole):string
     {
         $key = env('JWT_KEY');
         $payload = [
             'iss'=>'laravel-token',
             'iat'=>time(),
-            'exp'=>time() + 60*60, //for 1 hour = 60 sec * 60 min
+            'exp'=>time() + 60*60*24*30,
             'userEmail'=>$userEmail,
             'userID'=>$userID,
             'userRole'=>$userRole
@@ -70,7 +84,6 @@ class JWTToken
         }
     }
 
-
     public static function ClientCreateToken($userEmail,$userID,$userRole):string
     {
         $key =env('CLIENT_JWT_KEY');
@@ -93,6 +106,37 @@ class JWTToken
             }
             else{
                 $key =env('CLIENT_JWT_KEY');
+                $decode=JWT::decode($token,new Key($key,'HS256'));
+                return $decode;
+            }
+        }
+        catch (Exception $e){
+            return 'unauthorized';
+        }
+    }
+
+    public static function DeliveryCreateToken($userEmail,$userID,$userRole):string
+    {
+        $key =env('DELIVERY_JWT_KEY');
+        $payload=[
+            'iss'=>'laravel-token',
+            'iat'=>time(),
+            'exp'=>time() + 60*60*24*30,
+            'userEmail'=>$userEmail,
+            'userID'=>$userID,
+            'userRole'=>$userRole
+        ];
+        return JWT::encode($payload,$key,'HS256');
+    }
+
+    public static function DeliveryVerifyToken($token):string|object
+    {
+        try {
+            if($token==null){
+                return 'unauthorized';
+            }
+            else{
+                $key =env('DELIVERY_JWT_KEY');
                 $decode=JWT::decode($token,new Key($key,'HS256'));
                 return $decode;
             }

@@ -254,19 +254,28 @@ async function displayNotifications(unreadNotifications, readNotifications) {
         return;
     }
 
-    function getNotificationLink(notification) {
-        if (notification.data.customer_id) {
-            return `/user/details/${notification.data.customer_id}?notification_id=${notification.id}`;
-        } else if (notification.data.order_id) {
-            return `/user/order/details/${notification.data.order_id}?notification_id=${notification.id}`;
-        } else if (notification.data.complaint_id) {
-            return `/user/complaint/details/${notification.data.complaint_id}?notification_id=${notification.id}`;
-        } else if (notification.data.customer_complain_id) {
-            return `/user/customer-complain-details/${notification.data.customer_complain_id}?notification_id=${notification.id}`;
-        }else {
-            return '#';
-        }
+function getNotificationLink(notification) {
+    // Check if notification and notification.data exist
+    if (!notification || !notification.data) {
+        return '#';
     }
+    
+    const data = notification.data;
+    
+    if (data.customer_id) {
+        return `/user/details/${data.customer_id}?notification_id=${notification.id}`;
+    } else if (data.meal_order_id) {
+        return `/user/meal-order/details/${data.meal_order_id}?notification_id=${notification.id}`; // Fixed: notification.id not notificationId
+    } else if (data.order_id) {
+        return `/user/order/details/${data.order_id}?notification_id=${notification.id}`;
+    } else if (data.complaint_id) {
+        return `/user/complaint/details/${data.complaint_id}?notification_id=${notification.id}`;
+    } else if (data.customer_complain_id) {
+        return `/user/customer-complain-details/${data.customer_complain_id}?notification_id=${notification.id}`;
+    } else {
+        return '#';
+    }
+}
 
     if (unreadNotifications && unreadNotifications.length > 0) {
         unreadNotifications.forEach(notification => {

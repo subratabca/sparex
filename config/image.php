@@ -37,6 +37,11 @@ return [
             'medium' => base_path('public/upload/client-profile/medium/'),
             'small' => base_path('public/upload/client-profile/small/'),
         ],
+        'delivery' => [
+            'large' => base_path('public/upload/delivery-profile/large/'),
+            'medium' => base_path('public/upload/delivery-profile/medium/'),
+            'small' => base_path('public/upload/delivery-profile/small/'),
+        ],
     ],
     'resize' => [
         'large' => ['width' => 100, 'height' => 100],
@@ -54,10 +59,27 @@ return [
             'medium' => base_path('public/upload/client-document/medium/'),
             'small' => base_path('public/upload/client-document/small/'),
         ],
+        'delivery_document_paths' => [
+            'large' => base_path('public/upload/delivery-document/large/'),
+            'medium' => base_path('public/upload/delivery-document/medium/'),
+            'small' => base_path('public/upload/delivery-document/small/'),
+        ],
         'doc_resize' => [
             'large' => ['width' => 1200, 'height' => 1500],
             'medium' => ['width' => 800, 'height' => 1000],
             'small' => ['width' => 200, 'height' => 200],
+        ],
+    ],
+    'vehicle' => [
+        'paths' => [
+            'large' => base_path('public/upload/vehicle/large/'),
+            'medium' => base_path('public/upload/vehicle/medium/'),
+            'small' => base_path('public/upload/vehicle/small/'),
+        ],
+        'sizes' => [
+            'large' => ['width' => 300, 'height' => 200],
+            'medium' => ['width' => 200, 'height' => 100],
+            'small' => ['width' => 100, 'height' => 60],
         ],
     ],
     'logo' => [ 

@@ -15,12 +15,17 @@ return new class extends Migration
             $table->id();
             $table->foreignId('meal_order_id')->constrained('meal_orders')->onDelete('cascade'); 
             $table->date('meal_date');
+            $table->time('meal_time')->nullable();
             $table->foreignId('client_id')->constrained('users')->onDelete('cascade'); 
             $table->foreignId('meal_type_id')->constrained('meal_types')->onDelete('cascade'); 
             $table->foreignId('product_id')->constrained('products')->onDelete('cascade');
             $table->integer('quantity')->unsigned()->default(1);
             $table->decimal('unit_price', 10, 2);
             $table->decimal('total_price', 10, 2);
+            $table->enum('delivery_status', ['pending','preparing','ready_for_pickup','picked_up','on_the_way','arrived','delivered','failed','cancelled'])->default('pending');
+            $table->foreignId('delivery_person_id')->nullable()->constrained('users');
+            $table->timestamp('handover_time')->nullable();
+            $table->timestamp('delivered_time')->nullable();
             $table->timestamps();
         });
     }

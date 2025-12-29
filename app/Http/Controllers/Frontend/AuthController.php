@@ -207,7 +207,9 @@ class AuthController extends Controller
                 'message' => 'User Login Successful',
                 'token' => $token,
                 'redirect' => $intendedUrl,
-            ], 200)->cookie('token', $token, 60, null, null, false, false);
+            ], 200)->cookie('token', $token, 60 * 24 * 30, null, null, false, false);
+
+            //cookie('token', $token, 60, null, null, false, false);
 
         } catch (ValidationException $e) {
             ActivityLogger::beforeAuthLog('login_failed', 'Customer login failed due to validation errors.', $request, 'users');

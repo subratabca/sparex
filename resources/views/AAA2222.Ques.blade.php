@@ -1,108 +1,46 @@
-<!--Add Credit Limit Modal -->
-<div class="modal fade" id="creditLimitModal" tabindex="-1" aria-labelledby="creditLimitModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg">
-            
-            <div class="modal-header bg-info text-white">
-                <h5 class="modal-title fw-semibold" id="creditLimitModalLabel">Add Credit Limit</h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-            </div>
+In this project customer can order multiple meal from multiple clients(client means who will provide meal) for future booking.Meal type include breakfast,lunch,snacks,dinner. each meal type may have multiple items like breakfast have 3 items from 3 different clients. For meal delivery to customer there is a delivery charge which will calculate on distance wise from client location to customer meal shipping address.suppose customer-A order for breakfast for 3 items.1 item will come from client-1 and 2 items will come from client-2 then it will count 2 delivery charge one for clent-1 and 2nd for client-2 for same meal type for same day.if same customer may have order for dinner then delivery charge will be calculate same as breakfast this way.want to save delivery amount and payment_status as due or paid for delivery person for every delivery for same order same meal type on same day from same client delivery charge will count 1 time.Update below migration to fullfill this condition
 
-            <div class="modal-body">
+<?php
 
-                <!-- Payment Method -->
-                <div class="mb-3">
-                    <label class="form-label fw-semibold">Select Payment Method:</label>
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
 
-                    <div class="d-flex gap-4 mt-2">
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('meal_deliveries', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('meal_order_item_id')->constrained()->onDelete('cascade');
+            $table->foreignId('delivery_person_id')->nullable()->constrained('users');
+            $table->enum('delivery_status', ['pending','preparing','ready_for_pickup','picked_up','on_the_way','arrived','delivered','failed','cancelled'
+            ])->default('pending');
+            $table->timestamp('estimated_delivery_time')->nullable();
+            $table->timestamp('actual_delivery_time')->nullable();
+            $table->timestamp('pickup_time')->nullable();
+            $table->timestamp('handover_time')->nullable();
+            $table->text('delivery_notes')->nullable();
+            $table->string('tracking_code')->unique()->nullable();
+            $table->decimal('current_location_lat', 10, 8)->nullable();
+            $table->decimal('current_location_lng', 11, 8)->nullable();
+            $table->string('proof_of_delivery_image')->nullable();
+            $table->timestamps();
 
-                        <!-- Cash -->
-                        <label class="form-check">
-                            <input class="form-check-input" type="radio" name="credit_payment" value="cash" id="creditCash">
-                            Cash
-                        </label>
-
-                        <!-- Stripe -->
-                        <label class="form-check">
-                            <input class="form-check-input" type="radio" name="credit_payment" value="stripe" id="creditStripe">
-                            Stripe
-                        </label>
-
-                        <!-- PayPal -->
-                        <label class="form-check">
-                            <input class="form-check-input" type="radio" name="credit_payment" value="paypal" id="creditPaypal">
-                            PayPal
-                        </label>
-
-                    </div>
-                </div>
-
-                <!-- 💰 Amount Input (Hidden initially) -->
-                <div id="amountField" class="mb-3" style="display: none;">
-                    <label class="form-label fw-semibold">Enter Credit Amount:</label>
-                    <input type="number" id="creditAmount" class="form-control" placeholder="Enter amount (e.g. 100, 200)">
-                    <small id="amountError" class="text-danger" style="display:none;"></small>
-                </div>
-
-                <div class="text-end">
-                    <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button class="btn btn-info" onclick="submitCredit()">Submit</button>
-                </div>
-
-            </div>
-        </div>
-    </div>
-</div>
-
-
-<script>
-document.querySelectorAll('input[name="credit_payment"]').forEach(radio => {
-    radio.addEventListener('change', function () {
-        const amountField = document.getElementById('amountField');
-
-        if (this.value === "cash") {
-            amountField.style.display = "block"; // Show input
-        } else {
-            amountField.style.display = "none";  // Hide input
-        }
-    });
-});
-
-async function submitCredit() {
-    const method = document.querySelector('input[name="credit_payment"]:checked');
-    const amount = document.getElementById('creditAmount').value.trim();
-    const errorText = document.getElementById('amountError');
-
-    // Validation
-    if (!method) {
-        errorToast("Please select a payment method");
-        return;
+            $table->index('delivery_status');
+            $table->index('tracking_code');
+            $table->index('delivery_person_id');
+                });
     }
 
-    if (method.value === "cash" && (amount === "" || amount <= 0)) {
-        errorText.style.display = "block";
-        errorText.textContent = "Please enter a valid amount.";
-        return;
-    } else {
-        errorText.style.display = "none";
+    /**
+     * Reverse the migrations. 2025_12_13_165148
+     */
+    public function down(): void 
+    {
+        Schema::dropIfExists('meal_deliveries');
     }
-
-    showLoader();
-    try {
-        const response = await axios.post("/user/store/credit", {
-            payment_method: method.value,
-            amount: method.value === "cash" ? amount : null
-        });
-
-        if (response.status === 200) {
-            successToast("Credit added successfully!");
-            document.getElementById('creditLimitModal').querySelector(".btn-close").click();
-            window.location.href = '/user/credit';
-        }
-    } catch (error) {
-        handleError(error);
-    } finally {
-        hideLoader();
-    }
-}
-</script>
+};

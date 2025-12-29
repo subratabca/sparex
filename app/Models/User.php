@@ -26,6 +26,11 @@ class User extends BaseUserModel
         return $this->role === 'customer';
     }
 
+    public function isDelivery()
+    {
+        return $this->role === 'delivery';
+    }
+
     public function products()
     {
         return $this->hasMany(Product::class, 'client_id');
@@ -125,5 +130,21 @@ class User extends BaseUserModel
         return $this->hasMany(CreditTransaction::class, 'customer_id');
     }
 
+    // Delivery Person Relationships
+    public function assignedMealDeliveries()
+    {
+        return $this->hasMany(MealDelivery::class, 'delivery_person_id');
+    }
+
+    public function deliveryStatusUpdates()
+    {
+        return $this->hasMany(MealDeliveryStatusHistory::class, 'updated_by_id')
+                    ->where('updated_by_type', 'delivery_person');
+    }
+
+    public function deliveryVehicle()
+    {
+        return $this->hasOne(DeliveryVehicle::class, 'delivery_id');
+    }
 }
 

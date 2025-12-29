@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class MealCart extends Model
 {
-    protected $fillable = ['meal_date','client_id','customer_id','meal_type_id','product_id','quantity','unit_price','total_price'];
+    protected $fillable = ['meal_date','meal_time','client_id','customer_id','meal_type_id','product_id','quantity','unit_price','total_price'];
 
     public function customer()
     {

@@ -43,17 +43,9 @@ async function getList() {
 
         function getNotificationLink(notification) {
             if (notification.data) {
-                if (notification.data.order_id) {
-                    return `/client/order/details/${notification.data.order_id}?notification_id=${notification.id}`;
-                } else if (notification.data.complain_id) {
-                    return `/client/complain/details/${notification.data.complain_id}?notification_id=${notification.id}`;
-                } else if (notification.data.product_id) {
-                    return `/client/product/details/${notification.data.product_id}?notification_id=${notification.id}`;
-                } else if (notification.data.client_id) {
-                    return `/client/account/details/${notification.data.client_id}?notification_id=${notification.id}`;
-                } else if (notification.data.customer_complain_id) {
-                    return `/client/customer-complain/details/${notification.data.customer_complain_id}?notification_id=${notification.id}`;
-                }
+                if (notification.data.meal_order_id) {
+                    return `/client/meal-order/details/${notification.data.meal_order_id}?notification_id=${notification.id}`;
+                } 
             }
             return '#'; 
         }

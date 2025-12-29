@@ -95,7 +95,7 @@ class ClientListController extends Controller
                         ->count('orders.customer_id');
 
                     $totalOrders = $client->client_orders_count;
-                    $totalComplaints = Complaint::whereIn('product_id', $productIds)->count();
+                    //$totalComplaints = Complaint::whereIn('product_id', $productIds)->count();
 
                     return [
                         'id' => $client->id,
@@ -106,7 +106,7 @@ class ClientListController extends Controller
                         'total_products' => $totalProducts,
                         'total_customers' => $totalCustomers,
                         'total_orders' => $totalOrders,
-                        'total_complaints' => $totalComplaints,
+                        //'total_complaints' => $totalComplaints,
                     ];
                 });
 
@@ -179,12 +179,12 @@ class ClientListController extends Controller
                 ->count('order_id');
 
             $totalOrders = $client->client_orders_count;
-            $totalComplaints = Complaint::whereIn('product_id', $productIds)->count();
+            //$totalComplaints = Complaint::whereIn('product_id', $productIds)->count();
 
             $client->total_products = $totalProducts;
             $client->total_customers = $totalCustomers;
             $client->total_orders = $totalOrders;
-            $client->total_complaints = $totalComplaints;
+            //$client->total_complaints = $totalComplaints;
             return response()->json([
                 'status' => 'success',
                 'data' => $client
@@ -193,7 +193,7 @@ class ClientListController extends Controller
         } catch (Exception $e) {
             return response()->json([
                 'status' => 'failed',
-                'message' => 'An error occurred while retrieving the customer',
+                'message' => 'An error occurred while retrieving the client',
                 'error' => $e->getMessage()
             ], 500);
         }

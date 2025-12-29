@@ -33,6 +33,7 @@
         showLoader();
         try {
             let res = await axios.get("/admin/get/clients");
+            console.log('--------',res);
             if (res.status === 200 && res.data.status === 'success') {
                 let tableList = $("#tableList");
                 tableList.empty(); 

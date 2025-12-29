@@ -5,7 +5,7 @@
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0"><i class="mdi mdi-silverware-fork-knife me-2"></i>Meal Order Details</h5>
             <a href="{{ url()->previous() }}" class="btn btn-light btn-sm">
-                <i class="mdi mdi-arrow-left me-1"></i> Back
+                <i class="mdi mdi-arrow-left me-1"></i> Back222
             </a>
         </div>
         <div class="card-body">
@@ -298,7 +298,6 @@ async function loadDailyCalories(range) {
             errorToast(res.data.message);
         }
     } catch (err) {
-        console.error(err);
         errorToast('Failed to load calories data');
     } finally {
         hideLoader();
@@ -358,6 +357,20 @@ function renderBarChart(labels, data, unit, totalCalories, range) {
                     },
                     grid: {
                         color: "rgba(0, 0, 0, 0.1)"
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        callback: function(value, index, values) {
+                            // For months with many dates, show every nth label to avoid overcrowding
+                            const totalLabels = this.getLabels().length;
+                            if (totalLabels > 15 && (index % 2 === 0 || index === 0 || index === totalLabels - 1)) {
+                                return formattedLabels[index];
+                            } else if (totalLabels <= 15) {
+                                return formattedLabels[index];
+                            }
+                            return '';
+                        }
                     }
                 }
             },
@@ -380,9 +393,18 @@ function renderBarChart(labels, data, unit, totalCalories, range) {
                     displayColors: false,
                     callbacks: {
                         title: function(tooltipItems) {
-                            // Show original date in tooltip title
+                            // Show full date in tooltip title
                             const index = tooltipItems[0].dataIndex;
-                            return labels[index] || 'Unknown Date';
+                            const date = new Date(labels[index]);
+                            if (!isNaN(date.getTime())) {
+                                return date.toLocaleDateString('en-US', {
+                                    weekday: 'long',
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                });
+                            }
+                            return 'Unknown Date';
                         },
                         label: function(context) {
                             const date = labels[context.dataIndex];
@@ -423,47 +445,18 @@ function renderBarChart(labels, data, unit, totalCalories, range) {
 function formatChartLabels(labels, range) {
     if (!labels || labels.length === 0) return labels;
 
-    switch (range) {
-        case 'today':
-        case 'yesterday':
-            // For single day, show time if available, otherwise just the date
-            return labels.map(label => {
-                const date = new Date(label);
-                return date.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-            });
+    // Sort labels chronologically
+    const sortedLabels = [...labels].sort((a, b) => new Date(a) - new Date(b));
 
-        case '7days':
-            // For 7 days, show short date format
-            return labels.map(label => {
-                const date = new Date(label);
-                return date.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric'
-                });
-            });
-
-        case 'current_month':
-        case 'last_month':
-            // For months, show day numbers
-            return labels.map(label => {
-                const date = new Date(label);
-                return date.getDate().toString();
-            });
-
-        default:
-            return labels.map(label => {
-                const date = new Date(label);
-                return date.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric'
-                });
-            });
-    }
+    // Always use the same format: "Weekday, Month Day" (e.g., "Mon, Dec 1")
+    return sortedLabels.map(label => {
+        const date = new Date(label);
+        return date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
+        });
+    });
 }
 
 function toTitleCase(str) {
@@ -471,7 +464,7 @@ function toTitleCase(str) {
     return str.trim().toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
 }
 
-// Utility functions (make sure these exist in your global scope)
+// Utility functions
 function showLoader() {
     // Implement your loader show logic
     console.log('Loading...');

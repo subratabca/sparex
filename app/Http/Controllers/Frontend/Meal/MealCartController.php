@@ -22,6 +22,7 @@ class MealCartController extends Controller
     {
         $request->validate([
             'meal_date' => 'required|date|after:today',
+            'meal_time' => 'nullable|date_format:H:i',
             'meal_type_id' => 'required|integer|exists:meal_types,id',
             'product_id' => 'required|integer|exists:products,id',
             'quantity' => 'required|integer|min:1',
@@ -54,6 +55,7 @@ class MealCartController extends Controller
 
             MealCart::create([
                 'meal_date' => $request->meal_date,
+                'meal_time' => $request->meal_time, 
                 'client_id' => $product->client_id,
                 'customer_id' => $customerId,
                 'meal_type_id' => $request->meal_type_id,
@@ -121,6 +123,7 @@ class MealCartController extends Controller
                                 'unit_price' => $item->unit_price,
                                 'total_price' => $item->total_price,
                                 'meal_type' => $item->mealType,
+                                'meal_time' => $item->meal_time, // Add meal_time here
                                 'product' => $item->product,
                                 'client' => $item->client ? [
                                     'firstName' => $item->client->firstName,

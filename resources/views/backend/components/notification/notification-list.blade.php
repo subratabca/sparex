@@ -33,60 +33,85 @@ async function getList() {
     try {
         let res = await axios.get("/admin/notification/list/info");
 
+        if (res.data.status !== 'success') {
+            errorToast(res.data.message || 'Failed to load notifications');
+            hideLoader();
+            return;
+        }
+
         let tableList = $("#tableList");
         tableList.empty(); 
 
+        const unreadNotifications = res.data.unreadNotifications || [];
+        const readNotifications = res.data.readNotifications || [];
+        
+        // Combine all notifications
         const notifications = [
-            ...res.data.unreadNotifications.map(item => ({ ...item, status: 'unread' })),
-            ...res.data.readNotifications.map(item => ({ ...item, status: 'read' }))
+            ...unreadNotifications.map(item => ({ ...item, status: 'unread' })),
+            ...readNotifications.map(item => ({ ...item, status: 'read' }))
         ];
 
+        // Sort by created_at (most recent first)
+        notifications.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
         function getNotificationLink(notification) {
-            if (notification.data) {
-                if (notification.data.order_id) {
-                    return `/admin/order/details/${notification.data.order_id}?notification_id=${notification.id}`;
-                } else if (notification.data.complaint_id) {
-                    return `/admin/complaint/details/${notification.data.complaint_id}?notification_id=${notification.id}`;
-                } else if (notification.data.product_id) {
-                    return `/admin/product/details/${notification.data.product_id}?notification_id=${notification.id}`;
-                }else if (notification.data.client_id) {
-                    return `/admin/client/details/${notification.data.client_id}?notification_id=${notification.id}`;
-                }else if (notification.data.customer_id) {
-                    return `/admin/customer/details/${notification.data.customer_id}?notification_id=${notification.id}`;
-                }else if (notification.data.customer_complain_id) {
-                    return `/admin/customer-complain/details/${notification.data.customer_complain_id}?notification_id=${notification.id}`;
+            if (notification && notification.data) {
+                const data = notification.data;
+                
+                if (data.order_id) {
+                    return `/admin/order/details/${data.order_id}?notification_id=${notification.id}`;
+                } else if (data.meal_order_id) {
+                    return `/admin/meal-order/details/${data.meal_order_id}?notification_id=${notification.id}`;
+                } else if (data.complaint_id) {
+                    return `/admin/complaint/details/${data.complaint_id}?notification_id=${notification.id}`;
+                } else if (data.product_id) {
+                    return `/admin/product/details/${data.product_id}?notification_id=${notification.id}`;
+                } else if (data.client_id) {
+                    return `/admin/client/details/${data.client_id}?notification_id=${notification.id}`;
+                } else if (data.customer_id) {
+                    return `/admin/customer/details/${data.customer_id}?notification_id=${notification.id}`;
+                } else if (data.customer_complain_id) {
+                    return `/admin/customer-complain/details/${data.customer_complain_id}?notification_id=${notification.id}`;
                 }
             }
             return '#'; 
         }
 
-         
+        if (notifications.length === 0) {
+            tableList.append('<tr><td colspan="6" class="text-center py-4">No notifications found</td></tr>');
+        } else {
+            notifications.forEach(function (item, index) {
+                const link = getNotificationLink(item);
+                let date = new Date(item.created_at);
+                
+                let notificationText = item.data?.data || 'Notification';
+                let badgeClass = item.status === 'unread' ? 'badge bg-danger' : 'badge bg-success';
+                let badgeText = item.status.charAt(0).toUpperCase() + item.status.slice(1);
 
-        notifications.forEach(function (item, index) {
-            const link = getNotificationLink(item);
-            let date = new Date(item.created_at);
-
-            let badgeClass = item.status === 'unread' ? 'badge bg-danger' : 'badge bg-success';
-            let badgeText = item.status.charAt(0).toUpperCase() + item.status.slice(1);
-
-            let row = `<tr>
-                        <td class="text-truncate">${index + 1}</td>
-                        <td class="text-truncate"><a href="${link}">${item.data.data}</a></td>
-                        <td class="text-truncate">${date.toLocaleDateString()}</td>
-                        <td class="text-truncate">${date.toLocaleTimeString()}</td>
-                        <td class="text-truncate"><span class="${badgeClass}">${badgeText}</span></td>
-                        <td class="text-truncate">
-                           <button class="btn btn-danger" onclick="deleteNotification('${item.id}')">Delete</button>
-                        </td>
-                     </tr>`;
-            tableList.append(row);
-        });
+                let row = `<tr>
+                            <td class="text-truncate">${index + 1}</td>
+                            <td class="text-truncate">
+                                <a href="${link}" class="text-decoration-none">
+                                    ${notificationText}
+                                </a>
+                            </td>
+                            <td class="text-truncate">${date.toLocaleDateString()}</td>
+                            <td class="text-truncate">${date.toLocaleTimeString()}</td>
+                            <td class="text-truncate"><span class="${badgeClass}">${badgeText}</span></td>
+                            <td class="text-truncate">
+                               <button class="btn btn-danger btn-sm" onclick="deleteNotification('${item.id}')">Delete</button>
+                            </td>
+                         </tr>`;
+                tableList.append(row);
+            });
+        }
+        
         initializeDataTable();
 
     } catch (error) {
+        console.error('Error loading notifications:', error);
         handleError(error);
-    }finally{
+    } finally {
         hideLoader();
     }
 }
@@ -103,57 +128,60 @@ function initializeDataTable() {
         "ordering": true,
         "searching": true, 
         "lengthMenu": [10, 25, 50, 100], 
-        "pageLength": 10, 
+        "pageLength": 10,
+        "order": [[2, 'desc']] // Order by date column (3rd column)
     });
 }
 
 async function deleteNotification(notificationId) {
+    if (!confirm('Are you sure you want to delete this notification?')) {
+        return;
+    }
+    
     try {
         let res = await axios.delete(`/admin/delete/notification/${notificationId}`);
-        if (res.status === 200) {
-            successToast(res.data.message || 'Request success');
+        if (res.status === 200 && res.data.status === 'success') {
+            successToast(res.data.message || 'Notification deleted successfully');
             await getList(); 
         } else {
-            errorToast(res.data.message || "Request failed");
+            errorToast(res.data.message || "Failed to delete notification");
         }
     } catch (error) {
+        console.error('Delete notification error:', error);
         if (error.response) {
-            const status = error.response.status;
-            const message = error.response.data.message || 'An unexpected error occurred';
-
-            if (status === 404) {
-                if (error.response.data.status === 'failed to fetch user') {
-                    errorToast(error.response.data.message || 'User not found');
-                } else if (error.response.data.status === 'failed') {
-                    errorToast(error.response.data.message || 'Notification not found');
-                } else {
-                    errorToast(message);
-                }
-            } else if (status === 500) {
-                errorToast('Server error: ' + message);
+            if (error.response.status === 404) {
+                errorToast(error.response.data.message || 'Notification not found');
+            } else if (error.response.status === 500) {
+                errorToast('Server error occurred');
             } else {
-                errorToast(message); 
+                errorToast(error.response.data.message || 'Failed to delete notification');
             }
         } else {
-            errorToast('Error: ' + error.message); 
+            errorToast('Network error occurred');
         }
     }
 }
-
 
 function handleError(error) {
     if (error.response) {
         if (error.response.status === 400) {
             errorToast(error.response.data.message || "Unauthorized! Need to login.");
+        } else if (error.response.status === 401) {
+            errorToast("Session expired. Please login again.");
+        } else if (error.response.status === 404) {
+            errorToast("User not found.");
         } else if (error.response.status === 500) {
-            errorToast(error.response.data.message || "An internal server error occurred.");
+            errorToast("Server error. Please try again later.");
         } else {
             errorToast("Request failed!");
         }
+    } else if (error.request) {
+        errorToast("No response from server. Please check your connection.");
     } else {
-        errorToast("Request failed!");
+        errorToast("Error: " + error.message);
     }
 }
+</script>
 
 </script>
 

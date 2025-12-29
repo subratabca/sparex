@@ -19,7 +19,7 @@ class ClientAuthController extends Controller
 {
     public function registrationTermsConditionsPage()
     {
-        return view('frontend.pages.terms-condition.client-registration-terms-condition-page');
+        return view('client.pages.terms-condition.registration-terms-condition-page');
     }
 
     public function registrationTermsConditionsInfo(Request $request, $name)

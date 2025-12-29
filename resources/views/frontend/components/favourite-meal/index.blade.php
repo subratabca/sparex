@@ -24,6 +24,12 @@
                     <input type="date" id="meal-date" class="form-control" style="max-width: 220px;">
                 </div>
 
+                <!-- ⏰ Time Input -->
+                <div>
+                    <label for="meal-time" class="form-label fw-bold mb-1">Select Time:</label>
+                    <input type="time" id="meal-time" class="form-control" style="max-width: 150px;" value="12:00">
+                </div>
+
                 <!-- 🍽️ Meal Type Buttons -->
                 <div id="meal-type-buttons" class="d-flex flex-wrap gap-2 mt-3 mt-md-0"></div>
             </div>
@@ -86,6 +92,12 @@
                     <input type="date" id="modal-meal-date" class="form-control">
                 </div>
 
+                <!-- Meal Time -->
+                <div class="mb-3">
+                    <label for="modal-meal-time" class="form-label fw-semibold">Time:</label>
+                    <input type="time" id="modal-meal-time" class="form-control">
+                </div>
+
                 <!-- Quantity -->
                 <div class="mb-3">
                     <label for="meal-quantity" class="form-label fw-semibold">Quantity:</label>
@@ -119,7 +131,6 @@
     </div>
 </div>
 
-
 <script>
 let userLatitude = null;
 let userLongitude = null;
@@ -128,12 +139,16 @@ let selectedKeywords = [];
 let selectedProduct = null;
 let allProducts = [];
 let selectedMealDate = null;
-
+let selectedMealTime = null;
+let customerMealTimes = {}; // Store customer's meal times for each date and meal type
 
 document.addEventListener("DOMContentLoaded", async () => {
     setDateRange(); 
     await loadMealTypes(); 
     await getUserLocation();
+    
+    // Load customer's existing meal times
+    await loadCustomerMealTimes();
 
     const urlParams = new URLSearchParams(window.location.search);
     const selectedTypeName = urlParams.get('meal_type');
@@ -154,9 +169,74 @@ document.addEventListener("DOMContentLoaded", async () => {
         dateInput.value = selectedDate;
     }
 
-
-
+    // Add event listener for time input
+    document.getElementById('meal-time').addEventListener('change', function() {
+        selectedMealTime = this.value;
+    });
+    
+    // Add event listener for date input
+    document.getElementById('meal-date').addEventListener('change', function() {
+        updateTimeForSelectedMealType();
+    });
+    
+    // Initialize with default time
+    selectedMealTime = document.getElementById('meal-time').value;
 });
+
+// Load customer's existing meal times from cart
+async function loadCustomerMealTimes() {
+    try {
+        const response = await axios.get('/user/get/meal-times');
+        if (response.status === 200 && response.data.status === 'success') {
+            customerMealTimes = response.data.data || {};
+        }
+    } catch (error) {
+        console.error('Failed to load meal times:', error);
+        customerMealTimes = {};
+    }
+}
+
+// Update time input based on selected date and meal type
+async function updateTimeForSelectedMealType() {
+    const date = document.getElementById('meal-date').value;
+    const mealTypeId = selectedMealTypeId;
+    
+    if (!date || !mealTypeId) return;
+    
+    // Check if customer already has items for this date and meal type
+    const key = `${date}_${mealTypeId}`;
+    const existingTime = customerMealTimes[key];
+    
+    if (existingTime) {
+        // Set time to existing time for this meal type on this date
+        document.getElementById('meal-time').value = existingTime;
+        selectedMealTime = existingTime;
+    } else {
+        // Set default time based on meal type
+        setDefaultTimeForMealType(mealTypeId);
+    }
+}
+
+// Set default time based on meal type
+function setDefaultTimeForMealType(mealTypeId) {
+    // Get meal type name from active button
+    const mealTypeButton = document.querySelector('#meal-type-buttons button.active');
+    if (!mealTypeButton) return;
+    
+    const mealTypeName = mealTypeButton.textContent.trim().toLowerCase();
+    
+    // Set default times based on meal type
+    const defaultTimes = {
+        'breakfast': '08:00',
+        'lunch': '12:00',
+        'snacks': '16:00',
+        'dinner': '19:00'
+    };
+    
+    const defaultTime = defaultTimes[mealTypeName] || '12:00';
+    document.getElementById('meal-time').value = defaultTime;
+    selectedMealTime = defaultTime;
+}
 
 async function getUserLocation() {
     if (navigator.geolocation) {
@@ -197,7 +277,9 @@ async function loadMealTypes() {
                 const btn = document.createElement('button');
                 btn.className = 'btn btn-outline-primary rounded-pill px-4 py-2 fw-semibold text-capitalize shadow-sm hover-effect';
                 btn.textContent = mealType.name;
-                btn.onclick = (event) => selectMealType(event, mealType.id);
+                btn.onclick = async (event) => {
+                    await selectMealType(event, mealType.id);
+                };
                 buttonContainer.appendChild(btn);
             });
         } else {
@@ -212,6 +294,10 @@ async function selectMealType(event, mealTypeId) {
     document.querySelectorAll('#meal-type-buttons button').forEach(btn => btn.classList.remove('active'));
     event.target.classList.add('active');
     selectedMealTypeId = mealTypeId;
+    
+    // Update time for selected meal type and date
+    await updateTimeForSelectedMealType();
+    
     await loadMealKeywords(mealTypeId);
 }
 
@@ -394,7 +480,6 @@ function formatNutrientName(key) {
     return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
-
 // 🥗 Open Add to Meal Plan Modal
 function openAddMealModal(index) {
     const product = allProducts[index];
@@ -426,8 +511,13 @@ function openAddMealModal(index) {
     const mainDateInput = document.getElementById('meal-date');
     const modalDateInput = document.getElementById('modal-meal-date');
 
+    // ⏰ Sync selected time from main input
+    const mainTimeInput = document.getElementById('meal-time');
+    const modalTimeInput = document.getElementById('modal-meal-time');
+
     // Use the selected date from the main date picker
     const selectedMainDate = mainDateInput.value;
+    const selectedMainTime = mainTimeInput.value;
 
     // Limit date range: from tomorrow to next 7 days (same as main input)
     const today = new Date();
@@ -442,6 +532,9 @@ function openAddMealModal(index) {
     // Default date = selected main date (fallback to tomorrow if empty)
     modalDateInput.value = selectedMainDate || tomorrow.toISOString().split("T")[0];
 
+    // Default time = selected main time (fallback to 12:00 if empty)
+    modalTimeInput.value = selectedMainTime || '12:00';
+
     // 🖼️ Set product image
     const imageElement = document.getElementById('modal-product-image');
     imageElement.src = product.image 
@@ -455,16 +548,34 @@ function openAddMealModal(index) {
 document.getElementById('confirm-add-meal').addEventListener('click', async () => {
     const mealTypeSelect = document.getElementById('modal-meal-type');
     const mealDateInput = document.getElementById('modal-meal-date');
+    const mealTimeInput = document.getElementById('modal-meal-time');
     const quantityInput = document.getElementById('meal-quantity');
 
     const mealTypeId = parseInt(mealTypeSelect.value);
     const selectedDate = mealDateInput.value;
+    const selectedTime = mealTimeInput.value;
     const quantity = parseInt(quantityInput.value);
 
     if (!selectedProduct) return errorToast('No product selected.');
     if (!mealTypeId) return errorToast('Please select a meal type.');
     if (!selectedDate) return errorToast('Please choose a date.');
+    if (!selectedTime) return errorToast('Please choose a time.');
     if (!quantity || quantity <= 0) return errorToast('Invalid quantity.');
+
+    // Validate time consistency for this meal type on this date
+    const key = `${selectedDate}_${mealTypeId}`;
+    const existingTime = customerMealTimes[key];
+    
+    if (existingTime && existingTime !== selectedTime) {
+        // Get meal type name for error message
+        let mealTypeName = 'this meal type';
+        const selectedOption = mealTypeSelect.options[mealTypeSelect.selectedIndex];
+        if (selectedOption) {
+            mealTypeName = selectedOption.text;
+        }
+        
+        return errorToast(`For ${selectedDate}, all ${mealTypeName} items must have the same time. You have already selected items for ${mealTypeName} at ${existingTime}. Please use ${existingTime} or remove existing ${mealTypeName} items first.`);
+    }
 
     try {
         showLoader();
@@ -472,11 +583,16 @@ document.getElementById('confirm-add-meal').addEventListener('click', async () =
             product_id: selectedProduct.id,
             meal_type_id: mealTypeId,
             meal_date: selectedDate,
+            meal_time: selectedTime, 
             quantity: quantity
         });
 
         if (res.status === 201 && res.data.status === 'success') {
             successToast(res.data.message || 'Meal added successfully!');
+            
+            // Update local meal times data
+            customerMealTimes[key] = selectedTime;
+            
             bootstrap.Modal.getInstance(document.getElementById('addMealPlanModal')).hide();
         } else {
             errorToast(res.data.message || 'Failed to add to meal plan.');
@@ -517,7 +633,6 @@ function updatePagination(paginationData) {
     }
     paginationContainer.appendChild(createPageItem('Next »', current_page + 1, current_page === last_page));
 }
-
 
 function handleError(error) {
     if (error.response) {
@@ -564,4 +679,3 @@ function handleError(error) {
 </style>
 
 @endsection
-

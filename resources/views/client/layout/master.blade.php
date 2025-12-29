@@ -231,6 +231,8 @@ function displayNotifications(unreadNotifications, readNotifications) {
                 return `/client/account/details/${notification.data.client_id}?notification_id=${notificationId}`;
             } else if (notification.data.customer_complain_id) {
                 return `/client/customer-complain/details/${notification.data.customer_complain_id}?notification_id=${notificationId}`;
+            } else if (notification.data.meal_order_id) {
+                return `/client/meal-order/details/${notification.data.meal_order_id}?notification_id=${notificationId}`;
             }
         }
         return '#';
@@ -362,9 +364,6 @@ function handleError(error) {
         }
     }
 }
-
-
-
 </script>
 
 

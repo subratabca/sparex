@@ -48,6 +48,8 @@
             function getNotificationLink(notification) {
                 if (notification.data.customer_id) {
                     return `/user/details/${notification.data.customer_id}?notification_id=${notification.id}`;
+                } else if (notification.data.meal_order_id) {
+                    return `/user/meal-order/details/${notification.data.meal_order_id}?notification_id=${notification.id}`;
                 } else if (notification.data.order_id) {
                     return `/user/order/details/${notification.data.order_id}?notification_id=${notification.id}`;
                 } else if (notification.data.complaint_id) {

@@ -68,10 +68,24 @@
       </a>
     </li>
 
-    <li class="menu-item {{ request()->routeIs('client.meal.orders*') ? 'active' : '' }}">
+    <li class="menu-item {{ request()->routeIs('admin.meal.orders*') ? 'active' : '' }}">
       <a href="{{ route('admin.meal.orders') }}" class="menu-link">
         <i class="menu-icon tf-icons mdi mdi-food-fork-drink"></i>
         <div data-i18n="Meal Orders">Meal Orders</div>
+      </a>
+    </li>
+
+    <li class="menu-item {{ request()->routeIs('admin.client.meal.payments*') ? 'active' : '' }}">
+      <a href="{{ route('admin.client.meal.payments') }}" class="menu-link">
+        <i class="menu-icon tf-icons mdi mdi-food-fork-drink"></i>
+        <div data-i18n="Client Meal Payment">Client Meal Payment</div>
+      </a>
+    </li>
+
+    <li class="menu-item {{ $currentRoute == 'delivery-persons' ? 'active' : '' }}">
+      <a href="{{ route('admin.delivery.persons') }}" class="menu-link">
+        <i class="menu-icon tf-icons mdi mdi-truck-delivery-outline"></i>
+        <div data-i18n="Delivery Person">Delivery Person</div>
       </a>
     </li>
 

@@ -19,7 +19,7 @@ return new class extends Migration
             $table->enum('type', ['credit', 'debit']);
 
             // Payment method for credit additions
-            $table->enum('method', ['cash','credit','stripe','paypal'])->nullable();
+            $table->enum('payment_method', ['cash','credit','stripe','paypal'])->nullable();
 
             // Amount credited or debited
             $table->decimal('amount', 10, 2);

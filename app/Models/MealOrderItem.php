@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class MealOrderItem extends Model
 {
-    protected $fillable = ['meal_order_id','meal_date','client_id','meal_type_id','product_id','quantity','unit_price','total_price'];
+    protected $fillable = ['meal_order_id','meal_date','meal_time','client_id','meal_type_id','product_id','quantity','unit_price','total_price','delivery_status','delivery_person_id','handover_time','delivered_time'];
 
     public function client()
     {
@@ -26,5 +26,15 @@ class MealOrderItem extends Model
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id');
+    }
+
+    public function deliveryPerson()
+    {
+        return $this->belongsTo(User::class, 'delivery_person_id');
+    }
+
+    public function deliveryStatusHistory()
+    {
+        return $this->hasMany(MealDeliveryStatusHistory::class, 'meal_order_item_id');
     }
 }

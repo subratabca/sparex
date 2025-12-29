@@ -16,6 +16,7 @@
                   <option value="Food Deliver">Food Deliver</option>
                   <option value="Customer Registration">Customer Registration</option>
                   <option value="Client Registration">Client Registration</option>
+                  <option value="Delivery Registration">Delivery Registration</option>
                 </select>
                 <span class="error-message text-danger" id="name-error"></span> 
               </div>

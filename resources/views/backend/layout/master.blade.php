@@ -182,21 +182,12 @@ document.addEventListener("DOMContentLoaded", async function () {
           document.getElementById('login-user-img1').src = userData['image'] ? "/upload/admin-profile/small/" + userData['image'] : "/upload/no_image.jpg";
       }
   } catch (error) {
-      if (error.response) {
-          const status = error.response.status;
-          const message = error.response.data.message || 'An unexpected error occurred';
+        handleError(error);
+    } finally {
+        hideLoader();
+    }
+})
 
-          if (status === 400) {
-              errorToast(message || 'Bad Request');
-          } else if (status === 500) {
-              errorToast(message || 'Server Error');
-          } else {
-              errorToast(message);
-          }
-      } else {
-          errorToast1('No response received from the server.');
-      }
-  }
 
 function displayNotifications(unreadNotifications, readNotifications) {
     const notificationsContainer = document.querySelector('.dropdown-notifications-list ul');
@@ -210,23 +201,28 @@ function displayNotifications(unreadNotifications, readNotifications) {
     
 
     function getNotificationLink(notification) {
-        if (notification.data) {
-            if (notification.data.order_id) {
-                return `/admin/order/details/${notification.data.order_id}?notification_id=${notification.id}`;
-            } else if (notification.data.complaint_id) {
-                return `/admin/complaint/details/${notification.data.complaint_id}?notification_id=${notification.id}`;
-            } else if (notification.data.product_id) {
-                return `/admin/product/details/${notification.data.product_id}?notification_id=${notification.id}`;
-            }else if (notification.data.client_id) {
-                return `/admin/client/details/${notification.data.client_id}?notification_id=${notification.id}`;
-            }else if (notification.data.customer_id) {
-                return `/admin/customer/details/${notification.data.customer_id}?notification_id=${notification.id}`;
-            }else if (notification.data.customer_complain_id) {
-                return `/admin/customer-complain/details/${notification.data.customer_complain_id}?notification_id=${notification.id}`;
-            }
+        if (!notification || !notification.data) return '#';
+        
+        const data = notification.data;
+        
+        if (data.order_id) {
+            return `/admin/order/details/${data.order_id}?notification_id=${notification.id}`;
+        } else if (data.meal_order_id) {
+            return `/admin/meal-order/details/${data.meal_order_id}?notification_id=${notification.id}`;
+        } else if (data.complaint_id) {
+            return `/admin/complaint/details/${data.complaint_id}?notification_id=${notification.id}`;
+        } else if (data.product_id) {
+            return `/admin/product/details/${data.product_id}?notification_id=${notification.id}`;
+        } else if (data.client_id) {
+            return `/admin/client/details/${data.client_id}?notification_id=${notification.id}`;
+        } else if (data.customer_id) {
+            return `/admin/customer/details/${data.customer_id}?notification_id=${notification.id}`;
+        } else if (data.customer_complain_id) {
+            return `/admin/customer-complain/details/${data.customer_complain_id}?notification_id=${notification.id}`;
         }
         return '#'; 
     }
+
 
     if (unreadNotifications && unreadNotifications.length > 0) {
         unreadNotifications.forEach(notification => {
@@ -268,7 +264,7 @@ function displayNotifications(unreadNotifications, readNotifications) {
 
     notificationsContainer.innerHTML = notificationsHTML;
 }
-});
+
 
 
 async function deleteNotification(notificationId) {
@@ -303,9 +299,7 @@ async function deleteNotification(notificationId) {
             errorToast('Error: ' + error.message); 
         }
     }
-
 }
-
 
 async function markAllAsRead() {
       try {
@@ -344,6 +338,21 @@ async function markAllAsRead() {
               errorToast('No response received from the server.');
           }
       }
+}
+
+function handleError(error) {
+    if (error.response) {
+        const status = error.response.status;
+        const message = error.response.data.message || 'An unexpected error occurred';
+
+        if (status === 400) {
+            errorToast(message || 'Bad Request');
+        } else if (status === 500) {
+            errorToast(message || 'Server Error');
+        } else {
+            errorToast(message);
+        }
+    }
 }
 </script>
 

@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('email', 50)->unique();
             $table->string('mobile', 50)->nullable();
             $table->string('image', 255)->nullable();
-            $table->enum('role', ['admin', 'client', 'customer'])->default('customer');
+            $table->enum('role', ['admin', 'client', 'customer','delivery'])->default('customer');
             $table->string('password', 255); 
             $table->boolean('accept_registration_tnc')->default(0);
             $table->string('otp', 6); 

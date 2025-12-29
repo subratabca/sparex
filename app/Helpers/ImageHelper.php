@@ -184,4 +184,22 @@ class ImageHelper
 
         return $imageName;
     }
+
+    public static function processDeliveryVehicleImage($request, $oldImage = null)
+    {
+        if ($request->hasFile('image')) {
+            return self::processAndSaveImage(
+                $request->file('image'),
+                'vehicle',
+                false,
+                $oldImage
+            );
+        }
+        return $oldImage;
+    }
+
+    public static function deleteDeliveryVehicleImage($imageName)
+    {
+        return self::deleteOldImages($imageName, 'vehicle');
+    }
 }

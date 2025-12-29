@@ -599,6 +599,118 @@ function renderMealCart(mealCart) {
         mealTypes.forEach(type => {
             const typeTitle = toTitleCase(type);
             const items = dayItems.filter(i => i.meal_type?.name === type);
+            
+            // Get meal time for this meal type (assuming all items of same type have same meal time)
+            const mealTime = items[0]?.meal_time ? items[0].meal_time : null;
+            
+            // Format meal time if it exists
+            let deliveryTimeHtml = '';
+            if (mealTime) {
+                deliveryTimeHtml = `<span class="text-muted ms-2">|| Delivery Time: ${mealTime}</span>`;
+            }
+
+            mealTypeHtml += `
+                <h6 class="mt-3 d-flex align-items-center">
+                    <span>${typeTitle} (${items.length} items)</span>
+                    ${deliveryTimeHtml}
+                </h6>
+                <ul class="list-group mb-3">
+            `;
+
+            items.forEach(item => {
+                const productName = toTitleCase(item.product?.name || '');
+                const img = item.product?.image
+                    ? `/upload/product/small/${item.product.image}`
+                    : '/upload/no_image.jpg';
+
+                const clientName = item.client
+                    ? toTitleCase(
+                        [item.client.firstName, item.client.lastName]
+                            .filter(Boolean)
+                            .join(" ")
+                      )
+                    : "";
+
+                mealTypeHtml += `
+                    <li class="list-group-item d-flex justify-content-between align-items-center"
+                        data-product-id="${item.product?.id}"
+                        data-meal-type-id="${item.meal_type?.id}"
+                        data-client-id="${item.client?.id || ''}">
+                        <div class="d-flex align-items-center gap-3">
+                            <img src="${img}" alt="${productName}"
+                                class="rounded" style="width:60px;height:60px;object-fit:cover;">
+                            <div>
+                                <strong>${productName}</strong><br>
+                                $${parseFloat(item.unit_price).toFixed(2)}<br>
+                                ${clientName ? `<small class="text-muted">Provider: ${clientName}</small>` : ''}
+                            </div>
+                        </div>
+
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="number"
+                                class="form-control form-control-sm w-25"
+                                value="${item.quantity}" min="1"
+                                onchange="updateMealItem(${item.id}, this.value)">
+                            <button class="btn btn-sm btn-outline-danger"
+                                onclick="removeMealItem(${item.id})">&times;</button>
+                        </div>
+                    </li>
+                `;
+            });
+
+            mealTypeHtml += `</ul>`;
+        });
+
+        const block = `
+            <div class="accordion-item shadow-sm mb-3">
+                <h2 class="accordion-header">
+                    <button class="accordion-button ${index !== 0 ? 'collapsed' : ''}"
+                        type="button" data-bs-toggle="collapse"
+                        data-bs-target="#${collapseId}">
+                        ${formattedDate}
+                    </button>
+                </h2>
+
+                <div id="${collapseId}"
+                    class="accordion-collapse collapse ${index === 0 ? 'show' : ''}"
+                    data-bs-parent="#mealCartAccordion">
+                    <div class="accordion-body">${mealTypeHtml}</div>
+                </div>
+            </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', block);
+    });
+}
+
+function renderMealCart111(mealCart) {
+    const container = document.getElementById('mealCartAccordion');
+    container.innerHTML = '';
+
+    const dates = Object.keys(mealCart);
+
+    if (dates.length === 0) {
+        container.innerHTML = `<div class="alert alert-info">Your meal cart is empty.</div>`;
+        return;
+    }
+
+    dates.forEach((date, index) => {
+        const dayItems = mealCart[date];
+        const collapseId = `mealDay${index}`;
+
+        const formattedDate = new Date(date).toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric'
+        });
+
+        const mealTypes = [...new Set(dayItems.map(i => i.meal_type?.name))].filter(Boolean);
+
+        let mealTypeHtml = '';
+
+        mealTypes.forEach(type => {
+            const typeTitle = toTitleCase(type);
+            const items = dayItems.filter(i => i.meal_type?.name === type);
 
             mealTypeHtml += `
                 <h6 class="mt-3">${typeTitle} (${items.length} items)</h6>
@@ -1168,8 +1280,6 @@ async function processPayment(event) {
                     }
                     
                 } catch (stripeError) {
-                    console.error('❌ Stripe processing error:', stripeError);
-                    
                     if (stripeError.response?.data?.message) {
                         errorToast('Payment Error: ' + stripeError.response.data.message);
                     } else if (stripeError.message) {
@@ -1202,7 +1312,6 @@ async function processPayment(event) {
                     response = await axios.post(endpoint, requestData);
                     
                 } catch (creditError) {
-                    console.error('❌ Credit payment error:', creditError);
                     errorToast(creditError.message || 'Credit payment failed');
                     hideLoader();
                     submitBtn.disabled = false;
@@ -1217,7 +1326,6 @@ async function processPayment(event) {
                 try {
                     response = await axios.post(endpoint, requestData);
                 } catch (cashError) {
-                    console.error('❌ Cash payment error:', cashError);
                     errorToast(cashError.message || 'Cash payment failed');
                     hideLoader();
                     submitBtn.disabled = false;
