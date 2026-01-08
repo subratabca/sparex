@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class MealOrderItem extends Model
 {
-    protected $fillable = ['meal_order_id','meal_date','meal_time','client_id','meal_type_id','product_id','quantity','unit_price','total_price','delivery_status','delivery_person_id','handover_time','delivered_time'];
+    protected $fillable = ['meal_order_id','meal_date','meal_time','client_id','meal_type_id','product_id','quantity','unit_price','total_price'];
 
     public function client()
     {
@@ -28,13 +28,27 @@ class MealOrderItem extends Model
         return $this->belongsTo(Product::class, 'product_id');
     }
 
-    public function deliveryPerson()
+    // Delivery details are now handled through DeliveryChargeLedger
+    public function deliveryChargeLedger()
     {
-        return $this->belongsTo(User::class, 'delivery_person_id');
+        return $this->belongsTo(DeliveryChargeLedger::class, 'delivery_charge_ledger_id');
     }
 
-    public function deliveryStatusHistory()
+    // Helper method to get delivery status through DeliveryChargeLedger
+    public function getDeliveryStatusAttribute()
     {
-        return $this->hasMany(MealDeliveryStatusHistory::class, 'meal_order_item_id');
+        return $this->deliveryChargeLedger->delivery_status ?? null;
+    }
+
+    // Helper method to get delivery person through DeliveryChargeLedger
+    public function getDeliveryPersonAttribute()
+    {
+        return $this->deliveryChargeLedger->deliveryPerson ?? null;
+    }
+
+    // Helper method to get tracking number through DeliveryChargeLedger
+    public function getTrackingNumberAttribute()
+    {
+        return $this->deliveryChargeLedger->order_tracking ?? null;
     }
 }

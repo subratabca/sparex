@@ -63,6 +63,7 @@ use App\Http\Controllers\Delivery\Auth\DeliveryAuthController;
 use App\Http\Controllers\Delivery\DeliveryDashboardController;
 use App\Http\Controllers\Delivery\DeliveryProfileController;
 use App\Http\Controllers\Delivery\DeliveryNotificationController;
+use App\Http\Controllers\Delivery\DeliveryMealOrderController;
 
 
 
@@ -731,6 +732,8 @@ Route::prefix('client')->middleware([ClientTokenVerificationMiddleware::class])-
 
         Route::get('/meal-order/{order_id}/date/{date}', 'viewOrderDetailsByDate');
         Route::get('/get/meal-order/{order_id}/date/{date}', 'getMealOrderDetailsByDate');
+
+        Route::post('/update/delivery-status/{orderId}', 'updateDeliveryStatus');
     });
 
     Route::controller(ClientDashboardController::class)->group(function () {
@@ -971,5 +974,9 @@ Route::prefix('delivery')->middleware([DeliveryTokenVerificationMiddleware::clas
         Route::get('/notification/list/info', 'notificationList');
         Route::get('/markAsRead', 'markAsRead')->name('delivery.markRead');
         Route::delete('/delete/notification/{notificationId}', 'deleteNotification');
+    });
+
+    Route::controller(DeliveryMealOrderController::class)->group(function () {
+        Route::post('/update/delivery-status/{orderId}', 'updateDeliveryStatus');
     });
 });

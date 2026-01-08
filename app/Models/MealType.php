@@ -28,4 +28,14 @@ class MealType extends BaseModel
         return $this->hasMany(MealDeliveryCharge::class, 'meal_type_id');
     }
 
+    public function deliveryChargeLedgers()
+    {
+        return $this->hasMany(DeliveryChargeLedger::class, 'meal_type_id');
+    }
+
+    public function mealOrderItems()
+    {
+        return $this->hasMany(MealOrderItem::class, 'meal_type_id');
+    }
+
 }

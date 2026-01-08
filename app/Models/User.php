@@ -131,9 +131,9 @@ class User extends BaseUserModel
     }
 
     // Delivery Person Relationships
-    public function assignedMealDeliveries()
+    public function assignedDeliveryLedgers()
     {
-        return $this->hasMany(MealDelivery::class, 'delivery_person_id');
+        return $this->hasMany(DeliveryChargeLedger::class, 'delivery_person_id');
     }
 
     public function deliveryStatusUpdates()
@@ -145,6 +145,21 @@ class User extends BaseUserModel
     public function deliveryVehicle()
     {
         return $this->hasOne(DeliveryVehicle::class, 'delivery_id');
+    }
+
+    public function mealOrders()
+    {
+        return $this->hasMany(MealOrder::class, 'customer_id');
+    }
+
+    public function clientMealOrders()
+    {
+        return $this->hasMany(ClientMealOrder::class, 'client_id');
+    }
+
+    public function deliveryChargeLedgers()
+    {
+        return $this->hasMany(DeliveryChargeLedger::class, 'client_id');
     }
 }
 

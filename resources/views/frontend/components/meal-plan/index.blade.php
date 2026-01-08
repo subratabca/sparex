@@ -454,4 +454,3 @@ window.onload = getUserLocation;
   </div>
 </div>
 
-Remember above code for meal order.Nothing to do.

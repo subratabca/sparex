@@ -78,6 +78,9 @@ class Product extends BaseModel
         return $this->hasMany(MealCart::class, 'product_id');
     }
 
-
+    public function mealOrderItems()
+    {
+        return $this->hasMany(MealOrderItem::class, 'product_id');
+    }
 }
 

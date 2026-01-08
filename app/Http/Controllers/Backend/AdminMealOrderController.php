@@ -263,6 +263,95 @@ class AdminMealOrderController extends Controller
                         'total_calories' => $totalCalories,
                         'calories_by_meal_type' => $caloriesByMealType,
                     ],
+                    'shipping_address' => $order->mealShippingAddress,
+                    'items' => $order->items->map(function($item) {
+                        return [
+                            'id' => $item->id,
+                            'meal_date' => $item->meal_date,
+                            'meal_time' => $item->meal_time,
+                            'meal_type' => $item->mealType ? [
+                                'id' => $item->mealType->id,
+                                'name' => $item->mealType->name
+                            ] : null,
+                            'product' => $item->product,
+                            'client' => $item->client,
+                            'quantity' => $item->quantity,
+                            'unit_price' => $item->unit_price,
+                            'total_price' => $item->total_price
+                        ];
+                    })
+                ]
+            ], 200);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getMealOrderDetails2222($id)
+    {
+        try {
+            $order = MealOrder::with([
+                'items.mealType', 
+                'items.product.nutrient',
+                'items.client:id,firstName,lastName',
+                'mealShippingAddress.country',
+                'mealShippingAddress.county', 
+                'mealShippingAddress.city'
+            ])->find($id);
+
+            if (!$order) {
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'Meal order not found.',
+                ], 404);
+            }
+
+            // Group items by meal date and meal type
+            $groupedItems = $order->items->groupBy(function($item) {
+                return $item->meal_date;
+            })->map(function($dayItems) {
+                return $dayItems->groupBy(function($item) {
+                    return $item->mealType->name ?? 'Other';
+                });
+            });
+
+            // Total calories
+            $totalCalories = $order->items->sum(function ($item) {
+                return ($item->product->nutrient->calories ?? 0) * $item->quantity;
+            });
+
+            // Calories by meal type
+            $caloriesByMealType = $order->items->groupBy(function ($item) {
+                return $item->mealType->name ?? 'Other';
+            })->map(function ($group) {
+                return $group->sum(function ($item) {
+                    return ($item->product->nutrient->calories ?? 0) * $item->quantity;
+                });
+            });
+
+            // Calculate summary from order data
+            $summary = [
+                'subtotal' => floatval($order->subtotal ?? 0),
+                'tax' => floatval($order->tax ?? 0),
+                'delivery_fee' => floatval($order->delivery_fee ?? 0),
+                'total' => floatval($order->payable_amount ?? 0),
+                'total_items' => $order->items->sum('quantity')
+            ];
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'order' => $order,
+                    'summary' => $summary,
+                    'meal_cart' => $groupedItems,
+                    'nutrition' => [
+                        'total_calories' => $totalCalories,
+                        'calories_by_meal_type' => $caloriesByMealType,
+                    ],
                     'shipping_address' => $order->mealShippingAddress
                 ]
             ], 200);

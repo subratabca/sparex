@@ -6,19 +6,25 @@ use Illuminate\Database\Eloquent\Model;
 
 class MealDeliveryStatusHistory extends Model
 {
-    protected $fillable = [
-        'meal_delivery_id',
-        'delivery_status',
-        'notes',
-        'location_lat',
-        'location_lng',
-        'updated_by_id',
-        'updated_by_type'
+    protected $fillable = ['delivery_charge_ledger_id','delivery_status','picked_up_at','delivered_at','notes','updated_by_id','updated_by_type'
     ];
 
     protected $casts = [
-        'created_at' => 'datetime'
+        'created_at' => 'datetime',
+        'picked_up_at' => 'datetime',
+        'delivered_at' => 'datetime'
     ];
+
+    // Delivery Status Constants
+    const STATUS_PENDING = 'pending';
+    const STATUS_ACCEPT_ORDER = 'accept_order';
+    const STATUS_PREPARING = 'preparing';
+    const STATUS_READY_FOR_PICKUP = 'ready_for_pickup';
+    const STATUS_PICKED_UP = 'picked_up';
+    const STATUS_ON_THE_WAY = 'on_the_way';
+    const STATUS_ARRIVED = 'arrived';
+    const STATUS_DELIVERED = 'delivered';
+    const STATUS_CANCELLED = 'cancelled';
 
     // Updated By Types
     const UPDATED_BY_CLIENT = 'client';
@@ -27,19 +33,27 @@ class MealDeliveryStatusHistory extends Model
     const UPDATED_BY_CUSTOMER = 'customer';
     const UPDATED_BY_ADMIN = 'admin';
 
+    // Status labels
+    const STATUS_LABELS = [
+        self::STATUS_PENDING => 'Pending',
+        self::STATUS_ACCEPT_ORDER => 'Accept Order',
+        self::STATUS_PREPARING => 'Preparing',
+        self::STATUS_READY_FOR_PICKUP => 'Ready for Pickup',
+        self::STATUS_PICKED_UP => 'Picked Up',
+        self::STATUS_ON_THE_WAY => 'On the Way',
+        self::STATUS_ARRIVED => 'Arrived',
+        self::STATUS_DELIVERED => 'Delivered',
+        self::STATUS_CANCELLED => 'Cancelled',
+    ];
+
     // Relationships
-    public function mealDelivery()
+    public function deliveryChargeLedger()
     {
-        return $this->belongsTo(MealDelivery::class);
+        return $this->belongsTo(DeliveryChargeLedger::class, 'delivery_charge_ledger_id');
     }
 
     public function updatedBy()
     {
-        if ($this->updated_by_type === 'user') {
-            return $this->belongsTo(User::class, 'updated_by_id');
-        }
-        
-        // For other types (client, delivery_person, etc.)
         return $this->belongsTo(User::class, 'updated_by_id');
     }
 
@@ -47,6 +61,12 @@ class MealDeliveryStatusHistory extends Model
     public function scopeByUpdaterType($query, $type)
     {
         return $query->where('updated_by_type', $type);
+    }
+
+    // Scope for filtering by delivery status
+    public function scopeByStatus($query, $status)
+    {
+        return $query->where('delivery_status', $status);
     }
 
     public function getUpdatedByLabelAttribute()
@@ -65,18 +85,6 @@ class MealDeliveryStatusHistory extends Model
     // Status label helper
     public function getStatusLabelAttribute()
     {
-        $statusLabels = MealDelivery::STATUS_LABELS ?? [
-            'pending' => 'Pending',
-            'preparing' => 'Preparing',
-            'ready_for_pickup' => 'Ready for Pickup',
-            'picked_up' => 'Picked Up',
-            'on_the_way' => 'On the Way',
-            'arrived' => 'Arrived',
-            'delivered' => 'Delivered',
-            'failed' => 'Failed',
-            'cancelled' => 'Cancelled',
-        ];
-
-        return $statusLabels[$this->delivery_status] ?? 'Unknown';
+        return self::STATUS_LABELS[$this->delivery_status] ?? 'Unknown';
     }
 }

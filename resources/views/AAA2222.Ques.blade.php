@@ -1,46 +1,13 @@
-In this project customer can order multiple meal from multiple clients(client means who will provide meal) for future booking.Meal type include breakfast,lunch,snacks,dinner. each meal type may have multiple items like breakfast have 3 items from 3 different clients. For meal delivery to customer there is a delivery charge which will calculate on distance wise from client location to customer meal shipping address.suppose customer-A order for breakfast for 3 items.1 item will come from client-1 and 2 items will come from client-2 then it will count 2 delivery charge one for clent-1 and 2nd for client-2 for same meal type for same day.if same customer may have order for dinner then delivery charge will be calculate same as breakfast this way.want to save delivery amount and payment_status as due or paid for delivery person for every delivery for same order same meal type on same day from same client delivery charge will count 1 time.Update below migration to fullfill this condition
 
-<?php
+Client can change delivery_status from pending->accept_order->preparing->ready_for_pickup
 
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+Delivery Man can change delivery_status from ready_for_pickup->picked_up->on_the_way->arrived','delivered'
 
-return new class extends Migration
-{
-    /**
-     * Run the migrations.
-     */
-    public function up(): void
-    {
-        Schema::create('meal_deliveries', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('meal_order_item_id')->constrained()->onDelete('cascade');
-            $table->foreignId('delivery_person_id')->nullable()->constrained('users');
-            $table->enum('delivery_status', ['pending','preparing','ready_for_pickup','picked_up','on_the_way','arrived','delivered','failed','cancelled'
-            ])->default('pending');
-            $table->timestamp('estimated_delivery_time')->nullable();
-            $table->timestamp('actual_delivery_time')->nullable();
-            $table->timestamp('pickup_time')->nullable();
-            $table->timestamp('handover_time')->nullable();
-            $table->text('delivery_notes')->nullable();
-            $table->string('tracking_code')->unique()->nullable();
-            $table->decimal('current_location_lat', 10, 8)->nullable();
-            $table->decimal('current_location_lng', 11, 8)->nullable();
-            $table->string('proof_of_delivery_image')->nullable();
-            $table->timestamps();
+when delivery_status is pending it will show accept_order and cancelled,when delivery_status is accept_order it will show preparing only,when delivery_status is preparing it will show ready_for_pickup only,  in your provide function openDeliveryStatusModalForGroup() modal in view.blade.php.when delivery_status is preparing in modal it will show a input field to give pick up time manually by client.So give me full updated part only.
 
-            $table->index('delivery_status');
-            $table->index('tracking_code');
-            $table->index('delivery_person_id');
-                });
-    }
 
-    /**
-     * Reverse the migrations. 2025_12_13_165148
-     */
-    public function down(): void 
-    {
-        Schema::dropIfExists('meal_deliveries');
-    }
-};
+
+
+
+
+select status in dropdown will be disabled in your provide function openDeliveryStatusModalForGroup() modal.Give me this part only.

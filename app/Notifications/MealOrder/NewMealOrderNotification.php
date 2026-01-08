@@ -13,75 +13,211 @@ class NewMealOrderNotification extends Notification
 {
     use Queueable;
 
-    private $mealOrder;
-    private $clientMealOrder;
+    private $notificationData;
+    private $type; // 'meal_order', 'client_meal_order', or 'array'
 
-    public function __construct($order)
+    public function __construct($data)
     {
-        if($order instanceof MealOrder) {
-            $this->mealOrder = $order->load([
-                'customer',
-                'items.client',
-                'items.product', 
-                'items.mealType',
-                'clientMealOrders',
-                'mealShippingAddress'
-            ]);
-        } else if($order instanceof ClientMealOrder) {
-            $this->clientMealOrder = $order->load([
-                'client',
-                'mealOrder.customer',
-                'mealOrder.items' => function($query) use ($order) {
-                    $query->where('client_id', $order->client_id)
-                        ->with(['product', 'mealType']);
+        if ($data instanceof MealOrder) {
+            $this->type = 'meal_order';
+            $this->notificationData = [
+                'meal_order' => $data->load([
+                    'customer',
+                    'items.client',
+                    'items.product', 
+                    'items.mealType',
+                    'clientMealOrders.client',
+                    'mealShippingAddress',
+                    'deliveryChargeLedgers'
+                ])
+            ];
+        } elseif ($data instanceof ClientMealOrder) {
+            $this->type = 'client_meal_order';
+            $this->notificationData = [
+                'client_meal_order' => $data->load([
+                    'client',
+                    'mealOrder.customer',
+                    'mealOrder.mealShippingAddress',
+                    'mealOrder.deliveryChargeLedgers' => function($query) use ($data) {
+                        $query->where('client_id', $data->client_id);
+                    },
+                    'mealOrder.items' => function($query) use ($data) {
+                        $query->where('client_id', $data->client_id)
+                            ->with(['product', 'mealType', 'deliveryChargeLedger']);
+                    }
+                ])
+            ];
+        } elseif (is_array($data)) {
+            $this->type = 'array';
+            $this->notificationData = $data;
+            
+            // Load relationships if objects are provided
+            if (isset($this->notificationData['meal_order']) && $this->notificationData['meal_order'] instanceof MealOrder) {
+                if (!$this->notificationData['meal_order']->relationLoaded('customer')) {
+                    $this->notificationData['meal_order']->load([
+                        'customer',
+                        'mealShippingAddress'
+                    ]);
                 }
-            ]);
+            }
+            
+            if (isset($this->notificationData['client_meal_order']) && $this->notificationData['client_meal_order'] instanceof ClientMealOrder) {
+                if (!$this->notificationData['client_meal_order']->relationLoaded('client')) {
+                    $this->notificationData['client_meal_order']->load(['client', 'mealOrder']);
+                }
+            }
         }
     }
 
     public function via(object $notifiable): array
     {
-        return ['mail','database'];
+        return ['mail', 'database'];
     }
 
     public function toMail(object $notifiable): MailMessage
     {
-        $subject = $this->getSubject();
+        $subject = $this->getSubject($notifiable);
+        
+        // Prepare data for email template
+        $viewData = $this->prepareViewData($notifiable);
         
         return (new MailMessage)
             ->from('support@sparex.com')
-            ->view('email.notification.meal-order.new_meal_order', [
-                'mealOrder' => $this->mealOrder,
-                'clientMealOrder' => $this->clientMealOrder
-            ])
+            ->view('email.notification.meal-order.new_meal_order', $viewData)
             ->subject($subject);
     }
 
     public function toArray(object $notifiable): array
     {
-        if ($this->mealOrder) {
+        if ($this->type === 'meal_order') {
+            $mealOrder = $this->notificationData['meal_order'];
             return [
                 'data' => 'New Meal Order Received',
-                'meal_order_id' => $this->mealOrder->id,
-                'order_number' => $this->mealOrder->order_number,
-                'type' => 'main_order'
+                'meal_order_id' => $mealOrder->id,
+                'order_number' => $mealOrder->order_number,
+                'type' => 'meal_order',
+                'user_role' => $notifiable->role
             ];
-        } else {
+        } elseif ($this->type === 'client_meal_order') {
+            $clientMealOrder = $this->notificationData['client_meal_order'];
             return [
                 'data' => 'New Meal Order',
-                'meal_order_id' => $this->clientMealOrder->meal_order_id,
-                'client_order_id' => $this->clientMealOrder->id,
-                'type' => 'client_order'
+                'meal_order_id' => $clientMealOrder->meal_order_id,
+                'client_order_id' => $clientMealOrder->id,
+                'client_id' => $clientMealOrder->client_id,
+                'type' => 'client_meal_order',
+                'user_role' => 'client'
+            ];
+        } elseif ($this->type === 'array') {
+            $mealOrder = $this->notificationData['meal_order'] ?? null;
+            $clientMealOrder = $this->notificationData['client_meal_order'] ?? null;
+            
+            return [
+                'data' => 'New Meal Order',
+                'meal_order_id' => $mealOrder ? $mealOrder->id : ($clientMealOrder ? $clientMealOrder->meal_order_id : null),
+                'client_order_id' => $clientMealOrder ? $clientMealOrder->id : null,
+                'client_id' => $clientMealOrder ? $clientMealOrder->client_id : $notifiable->id,
+                'type' => 'client_array',
+                'user_role' => 'client'
             ];
         }
+        
+        return [
+            'data' => 'New Meal Order Notification',
+            'type' => 'unknown'
+        ];
     }
 
-    private function getSubject(): string
+    private function getSubject($notifiable): string
     {
-        if ($this->mealOrder) {
-            return 'New Meal Order #' . $this->mealOrder->order_number;
-        } else {
-            return 'New Meal Order #' . $this->clientMealOrder->mealOrder->order_number;
+        if ($this->type === 'meal_order') {
+            $mealOrder = $this->notificationData['meal_order'];
+            if ($notifiable->role === 'admin') {
+                return 'New Meal Order #' . $mealOrder->order_number . ' - Requires Attention';
+            } else {
+                return 'Your Meal Order #' . $mealOrder->order_number . ' Has Been Placed';
+            }
+        } elseif ($this->type === 'client_meal_order') {
+            $clientMealOrder = $this->notificationData['client_meal_order'];
+            return 'New Meal Order #' . $clientMealOrder->mealOrder->order_number . ' - Your Products';
+        } elseif ($this->type === 'array') {
+            $mealOrder = $this->notificationData['meal_order'] ?? null;
+            $clientMealOrder = $this->notificationData['client_meal_order'] ?? null;
+            
+            if ($clientMealOrder && $clientMealOrder->mealOrder) {
+                return 'New Meal Order #' . $clientMealOrder->mealOrder->order_number . ' - Your Products';
+            } elseif ($mealOrder) {
+                return 'New Meal Order #' . $mealOrder->order_number . ' - Your Products';
+            }
         }
+        
+        return 'New Meal Order Notification';
+    }
+
+    private function prepareViewData($notifiable): array
+    {
+        if ($this->type === 'meal_order') {
+            $mealOrder = $this->notificationData['meal_order'];
+            
+            // For admin: show all items
+            // For customer: show all their items
+            if ($notifiable->role === 'admin') {
+                $items = $mealOrder->items;
+                $clientMealOrder = null;
+            } else {
+                // For customer, show all items
+                $items = $mealOrder->items;
+                $clientMealOrder = null;
+            }
+            
+            return [
+                'mealOrder' => $mealOrder,
+                'clientMealOrder' => $clientMealOrder,
+                'items' => $items,
+                'notifiable' => $notifiable
+            ];
+            
+        } elseif ($this->type === 'client_meal_order') {
+            $clientMealOrder = $this->notificationData['client_meal_order'];
+            $mealOrder = $clientMealOrder->mealOrder;
+            
+            // For client: show only their items
+            $items = $mealOrder->items->where('client_id', $notifiable->id);
+            
+            return [
+                'mealOrder' => $mealOrder,
+                'clientMealOrder' => $clientMealOrder,
+                'items' => $items,
+                'notifiable' => $notifiable
+            ];
+            
+        } elseif ($this->type === 'array') {
+            $mealOrder = $this->notificationData['meal_order'] ?? null;
+            $clientMealOrder = $this->notificationData['client_meal_order'] ?? null;
+            $deliveryLedgers = $this->notificationData['delivery_ledgers'] ?? collect([]);
+            
+            if ($clientMealOrder && $clientMealOrder->mealOrder) {
+                $mealOrder = $clientMealOrder->mealOrder;
+                $items = $mealOrder->items->where('client_id', $notifiable->id);
+            } elseif ($mealOrder) {
+                // If only mealOrder is provided, get items for this client
+                $items = $mealOrder->items->where('client_id', $notifiable->id);
+            } else {
+                $items = collect([]);
+            }
+            
+            return [
+                'mealOrder' => $mealOrder,
+                'clientMealOrder' => $clientMealOrder,
+                'deliveryLedgers' => $deliveryLedgers,
+                'items' => $items,
+                'notifiable' => $notifiable
+            ];
+        }
+        
+        return [
+            'notifiable' => $notifiable,
+            'items' => collect([])
+        ];
     }
 }

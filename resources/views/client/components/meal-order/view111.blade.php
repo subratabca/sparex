@@ -134,7 +134,6 @@
 </div>
 
 <!-- Delivery Status Update Modal -->
-<!-- Delivery Status Update Modal -->
 <div class="modal fade" id="deliveryStatusModal" tabindex="-1" aria-labelledby="deliveryStatusModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -146,128 +145,61 @@
                 <form id="deliveryStatusForm">
                     <input type="hidden" id="updateMealOrderItemId">
                     <input type="hidden" id="updateOrderId">
-                    <input type="hidden" id="currentDeliveryStatus">
                     
                     <div class="mb-3">
-                        <label for="currentItemInfo" class="form-label">Order Information</label>
-                        <div class="form-control bg-light p-3" id="currentItemInfo" style="min-height: 60px;">
-                            <div class="d-flex align-items-center">
-                                <i class="mdi mdi-information-outline me-2 text-primary"></i>
-                                <span>Loading item details...</span>
-                            </div>
+                        <label for="currentItemInfo" class="form-label">Item Information</label>
+                        <div class="form-control bg-light" id="currentItemInfo" style="min-height: 40px;">
+                            Loading item details...
                         </div>
                     </div>
                     
-                    <!-- Delivery Status Selection -->
                     <div class="mb-3">
-                        <label for="deliveryStatusSelect" class="form-label fw-semibold">
-                            <i class="mdi mdi-truck-delivery-outline me-1"></i>Delivery Status
-                        </label>
+                        <label for="deliveryStatusSelect" class="form-label">Delivery Status</label>
                         <select class="form-select" id="deliveryStatusSelect" required>
                             <option value="">Select Status</option>
-                            <!-- Options will be populated dynamically based on current status -->
+                            <option value="pending">Pending</option>
+                            <option value="preparing">Preparing</option>
+                            <option value="ready_for_pickup">Ready for Pickup</option>
+                            <option value="picked_up">Picked Up</option>
+                            <option value="on_the_way">On the Way</option>
+                            <option value="arrived">Arrived</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="failed">Failed</option>
+                            <option value="cancelled">Cancelled</option>
                         </select>
                     </div>
                     
-                    <!-- Pickup Time Field (shown only when current status is "preparing") -->
-                    <div class="mb-3" id="pickupTimeContainer" style="display: none;">
-                        <label for="pickup_time" class="form-label fw-semibold">
-                            <i class="mdi mdi-clock-outline me-1"></i>Pickup Time
-                        </label>
-                        <input type="datetime-local" class="form-control" id="pickup_time" 
-                               placeholder="Select pickup time">
-                        <small class="text-muted">Set the time when items will be ready for pickup</small>
-                    </div>
-                    
-                    <!-- Notes Section -->
                     <div class="mb-3">
-                        <label for="deliveryNotes" class="form-label fw-semibold">
-                            <i class="mdi mdi-note-text-outline me-1"></i>Notes (Optional)
-                        </label>
+                        <label for="deliveryNotes" class="form-label">Notes (Optional)</label>
                         <textarea class="form-control" id="deliveryNotes" rows="3" placeholder="Add any notes about the delivery status update..."></textarea>
+                        <div class="form-text">This will be recorded in the delivery history.</div>
                     </div>
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                    <i class="mdi mdi-close me-1"></i>Cancel
-                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-primary" id="saveDeliveryStatusBtn">
                     <span class="spinner-border spinner-border-sm d-none" id="updateSpinner"></span>
-                    <i class="mdi mdi-check-circle-outline me-1"></i>Update Status
+                    Update Status
                 </button>
             </div>
         </div>
     </div>
 </div>
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-// Toast notification functions
-function successToast(message) {
-    Toastify({
-        text: message,
-        duration: 3000,
-        close: true,
-        gravity: "top",
-        position: "right",
-        backgroundColor: "#28a745",
-    }).showToast();
-}
-
-function errorToast(message) {
-    Toastify({
-        text: message,
-        duration: 3000,
-        close: true,
-        gravity: "top",
-        position: "right",
-        backgroundColor: "#dc3545",
-    }).showToast();
-}
-
-function showLoader() {
-    const loader = document.getElementById('bouncing-loader');
-    if (loader) {
-        loader.style.display = 'flex';
-    }
-}
-
-function hideLoader() {
-    const loader = document.getElementById('bouncing-loader');
-    if (loader) {
-        loader.style.display = 'none';
-    }
-}
-
-function handleError(error) {
-    let message = "An unexpected error occurred.";
-    if (error.response) {
-        const { status, data } = error.response;
-        switch (status) {
-            case 500:
-                message = data?.message || "Internal server error. Please try again later.";
-                break;
-            case 404:
-                message = data?.message || "Order not found.";
-                break;
-            default:
-                message = data?.message || "Something went wrong.";
-        }
-    } else if (error.request) {
-        message = "No response from server. Please check your connection.";
-    } else {
-        message = error.message;
-    }
-    errorToast(message);
-}
-
 document.addEventListener('DOMContentLoaded', async function() {
     await loadClientPaymentDetails();
+    
+    // Initialize delivery status update functionality
+    initializeDeliveryStatusUpdate();
 });
 
 async function loadClientPaymentDetails() {
-    showLoader();
     try {
+        showLoader();
+        
         const orderId = window.location.pathname.split('/').pop();
         const response = await axios.get(`/client/get/meal-order/details/${orderId}`);
 
@@ -298,12 +230,26 @@ async function loadClientPaymentDetails() {
             // Render order items with delivery status
             renderMealOrderItems(data.items, data.dates, data.items_with_time);
             
-            successToast('Payment details loaded successfully');
         } else {
-            errorToast(response.data.message || 'Failed to load payment details');
+            showError(response.data.message || 'Failed to load payment details');
         }
     } catch (error) {
-        handleError(error);
+        console.error('Error loading payment details:', error);
+        let errorMessage = 'An error occurred while loading payment details';
+        
+        if (error.response) {
+            console.error('Error response:', error.response.data);
+            errorMessage = error.response.data.message || errorMessage;
+            
+            // If there's a server error message, show it
+            if (error.response.data.error && env('APP_DEBUG')) {
+                errorMessage += `: ${error.response.data.error}`;
+            }
+        } else if (error.message) {
+            errorMessage = error.message;
+        }
+        
+        showError(errorMessage);
     } finally {
         hideLoader();
     }
@@ -370,36 +316,37 @@ function updateDeliverySummary(data) {
         return;
     }
     
-    // Count delivery statuses across all groups
+    // Count delivery statuses across all items
     const statusCount = {};
-    let totalItems = data.summary.total_items || 0;
+    let totalItems = 0;
     
-    // Count statuses from grouped items
+    // Flatten all items to count statuses
     Object.values(data.items).forEach(dateItems => {
-        Object.values(dateItems).forEach(group => {
-            const status = group.delivery_status || 'pending';
-            statusCount[status] = (statusCount[status] || 0) + 1;
+        Object.values(dateItems).forEach(mealTypeItems => {
+            mealTypeItems.forEach(item => {
+                totalItems++;
+                const status = item.delivery_status || 'pending';
+                statusCount[status] = (statusCount[status] || 0) + 1;
+            });
         });
     });
     
     // Create HTML for status summary
     let html = `<div class="text-start mb-3">
-                    <p class="mb-2"><strong>Total Groups:</strong> ${data.summary.total_groups || 0}</p>
                     <p class="mb-2"><strong>Total Items:</strong> ${totalItems}</p>
                 </div>`;
     
     // Add status badges
     html += '<div class="row g-2">';
     
-    const statusOrder = ['delivered', 'arrived', 'on_the_way', 
-                        'picked_up', 'ready_for_pickup', 'preparing', 
-                        'accept_order', 'pending', 'cancelled'];
+    const statusOrder = ['pending', 'preparing', 'ready_for_pickup', 'picked_up', 
+                        'on_the_way', 'arrived', 'delivered', 'failed', 'cancelled'];
     
     statusOrder.forEach(status => {
         if (statusCount[status]) {
             const label = data.delivery_statuses[status] || toTitleCase(status);
             const count = statusCount[status];
-            const percentage = totalItems > 0 ? ((count / totalItems) * 100).toFixed(1) : '0.0';
+            const percentage = ((count / totalItems) * 100).toFixed(1);
             const badgeClass = getDeliveryBadgeClass(status);
             
             html += `
@@ -450,19 +397,23 @@ function renderMealOrderItems(items, dates, itemsWithTime = []) {
 
         mealTypes.forEach(type => {
             const typeTitle = toTitleCase(type);
-            const group = dayItems[type];
-            const itemsList = group.items || [];
+            const group = dayItems[type]; // This is now an object, not an array
+            const itemsList = group.items || []; // Access the items array from the group
             
+            // Get meal time for this group (from group data)
             const mealTime = group.meal_time || getMealTimeForType(date, type, itemsWithTime);
             const formattedMealTime = mealTime ? formatMealTime(mealTime) : '';
             
+            // Calculate total for this meal type on this date (use group total if available)
             const typeTotal = group.total_price || itemsList.reduce((sum, item) => sum + parseFloat(item.total_price || 0), 0);
             
-            const deliveryStatus = group.delivery_status || 'pending';
-            const deliveryStatusLabel = group.delivery_status_label || window.deliveryStatuses[deliveryStatus] || toTitleCase(deliveryStatus);
+            // Get aggregated delivery status for the group
+            const deliveryStatus = group.aggregated_status || 'pending';
+            const deliveryStatusLabel = group.aggregated_status_label || window.deliveryStatuses[deliveryStatus] || toTitleCase(deliveryStatus);
             const deliveryBadgeClass = getDeliveryBadgeClass(deliveryStatus);
             const deliveryPerson = group.delivery_person_name || 'Not Assigned';
             
+            // Get all item IDs in this group (for batch update)
             const itemIds = itemsList.map(item => item.id).join(',');
 
             mealTypeHtml += `
@@ -488,7 +439,6 @@ function renderMealOrderItems(items, dates, itemsWithTime = []) {
                                         data-order-id="${window.location.pathname.split('/').pop()}"
                                         data-group-name="${typeTitle}"
                                         data-meal-date="${date}"
-                                        data-meal-type-id="${group.meal_type_id}"
                                         data-current-status="${deliveryStatus}"
                                         data-current-status-label="${deliveryStatusLabel}"
                                         title="Update delivery status for all ${itemsList.length} ${typeTitle} items">
@@ -541,6 +491,7 @@ function renderMealOrderItems(items, dates, itemsWithTime = []) {
             `;
         });
 
+        // Calculate total for this date
         const dateTotal = mealTypes.reduce((total, type) => {
             const group = dayItems[type];
             return total + (group.total_price || 0);
@@ -567,7 +518,20 @@ function renderMealOrderItems(items, dates, itemsWithTime = []) {
     
     container.innerHTML = html;
     
+    // Re-attach event listeners to group status buttons
     attachDeliveryStatusGroupEventListeners();
+}
+
+function initializeDeliveryStatusUpdate() {
+    // Handle save button click
+    document.getElementById('saveDeliveryStatusBtn').addEventListener('click', updateDeliveryStatus);
+    
+    // Reset modal when closed
+    const modal = document.getElementById('deliveryStatusModal');
+    modal.addEventListener('hidden.bs.modal', function() {
+        document.getElementById('deliveryStatusForm').reset();
+        document.getElementById('currentItemInfo').textContent = 'Loading item details...';
+    });
 }
 
 function attachDeliveryStatusGroupEventListeners() {
@@ -578,7 +542,6 @@ function attachDeliveryStatusGroupEventListeners() {
                 this.dataset.orderId,
                 this.dataset.groupName,
                 this.dataset.mealDate,
-                this.dataset.mealTypeId,
                 this.dataset.currentStatus,
                 this.dataset.currentStatusLabel
             );
@@ -586,60 +549,25 @@ function attachDeliveryStatusGroupEventListeners() {
     });
 }
 
-function populateStatusOptions(currentStatus) {
-    const select = document.getElementById('deliveryStatusSelect');
-    select.innerHTML = '<option value="">Select Status</option>';
-    
-    let availableOptions = [];
-    
-    // Define available status transitions based on user role (client side)
-    switch(currentStatus) {
-        case 'pending':
-            availableOptions = [
-                { value: 'accept_order', label: 'Accept Order' },
-                { value: 'cancelled', label: 'Cancelled' }
-            ];
-            break;
-        case 'accept_order':
-            availableOptions = [
-                { value: 'preparing', label: 'Preparing' }
-            ];
-            break;
-        case 'preparing':
-            availableOptions = [
-                { value: 'ready_for_pickup', label: 'Ready for Pickup' }
-            ];
-            break;
-        case 'ready_for_pickup':
-            availableOptions = [];
-            // Delivery man will handle from here
-            break;
-        default:
-            availableOptions = [];
-    }
-    
-    // Add options to select
-    availableOptions.forEach(option => {
-        const optionElement = document.createElement('option');
-        optionElement.value = option.value;
-        optionElement.textContent = option.label;
-        select.appendChild(optionElement);
-    });
-    
-    // Disable select if no options available
-    if (availableOptions.length === 0) {
-        select.disabled = true;
-        select.innerHTML = '<option value="">No further status changes allowed</option>';
-    } else {
-        select.disabled = false;
+function getDeliveryBadgeClass(status) {
+    switch(status) {
+        case 'delivered': return 'bg-success';
+        case 'picked_up': return 'bg-info';
+        case 'on_the_way': return 'bg-info';
+        case 'arrived': return 'bg-info';
+        case 'ready_for_pickup': return 'bg-primary';
+        case 'preparing': return 'bg-warning';
+        case 'pending': return 'bg-warning';
+        case 'failed': return 'bg-danger';
+        case 'cancelled': return 'bg-dark';
+        default: return 'bg-secondary';
     }
 }
 
-function openDeliveryStatusModalForGroup(itemIds, orderId, groupName, mealDate, mealTypeId, currentStatus, currentStatusLabel) {
+function openDeliveryStatusModalForGroup(itemIds, orderId, groupName, mealDate, currentStatus, currentStatusLabel) {
     // Set form values
-    document.getElementById('updateMealOrderItemId').value = itemIds;
+    document.getElementById('updateMealOrderItemId').value = itemIds; // Comma-separated IDs
     document.getElementById('updateOrderId').value = orderId;
-    document.getElementById('currentDeliveryStatus').value = currentStatus;
     
     const formattedDate = new Date(mealDate).toLocaleDateString('en-US', {
         weekday: 'long',
@@ -648,141 +576,80 @@ function openDeliveryStatusModalForGroup(itemIds, orderId, groupName, mealDate, 
         year: 'numeric'
     });
     
-    document.getElementById('currentItemInfo').innerHTML = `
-        <div class="d-flex align-items-center">
-            <i class="mdi mdi-package-variant-closed me-2 text-primary"></i>
-            <div>
-                <strong>${groupName}</strong><br>
-                <small class="text-muted">${formattedDate} • ${itemIds.split(',').length} items</small>
-            </div>
-        </div>
-    `;
+    document.getElementById('currentItemInfo').textContent = `${groupName} on ${formattedDate} (${itemIds.split(',').length} items)`;
     
-    // Show/hide pickup time field based on current status
-    const pickupTimeContainer = document.getElementById('pickupTimeContainer');
-    if (currentStatus === 'preparing') {
-        pickupTimeContainer.style.display = 'block';
-        // Set default pickup time to 1 hour from now
-        const now = new Date();
-        now.setHours(now.getHours() + 1);
-        const formattedTime = now.toISOString().slice(0, 16);
-        document.getElementById('pickup_time').value = formattedTime;
-        document.getElementById('pickup_time').required = true;
-    } else {
-        pickupTimeContainer.style.display = 'none';
-        document.getElementById('pickup_time').required = false;
-    }
-    
-    // Populate status options based on current status
-    populateStatusOptions(currentStatus);
+    // Set current status in select
+    const select = document.getElementById('deliveryStatusSelect');
+    select.value = currentStatus || '';
     
     // Show modal
     const modal = new bootstrap.Modal(document.getElementById('deliveryStatusModal'));
     modal.show();
 }
 
-async function updateDeliveryStatus() {
-    const itemIds = document.getElementById('updateMealOrderItemId').value;
-    const orderId = document.getElementById('updateOrderId').value;
-    const status = document.getElementById('deliveryStatusSelect').value;
-    const notes = document.getElementById('deliveryNotes').value;
-    const currentStatus = document.getElementById('currentDeliveryStatus').value;
-    const pickupTime = document.getElementById('pickup_time').value;
+function updateDeliverySummary(data) {
+    const container = document.getElementById('deliveryStats');
     
-    if (!status) {
-        errorToast('Please select a delivery status');
+    if (!data.items || Object.keys(data.items).length === 0) {
+        container.innerHTML = '<p class="text-muted">No delivery information available.</p>';
         return;
     }
     
-    // Validate pickup time if status is "ready_for_pickup"
-    if (currentStatus === 'preparing' && status === 'ready_for_pickup' && !pickupTime) {
-        errorToast('Please provide pickup time');
-        return;
-    }
+    // Count delivery statuses across all groups
+    const statusCount = {};
+    let totalItems = data.summary.total_items || 0;
     
-    showLoader();
-    try {
-        // Get meal date and meal type from the current data
-        const mealDate = document.querySelector('.update-delivery-btn-group[data-item-ids="' + itemIds + '"]')?.dataset.mealDate;
-        const mealTypeId = document.querySelector('.update-delivery-btn-group[data-item-ids="' + itemIds + '"]')?.dataset.mealTypeId;
-        
-        // Prepare request data
-        const requestData = {
-            meal_order_item_id: itemIds,
-            delivery_status: status,
-            notes: notes,
-            meal_date: mealDate,
-            meal_type_id: mealTypeId
-        };
-        
-        // Add pickup time if provided
-        if (pickupTime) {
-            requestData.pickup_time = pickupTime;
-        }
-        
-        // Make API call
-        const response = await axios.post(`/client/update/delivery-status/${orderId}`, requestData);
-        
-        if (response.data.status === 'success') {
-            // Close modal
-            const modal = bootstrap.Modal.getInstance(document.getElementById('deliveryStatusModal'));
-            modal.hide();
-            
-            // Show success message
-            successToast(response.data.message || 'Delivery status updated successfully');
-            
-            // Reload data
-            setTimeout(() => {
-                loadClientPaymentDetails();
-            }, 1000);
-        } else {
-            errorToast(response.data.message || 'Failed to update delivery status');
-        }
-    } catch (error) {
-        handleError(error);
-    } finally {
-        hideLoader();
-    }
-}
-
-// Initialize event listeners
-document.addEventListener('DOMContentLoaded', function() {
-    // Handle save button click
-    document.getElementById('saveDeliveryStatusBtn').addEventListener('click', updateDeliveryStatus);
-    
-    // Reset modal when closed
-    const modal = document.getElementById('deliveryStatusModal');
-    modal.addEventListener('hidden.bs.modal', function() {
-        document.getElementById('deliveryStatusForm').reset();
-        document.getElementById('currentItemInfo').innerHTML = `
-            <div class="d-flex align-items-center">
-                <i class="mdi mdi-information-outline me-2 text-primary"></i>
-                <span>Loading item details...</span>
-            </div>
-        `;
-        document.getElementById('pickupTimeContainer').style.display = 'none';
-        document.getElementById('pickup_time').required = false;
+    // Count statuses from grouped items
+    Object.values(data.items).forEach(dateItems => {
+        Object.values(dateItems).forEach(group => {
+            const status = group.aggregated_status || 'pending';
+            statusCount[status] = (statusCount[status] || 0) + 1;
+        });
     });
-});
-
-function getDeliveryBadgeClass(status) {
-    switch(status) {
-        case 'delivered': return 'bg-success';
-        case 'arrived': return 'bg-primary';
-        case 'on_the_way': return 'bg-info';
-        case 'picked_up': return 'bg-info';
-        case 'ready_for_pickup': return 'bg-warning';
-        case 'preparing': return 'bg-warning';
-        case 'accept_order': return 'bg-secondary';
-        case 'pending': return 'bg-secondary';
-        case 'cancelled': return 'bg-dark';
-        default: return 'bg-secondary';
-    }
+    
+    // Create HTML for status summary
+    let html = `<div class="text-start mb-3">
+                    <p class="mb-2"><strong>Total Groups:</strong> ${data.summary.total_groups || 0}</p>
+                    <p class="mb-2"><strong>Total Items:</strong> ${totalItems}</p>
+                </div>`;
+    
+    // Add status badges
+    html += '<div class="row g-2">';
+    
+    const statusOrder = ['delivered', 'failed', 'cancelled', 'arrived', 'on_the_way', 
+                        'picked_up', 'ready_for_pickup', 'preparing', 'pending'];
+    
+    statusOrder.forEach(status => {
+        if (statusCount[status]) {
+            const label = data.delivery_statuses[status] || toTitleCase(status);
+            const count = statusCount[status];
+            const percentage = totalItems > 0 ? ((count / totalItems) * 100).toFixed(1) : '0.0';
+            const badgeClass = getDeliveryBadgeClass(status);
+            
+            html += `
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center p-2 border rounded mb-2">
+                        <div class="d-flex align-items-center">
+                            <span class="badge ${badgeClass} me-2">${count}</span>
+                            <span>${label}</span>
+                        </div>
+                        <small class="text-muted">${percentage}%</small>
+                    </div>
+                </div>
+            `;
+        }
+    });
+    
+    html += '</div>';
+    
+    container.innerHTML = html;
 }
 
+// Also update the getMealTimeForType function to handle the new structure
 function getMealTimeForType(date, mealType, itemsWithTime) {
     if (!itemsWithTime || !Array.isArray(itemsWithTime)) return null;
     
+    // Find the first item that matches date and meal type
     const matchingItem = itemsWithTime.find(item => {
         const itemDate = item.meal_date;
         const itemMealTypeName = item.meal_type_name || 'Other';
@@ -801,31 +668,35 @@ function formatMealTime(timeString) {
     if (!timeString) return '';
     
     try {
+        // If it's already in 12-hour format with AM/PM, return as-is
         if (timeString.toLowerCase().includes('am') || timeString.toLowerCase().includes('pm')) {
             return timeString;
         }
         
+        // Handle time formats like "08:00:00" (with seconds) or "08:00" (without seconds)
         const timeParts = timeString.split(':');
         
         if (timeParts.length >= 2) {
             let hour = parseInt(timeParts[0], 10);
             let minute = parseInt(timeParts[1], 10);
             
+            // Validate hour and minute
             if (isNaN(hour) || isNaN(minute)) {
                 return timeString;
             }
             
+            // Convert to 12-hour format
             const period = hour >= 12 ? 'pm' : 'am';
-            const displayHour = hour % 12 || 12;
+            const displayHour = hour % 12 || 12; // Convert 0 to 12 for midnight
             const displayMinute = minute.toString().padStart(2, '0');
             
             return `${displayHour}:${displayMinute} ${period}`;
         }
         
-        return timeString;
+        return timeString; // Return as-is if format is unknown
     } catch (e) {
         console.error('Error formatting time:', e, 'Input:', timeString);
-        return timeString;
+        return timeString; // Return as-is if parsing fails
     }
 }
 
@@ -841,40 +712,71 @@ function formatCurrency(amount) {
         currency: 'GBP'
     }).format(numAmount);
 }
+
+function showLoader() {
+    document.getElementById('loadingSpinner').style.display = 'block';
+    document.getElementById('mainContent').style.opacity = '0.5';
+    document.getElementById('errorMessage').style.display = 'none';
+}
+
+function hideLoader() {
+    document.getElementById('loadingSpinner').style.display = 'none';
+    document.getElementById('mainContent').style.opacity = '1';
+}
+
+function showError(message) {
+    hideLoader();
+    document.getElementById('errorText').textContent = message;
+    document.getElementById('errorMessage').style.display = 'block';
+}
+
+function successToast(message) {
+    Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: message,
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true
+    });
+}
+
+function errorToast(message) {
+    Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: message,
+        toast: true,
+        position: 'top-end',
+        showConfirmButton: false,
+        timer: 3000,
+        timerProgressBar: true
+    });
+}
 </script>
 
 <style>
-.modal-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
+.hover-card {
+    transition: all 0.3s ease;
 }
-
-.modal-header .btn-close {
-    filter: invert(1);
-}
-
-#currentItemInfo {
-    background: linear-gradient(to right, #f8f9fa, #e9ecef);
-    border: 1px solid #dee2e6;
-}
-
-#deliveryNotes {
-    resize: vertical;
-}
-
-.form-label {
-    font-weight: 600;
-    color: #495057;
-}
-
-#deliveryStatusSelect:disabled {
-    background-color: #e9ecef;
-    cursor: not-allowed;
-}
-
 .hover-card:hover {
-    transform: translateY(-2px);
-    transition: transform 0.2s ease-in-out;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transform: translateY(-5px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+}
+.accordion-button:not(.collapsed) {
+    background-color: #e3f2fd;
+    color: #0d6efd;
+}
+.payment-status-badge {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+}
+.update-delivery-btn:hover .badge {
+    opacity: 0.9;
+    transform: scale(1.05);
+    transition: all 0.2s ease;
 }
 </style>

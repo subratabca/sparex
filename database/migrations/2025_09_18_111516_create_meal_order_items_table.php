@@ -22,16 +22,13 @@ return new class extends Migration
             $table->integer('quantity')->unsigned()->default(1);
             $table->decimal('unit_price', 10, 2);
             $table->decimal('total_price', 10, 2);
-            $table->enum('delivery_status', ['pending','preparing','ready_for_pickup','picked_up','on_the_way','arrived','delivered','failed','cancelled'])->default('pending');
-            $table->foreignId('delivery_person_id')->nullable()->constrained('users');
-            $table->timestamp('handover_time')->nullable();
-            $table->timestamp('delivered_time')->nullable();
             $table->timestamps();
         });
     }
 
     /**
      * Reverse the migrations.
+     * 
      */
     public function down(): void
     {

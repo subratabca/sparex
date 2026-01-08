@@ -27,4 +27,9 @@ class MealOrder extends Model
     {
         return $this->hasOne(MealShippingAddress::class, 'meal_order_id');
     }
+
+    public function deliveryChargeLedgers()
+    {
+        return $this->hasMany(DeliveryChargeLedger::class, 'meal_order_id');
+    }
 }

@@ -14,33 +14,30 @@ return new class extends Migration
         Schema::create('delivery_charge_ledgers', function (Blueprint $table) {
             $table->id();
             
-            // Order information
             $table->foreignId('meal_order_id')->constrained('meal_orders')->onDelete('cascade');
             $table->foreignId('customer_id')->constrained('users')->onDelete('cascade');
             
-            // Client information (who provides the meal)
             $table->foreignId('client_id')->constrained('users')->onDelete('cascade');
             
-            // Delivery person information (will be assigned later)
             $table->foreignId('delivery_person_id')->nullable()->constrained('users')->onDelete('set null');
             
-            // Meal information
             $table->foreignId('meal_type_id')->constrained('meal_types')->onDelete('cascade');
-            $table->date('delivery_date'); // The actual delivery date
+            $table->date('delivery_date');
+
+            $table->string('order_tracking')->unique()->nullable();
+
+            $table->enum('delivery_status', ['pending','accept_order','preparing','ready_for_pickup','picked_up','on_the_way','arrived','delivered','cancelled'])->default('pending');
             
-            // Delivery charge calculation
             $table->decimal('delivery_charge', 10, 2)->default(0);
-            $table->decimal('distance_km', 8, 2)->nullable(); // Distance from client to customer
-            $table->string('distance_category')->nullable(); // inside_city_2km, inside_city_5km, etc
+            $table->decimal('distance_km', 8, 2)->nullable(); 
+            $table->string('distance_category')->nullable(); 
             
-            // Payment tracking for delivery person
             $table->enum('payment_status', ['due', 'paid', 'cancelled'])->default('due');
             $table->timestamp('payment_date')->nullable();
             $table->text('payment_notes')->nullable();
             
-            // Flags to ensure unique delivery charge per client per meal type per day
             $table->boolean('is_charge_counted')->default(true);
-            $table->string('charge_key')->unique(); // Composite key for uniqueness
+            $table->string('charge_key')->unique(); 
             
             $table->timestamps();
             
@@ -50,6 +47,10 @@ return new class extends Migration
             $table->index('charge_key', 'idx_dcl_charge_key');
             $table->index('meal_order_id', 'idx_dcl_meal_order');
             $table->index('customer_id', 'idx_dcl_customer');
+            
+            // indexes for tracking
+            $table->index('order_tracking', 'idx_dcl_order_tracking');
+            $table->index(['customer_id', 'delivery_status'], 'idx_dcl_customer_status');
         });
     }
 

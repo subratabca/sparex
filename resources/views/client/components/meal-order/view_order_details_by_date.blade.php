@@ -55,6 +55,7 @@ async function loadMealOrderDetailsByDate() {
             const shippingAddress = response.data.data.shipping_address;
             const order = response.data.data.order;
             const selectedDate = response.data.data.selected_date;
+            const items = response.data.data.items || [];
 
             // Format date for display
             const formattedDate = new Date(selectedDate).toLocaleDateString('en-US', {
@@ -69,7 +70,7 @@ async function loadMealOrderDetailsByDate() {
             document.getElementById('dateNumberText').textContent = `${summary.total_items} items`;
             document.getElementById('selectedDateText').textContent = formattedDate;
 
-            renderMealDateItems(mealCart);
+            renderMealDateItems(mealCart, items);
             renderMealSummary(summary);
             renderNutritionSummary(nutrition);
             renderShippingAddress(shippingAddress);
@@ -84,7 +85,7 @@ async function loadMealOrderDetailsByDate() {
     }
 }
 
-function renderMealDateItems(mealCart) {
+function renderMealDateItems(mealCart, allItems) {
     const container = document.getElementById('mealDateAccordion');
     container.innerHTML = '';
 
@@ -97,9 +98,12 @@ function renderMealDateItems(mealCart) {
     mealTypes.forEach((mealType, index) => {
         const items = mealCart[mealType];
         const collapseId = `mealType${index}`;
+        
+        // Get meal time for this meal type
+        const mealTime = getMealTimeForType(mealType, allItems);
+        const formattedMealTime = mealTime ? formatMealTime(mealTime) : '';
 
         const mealTypeHtml = `
-            <h6 class="text-primary mb-3">${toTitleCase(mealType)} (${items.length} items)</h6>
             <ul class="list-group mb-3">
                 ${items.map(item => {
                     const productName = toTitleCase(item.product?.name || '');
@@ -127,11 +131,17 @@ function renderMealDateItems(mealCart) {
             </ul>
         `;
 
+        // Create accordion button content with meal time
+        let accordionButtonContent = `${toTitleCase(mealType)} (${items.length} items)`;
+        if (formattedMealTime) {
+            accordionButtonContent += ` || Delivery time: ${formattedMealTime}`;
+        }
+
         const block = `
             <div class="accordion-item shadow-sm mb-3">
                 <h2 class="accordion-header">
                     <button class="accordion-button ${index !== 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
-                        ${toTitleCase(mealType)}
+                        ${accordionButtonContent}
                     </button>
                 </h2>
                 <div id="${collapseId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#mealDateAccordion">
@@ -142,6 +152,61 @@ function renderMealDateItems(mealCart) {
 
         container.insertAdjacentHTML('beforeend', block);
     });
+}
+
+function getMealTimeForType(mealType, allItems) {
+    if (!allItems || !Array.isArray(allItems) || allItems.length === 0) {
+        console.log('No items array provided or empty');
+        return null;
+    }
+    
+    // Find the first item that matches the meal type
+    const matchingItem = allItems.find(item => {
+        const itemMealTypeName = item.meal_type?.name || 'Other';
+        return itemMealTypeName === mealType && item.meal_time;
+    });
+    
+    if (matchingItem && matchingItem.meal_time) {
+        return matchingItem.meal_time;
+    }
+    
+    return null;
+}
+
+function formatMealTime(timeString) {
+    if (!timeString) return '';
+    
+    try {
+        // If it's already in 12-hour format with AM/PM, return as-is
+        if (timeString.toLowerCase().includes('am') || timeString.toLowerCase().includes('pm')) {
+            return timeString;
+        }
+        
+        // Handle time formats like "08:00:00" (with seconds) or "08:00" (without seconds)
+        const timeParts = timeString.split(':');
+        
+        if (timeParts.length >= 2) {
+            let hour = parseInt(timeParts[0], 10);
+            let minute = parseInt(timeParts[1], 10);
+            
+            // Validate hour and minute
+            if (isNaN(hour) || isNaN(minute)) {
+                return timeString;
+            }
+            
+            // Convert to 12-hour format
+            const period = hour >= 12 ? 'pm' : 'am';
+            const displayHour = hour % 12 || 12; // Convert 0 to 12 for midnight
+            const displayMinute = minute.toString().padStart(2, '0');
+            
+            return `${displayHour}:${displayMinute} ${period}`;
+        }
+        
+        return timeString; // Return as-is if format is unknown
+    } catch (e) {
+        console.error('Error formatting time:', e, 'Input:', timeString);
+        return timeString; // Return as-is if parsing fails
+    }
 }
 
 // Reuse the same render functions from your main order details page
@@ -242,6 +307,15 @@ function renderShippingAddress(shippingAddress) {
 function toTitleCase(str) {
     if (!str) return "";
     return str.trim().toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+}
+
+// Utility functions
+function showLoader() {
+    console.log('Loading...');
+}
+
+function errorToast(message) {
+    alert('Error: ' + message);
 }
 </script>
 

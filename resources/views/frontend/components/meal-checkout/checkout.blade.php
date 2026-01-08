@@ -683,106 +683,6 @@ function renderMealCart(mealCart) {
     });
 }
 
-function renderMealCart111(mealCart) {
-    const container = document.getElementById('mealCartAccordion');
-    container.innerHTML = '';
-
-    const dates = Object.keys(mealCart);
-
-    if (dates.length === 0) {
-        container.innerHTML = `<div class="alert alert-info">Your meal cart is empty.</div>`;
-        return;
-    }
-
-    dates.forEach((date, index) => {
-        const dayItems = mealCart[date];
-        const collapseId = `mealDay${index}`;
-
-        const formattedDate = new Date(date).toLocaleDateString('en-US', {
-            weekday: 'long',
-            month: 'short',
-            day: 'numeric'
-        });
-
-        const mealTypes = [...new Set(dayItems.map(i => i.meal_type?.name))].filter(Boolean);
-
-        let mealTypeHtml = '';
-
-        mealTypes.forEach(type => {
-            const typeTitle = toTitleCase(type);
-            const items = dayItems.filter(i => i.meal_type?.name === type);
-
-            mealTypeHtml += `
-                <h6 class="mt-3">${typeTitle} (${items.length} items)</h6>
-                <ul class="list-group mb-3">
-            `;
-
-            items.forEach(item => {
-                const productName = toTitleCase(item.product?.name || '');
-                const img = item.product?.image
-                    ? `/upload/product/small/${item.product.image}`
-                    : '/upload/no_image.jpg';
-
-                const clientName = item.client
-                    ? toTitleCase(
-                        [item.client.firstName, item.client.lastName]
-                            .filter(Boolean)
-                            .join(" ")
-                      )
-                    : "";
-
-                mealTypeHtml += `
-                    <li class="list-group-item d-flex justify-content-between align-items-center"
-                        data-product-id="${item.product?.id}"
-                        data-meal-type-id="${item.meal_type?.id}"
-                        data-client-id="${item.client?.id || ''}">
-                        <div class="d-flex align-items-center gap-3">
-                            <img src="${img}" alt="${productName}"
-                                class="rounded" style="width:60px;height:60px;object-fit:cover;">
-                            <div>
-                                <strong>${productName}</strong><br>
-                                $${parseFloat(item.unit_price).toFixed(2)}<br>
-                                ${clientName ? `<small class="text-muted">Provider: ${clientName}</small>` : ''}
-                            </div>
-                        </div>
-
-                        <div class="d-flex align-items-center gap-2">
-                            <input type="number"
-                                class="form-control form-control-sm w-25"
-                                value="${item.quantity}" min="1"
-                                onchange="updateMealItem(${item.id}, this.value)">
-                            <button class="btn btn-sm btn-outline-danger"
-                                onclick="removeMealItem(${item.id})">&times;</button>
-                        </div>
-                    </li>
-                `;
-            });
-
-            mealTypeHtml += `</ul>`;
-        });
-
-        const block = `
-            <div class="accordion-item shadow-sm mb-3">
-                <h2 class="accordion-header">
-                    <button class="accordion-button ${index !== 0 ? 'collapsed' : ''}"
-                        type="button" data-bs-toggle="collapse"
-                        data-bs-target="#${collapseId}">
-                        ${formattedDate}
-                    </button>
-                </h2>
-
-                <div id="${collapseId}"
-                    class="accordion-collapse collapse ${index === 0 ? 'show' : ''}"
-                    data-bs-parent="#mealCartAccordion">
-                    <div class="accordion-body">${mealTypeHtml}</div>
-                </div>
-            </div>
-        `;
-
-        container.insertAdjacentHTML('beforeend', block);
-    });
-}
-
 async function updateMealItem(id, quantity) {
     if (quantity < 1) return errorToast('Quantity must be at least 1');
 
@@ -1506,43 +1406,66 @@ function extractMealOrdersFromCheckout() {
         
         if (!mealDate) return;
 
-        const mealItems = accordionItem.querySelectorAll('.list-group-item');
+        const mealTypeSections = accordionItem.querySelectorAll('.accordion-body > h6');
         
-        mealItems.forEach(mealItem => {
-            const productNameElement = mealItem.querySelector('strong');
-            const productName = productNameElement ? productNameElement.textContent.trim() : '';
+        mealTypeSections.forEach(section => {
+            const sectionText = section.textContent.trim();
+            const deliveryTimeSpan = section.querySelector('.text-muted');
+            let mealTime = null;
             
-            const priceText = mealItem.querySelector('div > div:nth-child(2)')?.textContent || '';
-            const unitPriceMatch = priceText.match(/\$([0-9.]+)/);
-            const unitPrice = unitPriceMatch ? parseFloat(unitPriceMatch[1]) : 0;
+            if (deliveryTimeSpan) {
+                const timeText = deliveryTimeSpan.textContent;
+                // Extract time from "|| Delivery Time: 8:00 AM"
+                const timeMatch = timeText.match(/Delivery Time:\s*(.+)/i);
+                if (timeMatch) {
+                    mealTime = timeMatch[1].trim();
+                }
+            }
             
-            const quantityInput = mealItem.querySelector('input[type="number"]');
-            const quantity = quantityInput ? parseInt(quantityInput.value) : 1;
+            const mealTypeMatch = sectionText.match(/^([^(]+)/);
+            const mealTypeName = mealTypeMatch ? mealTypeMatch[0].trim() : '';
             
-            const sectionHeader = mealItem.closest('.accordion-body').querySelector('h6');
-            const mealTypeText = sectionHeader ? sectionHeader.textContent.trim() : '';
-            const mealTypeName = mealTypeText.split(' (')[0];
-            
-            const providerText = mealItem.querySelector('small.text-muted')?.textContent || '';
-            const clientName = providerText.replace('Provider: ', '').trim();
-            
-            const productId = mealItem.dataset.productId;
-            const mealTypeId = mealItem.dataset.mealTypeId;
-            const clientId = mealItem.dataset.clientId;
+            // Find all meal items under this meal type section
+            let nextElement = section.nextElementSibling;
+            while (nextElement && nextElement.tagName === 'UL') {
+                const mealItems = nextElement.querySelectorAll('.list-group-item');
+                
+                mealItems.forEach(mealItem => {
+                    const productNameElement = mealItem.querySelector('strong');
+                    const productName = productNameElement ? productNameElement.textContent.trim() : '';
+                    
+                    const priceText = mealItem.querySelector('div > div:nth-child(2)')?.textContent || '';
+                    const unitPriceMatch = priceText.match(/\$([0-9.]+)/);
+                    const unitPrice = unitPriceMatch ? parseFloat(unitPriceMatch[1]) : 0;
+                    
+                    const quantityInput = mealItem.querySelector('input[type="number"]');
+                    const quantity = quantityInput ? parseInt(quantityInput.value) : 1;
+                    
+                    const providerText = mealItem.querySelector('small.text-muted')?.textContent || '';
+                    const clientName = providerText.replace('Provider: ', '').trim();
+                    
+                    const productId = mealItem.dataset.productId;
+                    const mealTypeId = mealItem.dataset.mealTypeId;
+                    const clientId = mealItem.dataset.clientId;
 
-            if (productId && mealTypeId) {
-                mealOrders.push({
-                    meal_date: mealDate,
-                    meal_type_id: parseInt(mealTypeId),
-                    product_id: parseInt(productId),
-                    client_id: clientId ? parseInt(clientId) : null,
-                    quantity: quantity,
-                    unit_price: unitPrice,
-                    total_price: unitPrice * quantity,
-                    product_name: productName,
-                    meal_type_name: mealTypeName,
-                    client_name: clientName
+                    if (productId && mealTypeId) {
+                        mealOrders.push({
+                            meal_date: mealDate,
+                            meal_time: mealTime, // Add meal_time here
+                            meal_type_id: parseInt(mealTypeId),
+                            product_id: parseInt(productId),
+                            client_id: clientId ? parseInt(clientId) : null,
+                            quantity: quantity,
+                            unit_price: unitPrice,
+                            total_price: unitPrice * quantity,
+                            product_name: productName,
+                            meal_type_name: mealTypeName,
+                            client_name: clientName
+                        });
+                    }
                 });
+                
+                nextElement = nextElement.nextElementSibling;
             }
         });
     });
