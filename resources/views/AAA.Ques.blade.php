@@ -1,889 +1,603 @@
-    public function storeByCash(Request $request)
+<?php
+namespace App\Http\Controllers\Frontend\Meal;
+
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use App\Notifications\MealOrder\NewMealOrderNotification;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use App\Helpers\DeliveryHelper;
+use App\Models\Product;
+use App\Models\MealType;
+use App\Models\MealOrder;
+use App\Models\MealOrderItem;
+use App\Models\ClientMealOrder;
+use App\Models\MealShippingAddress;
+use App\Models\MealDeliveryCharge;
+use App\Models\CreditTransaction;
+use App\Models\DeliveryChargeLedger;
+use App\Models\MealDeliveryStatusHistory;
+use App\Models\User;
+use Carbon\Carbon;
+use Exception;
+
+class MealOrderController extends Controller
+{  
+    public function getMealOrderDetails($id)
     {
-        $request->validate([
-            'meal_orders' => 'required|array|min:1',
-            'meal_orders.*.meal_date' => 'required|date',
-            'meal_orders.*.meal_time' => 'nullable|string',
-            'meal_orders.*.meal_type_id' => 'required|integer|exists:meal_types,id',
-            'meal_orders.*.product_id' => 'required|integer|exists:products,id',
-            'meal_orders.*.quantity' => 'required|integer|min:1',
-            'meal_orders.*.unit_price' => 'required|numeric|min:0',
-            'meal_orders.*.total_price' => 'required|numeric|min:0',
-            'name' => 'required|string|max:255',
-            'email' => 'required|email',
-            'phone' => 'required|string|max:20',
-            'address1' => 'required|string|max:255',
-            'address2' => 'nullable|string|max:255',
-            'zip_code' => 'required|string|max:20',
-            'country_id' => 'required|integer|exists:countries,id',
-            'county_id' => 'required|integer|exists:counties,id',
-            'city_id' => 'required|integer|exists:cities,id',
-            'delivery_option' => 'required|in:self_pickup,courier',
-            'subtotal' => 'required|numeric|min:0',
-            'tax' => 'required|numeric|min:0',
-            'delivery_charge' => 'required|numeric|min:0',
-            'total_amount' => 'required|numeric|min:0',
-        ]);
-
-        DB::beginTransaction();
-
         try {
-            $customerId = $request->header('id');
-            $mealOrders = $request->meal_orders;
-            
-            // Get TAX_RATE from config
-            $taxRate = (float) config('services.tax_rate', 0.10);
-
-            // Calculate overall totals
-            $overallSubtotal = 0;
-            foreach ($mealOrders as $item) {
-                $overallSubtotal += $item['total_price'];
-            }
-            $overallTax = $overallSubtotal * $taxRate;
-
-            // Generate order numbers
-            $orderNumber = 'MO-' . Str::upper(Str::random(8)) . '-' . time();
-            $invoiceNo = 'INV-' . Str::upper(Str::random(6)) . '-' . time();
-
-            // ✅ Prepare customer shipping address for distance calculation
-            $customerShippingAddress = [
-                'city_id'  => $request->city_id,
-                'address1' => $request->address1,
-                'zip_code' => $request->zip_code,
-            ];
-
-            // ✅ Group by meal_date
-            $mealOrdersByDate = [];
-            foreach ($mealOrders as $item) {
-                $date = $item['meal_date'];
-                if (!isset($mealOrdersByDate[$date])) {
-                    $mealOrdersByDate[$date] = [];
-                }
-                $mealOrdersByDate[$date][] = $item;
-            }
-
-            $totalCalculatedDeliveryCharge = 0;
-            $chargesPerDate = [];
-            $deliveryLedgerData = [];
-
-            // Calculate delivery charges per date
-            foreach ($mealOrdersByDate as $date => $itemsForDate) {
-                $chargesPerClientMealType = [];
-                $dateCharge = 0;
-
-                foreach ($itemsForDate as $item) {
-                    $product = Product::find($item['product_id']);
-                    if (!$product) continue;
-
-                    $client = User::find($product->client_id);
-                    $mealType = MealType::find($item['meal_type_id']);
-                    
-                    if (!$client || !$mealType) continue;
-
-                    // Key: client_id + meal_type_id to avoid double counting
-                    $key = $client->id . '_' . $mealType->id;
-
-                    if (isset($chargesPerClientMealType[$key])) {
-                        // Already counted this client + meal type for this date
-                        continue;
-                    }
-
-                    // Ensure client has valid address
-                    if (!$client->city_id || !$client->address1 || !$client->zip_code) continue;
-
-                    $clientAddress = [
-                        'city_id'  => $client->city_id,
-                        'address1' => $client->address1,
-                        'zip_code' => $client->zip_code,
-                    ];
-
-                    // Calculate distance
-                    $distance = $this->getDistanceBetweenLocations($clientAddress, $customerShippingAddress);
-                    if ($distance === null) continue;
-
-                    // Get delivery charge for this client + meal type
-                    $deliveryCharge = MealDeliveryCharge::where('client_id', $client->id)
-                        ->where('meal_type_id', $mealType->id)
-                        ->first();
-
-                    if (!$deliveryCharge) continue;
-
-                    // Determine charge based on distance
-                    if ($distance <= 2) {
-                        $charge = $deliveryCharge->inside_city_2km;
-                        $category = 'inside_city_2km';
-                    } elseif ($distance <= 5) {
-                        $charge = $deliveryCharge->inside_city_5km;
-                        $category = 'inside_city_5km';
-                    } elseif ($distance <= 10) {
-                        $charge = $deliveryCharge->inside_city_10km;
-                        $category = 'inside_city_10km';
-                    } else {
-                        $charge = $deliveryCharge->inside_city_above_10km;
-                        $category = 'inside_city_above_10km';
-                    }
-
-                    // Store charge for this client + meal type (counted once)
-                    $chargesPerClientMealType[$key] = $charge;
-                    $dateCharge += $charge;
-
-                    // Store delivery ledger data
-                    $deliveryLedgerData[] = [
-                        'client_id' => $client->id,
-                        'meal_type_id' => $mealType->id,
-                        'delivery_date' => $date,
-                        'delivery_charge' => $charge,
-                        'distance_km' => $distance,
-                        'distance_category' => $category,
-                    ];
-                }
-
-                $chargesPerDate[$date] = $dateCharge;
-                $totalCalculatedDeliveryCharge += $dateCharge;
-            }
-
-            // ✅ Use the CALCULATED delivery charge instead of frontend provided charge
-            $calculatedDeliveryCharge = $totalCalculatedDeliveryCharge;
-            $overallTotal = $overallSubtotal + $overallTax + $calculatedDeliveryCharge;
-
-            // Create main meal order with CALCULATED delivery charge
-            $mealOrder = MealOrder::create([
-                'customer_id' => $customerId,
-                'order_number' => $orderNumber,
-                'invoice_no' => $invoiceNo,
-                'status' => 'pending',
-                'delivery_type' => $request->delivery_option,
-                'delivery_fee' => $calculatedDeliveryCharge,
-                'subtotal' => $overallSubtotal,
-                'tax' => $overallTax,
-                'payable_amount' => $overallTotal,
-                'paid_amount' => 0,
-                'payment_type' => 'cash',
-                'payment_method' => 'cash',
-                'payment_status' => 'due',
-                'currency' => 'USD',
-                'transaction_id' => null,
-            ]);
-
-            // Create shipping address
-            MealShippingAddress::create([
-                'meal_order_id' => $mealOrder->id,
-                'name' => $request->name,
-                'email' => $request->email,
-                'phone' => $request->phone,
-                'address1' => $request->address1,
-                'address2' => $request->address2,
-                'zip_code' => $request->zip_code,
-                'country_id' => $request->country_id,
-                'county_id' => $request->county_id,
-                'city_id' => $request->city_id,
-                'latitude' => null,
-                'longitude' => null,
-            ]);
-
-            $allOrderItems = [];
-
-            // Calculate client delivery fees
-            $clientDeliveryFees = [];
-            $clientSubtotals = [];
-            $clientTaxes = [];
-
-            // Re-calculate delivery fees per client
-            foreach ($mealOrdersByDate as $date => $itemsForDate) {
-                $calculatedClientsForDate = [];
-                
-                foreach ($itemsForDate as $item) {
-                    $product = Product::find($item['product_id']);
-                    if (!$product) continue;
-
-                    $clientId = $product->client_id;
-                    $mealTypeId = $item['meal_type_id'];
-                    
-                    $key = $clientId . '_' . $mealTypeId;
-
-                    // Skip if already calculated this client+meal_type for this date
-                    if (isset($calculatedClientsForDate[$key])) {
-                        continue;
-                    }
-
-                    $client = User::find($clientId);
-                    $mealType = MealType::find($mealTypeId);
-                    
-                    if (!$client || !$mealType) continue;
-
-                    // Ensure client has valid address
-                    if (!$client->city_id || !$client->address1 || !$client->zip_code) continue;
-
-                    $clientAddress = [
-                        'city_id'  => $client->city_id,
-                        'address1' => $client->address1,
-                        'zip_code' => $client->zip_code,
-                    ];
-
-                    // Calculate distance
-                    $distance = $this->getDistanceBetweenLocations($clientAddress, $customerShippingAddress);
-                    if ($distance === null) continue;
-
-                    // Get delivery charge
-                    $deliveryCharge = MealDeliveryCharge::where('client_id', $clientId)
-                        ->where('meal_type_id', $mealTypeId)
-                        ->first();
-
-                    if (!$deliveryCharge) continue;
-
-                    // Determine charge based on distance
-                    if ($distance <= 2) {
-                        $charge = $deliveryCharge->inside_city_2km;
-                    } elseif ($distance <= 5) {
-                        $charge = $deliveryCharge->inside_city_5km;
-                    } elseif ($distance <= 10) {
-                        $charge = $deliveryCharge->inside_city_10km;
-                    } else {
-                        $charge = $deliveryCharge->inside_city_above_10km;
-                    }
-
-                    // Add to client delivery fees
-                    if (!isset($clientDeliveryFees[$clientId])) {
-                        $clientDeliveryFees[$clientId] = 0;
-                    }
-                    $clientDeliveryFees[$clientId] += $charge;
-                    
-                    $calculatedClientsForDate[$key] = true;
-                }
-            }
-
-            // Process meal items and calculate subtotals/taxes per client
-            foreach ($mealOrders as $item) {
-                $product = Product::find($item['product_id']);
-                if (!$product) continue;
-
-                $clientId = $product->client_id;
-                $mealTypeId = $item['meal_type_id'];
-                $mealDate = $item['meal_date'];
-                $mealTime = $item['meal_time'] ?? null;
-
-                // Initialize client data if not exists
-                if (!isset($clientSubtotals[$clientId])) {
-                    $clientSubtotals[$clientId] = 0;
-                    $clientTaxes[$clientId] = 0;
-                }
-
-                // Add to subtotal and tax
-                $clientSubtotals[$clientId] += $item['total_price'];
-                $clientTaxes[$clientId] += $item['total_price'] * $taxRate;
-
-                // Find the corresponding delivery charge ledger for this item
-                $deliveryLedger = collect($deliveryLedgers ?? [])->first(function ($ledger) use ($clientId, $mealTypeId, $mealDate) {
-                    return $ledger->client_id == $clientId 
-                        && $ledger->meal_type_id == $mealTypeId 
-                        && $ledger->delivery_date == $mealDate;
-                });
-
-                // Create order item
-                $orderItem = MealOrderItem::create([
-                    'meal_order_id' => $mealOrder->id,
-                    'client_id' => $clientId,
-                    'meal_type_id' => $item['meal_type_id'],
-                    'product_id' => $item['product_id'],
-                    'meal_date' => $item['meal_date'],
-                    'meal_time' => $mealTime,
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'total_price' => $item['total_price'],
-                    'delivery_charge_ledger_id' => $deliveryLedger ? $deliveryLedger->id : null,
-                ]);
-
-                $allOrderItems[] = $orderItem;
-            }
-
-            // ✅ NOW Create ClientMealOrder records with PROPER delivery fees (after calculating subtotals/taxes)
-            $clientMealOrders = [];
-            foreach ($clientSubtotals as $clientId => $subtotal) {
-                $deliveryFee = $clientDeliveryFees[$clientId] ?? 0;
-                $tax = $clientTaxes[$clientId] ?? 0;
-                $total = $subtotal + $tax + $deliveryFee;
-
-                $clientMealOrder = ClientMealOrder::create([
-                    'meal_order_id' => $mealOrder->id,
-                    'client_id' => $clientId,
-                    'subtotal' => $subtotal,
-                    'tax' => $tax,
-                    'delivery_fee' => $deliveryFee,
-                    'payable_amount' => $total,
-                    'paid_amount' => 0,
-                    'payment_status' => 'due',
-                ]);
-
-                $clientMealOrders[] = $clientMealOrder;
-            }
-
-            // Create DeliveryChargeLedger records for each unique client+meal_type+date combination
-            $deliveryLedgers = [];
-            foreach ($deliveryLedgerData as $ledgerItem) {
-                $chargeKey = DeliveryChargeLedger::generateChargeKey(
-                    $mealOrder->id,
-                    $ledgerItem['client_id'],
-                    $ledgerItem['meal_type_id'],
-                    $ledgerItem['delivery_date']
-                );
-
-                // Generate tracking number
-                $trackingNumber = DeliveryChargeLedger::generateTrackingNumber();
-
-                // Create delivery charge ledger record
-                $deliveryLedger = DeliveryChargeLedger::create([
-                    'meal_order_id' => $mealOrder->id,
-                    'customer_id' => $customerId,
-                    'client_id' => $ledgerItem['client_id'],
-                    'delivery_person_id' => null,
-                    'meal_type_id' => $ledgerItem['meal_type_id'],
-                    'delivery_date' => $ledgerItem['delivery_date'],
-                    'order_tracking' => $trackingNumber,
-                    'delivery_charge' => $ledgerItem['delivery_charge'],
-                    'distance_km' => $ledgerItem['distance_km'],
-                    'distance_category' => $ledgerItem['distance_category'],
-                    'payment_status' => 'due',
-                    'is_charge_counted' => true,
-                    'charge_key' => $chargeKey,
-                ]);
-
-                // Create initial status history
-                MealDeliveryStatusHistory::create([
-                    'delivery_charge_ledger_id' => $deliveryLedger->id,
-                    'delivery_status' => 'pending',
-                    'notes' => 'Order placed',
-                    'updated_by_id' => $customerId,
-                    'updated_by_type' => 'customer',
-                ]);
-
-                $deliveryLedgers[] = $deliveryLedger;
-            }
-
-            // Update meal order items with delivery charge ledger IDs
-            foreach ($allOrderItems as $orderItem) {
-                $deliveryLedger = collect($deliveryLedgers)->first(function ($ledger) use ($orderItem) {
-                    return $ledger->client_id == $orderItem->client_id 
-                        && $ledger->meal_type_id == $orderItem->meal_type_id 
-                        && $ledger->delivery_date == $orderItem->meal_date;
-                });
-
-                if ($deliveryLedger) {
-                    $orderItem->update([
-                        'delivery_charge_ledger_id' => $deliveryLedger->id
-                    ]);
-                }
-            }
-
-            DB::commit();
-
-            // Notifications
-            $admin = User::where('role', 'admin')->first();
-            if ($admin) {
-                $admin->notify(new NewMealOrderNotification($mealOrder));
-            }
-
-            // Notify customer
-            $customer = User::find($customerId);
-            if ($customer) {
-                $customer->notify(new NewMealOrderNotification($mealOrder));
-            }
-
-            // Notify each client using the created ClientMealOrder objects
-            foreach ($clientMealOrders as $clientMealOrder) {
-                $client = User::find($clientMealOrder->client_id);
-                if ($client) {
-                    // Pass the ClientMealOrder object directly
-                    $client->notify(new NewMealOrderNotification($clientMealOrder));
-                }
-            }
-
-            // Load relationships for the response
-            $mealOrder->load(['items', 'clientMealOrders', 'mealShippingAddress', 'deliveryChargeLedgers']);
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Cash meal order placed successfully!',
-                'data' => [
-                    'meal_order' => $mealOrder,
-                    'order_items' => $allOrderItems,
-                    'total_items' => count($allOrderItems),
-                    'total_clients' => count($clientSubtotals),
-                    'delivery_ledgers' => collect($deliveryLedgers)->map(function($ledger) {
-                        return [
-                            'id' => $ledger->id,
-                            'tracking_number' => $ledger->order_tracking,
-                            'client_id' => $ledger->client_id,
-                            'meal_type_id' => $ledger->meal_type_id,
-                            'delivery_date' => $ledger->delivery_date,
-                            'delivery_status' => $ledger->delivery_status,
-                            'delivery_charge' => $ledger->delivery_charge,
-                        ];
-                    }),
-                    'tax_rate_used' => $taxRate,
-                    'delivery_calculation' => [
-                        'calculated_total' => $calculatedDeliveryCharge,
-                        'frontend_provided' => $request->delivery_charge,
-                        'details_per_date' => $chargesPerDate,
-                    ],
-                ],
-                'redirect_url' => '/user/meal-order'
-            ], 201);
-
-        } catch (Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'Unable to place cash meal order.',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-
-
-    public function storeByCredit(Request $request)
-    {
-        $request->validate([
-            'meal_orders' => 'required|array|min:1',
-            'meal_orders.*.meal_date' => 'required|date',
-            'meal_orders.*.meal_time' => 'nullable|string',
-            'meal_orders.*.meal_type_id' => 'required|integer|exists:meal_types,id',
-            'meal_orders.*.product_id' => 'required|integer|exists:products,id',
-            'meal_orders.*.quantity' => 'required|integer|min:1',
-            'meal_orders.*.unit_price' => 'required|numeric|min:0',
-            'meal_orders.*.total_price' => 'required|numeric|min:0',
-            'name' => 'required|string|max:255',
-            'email' => 'required|email',
-            'phone' => 'required|string|max:20',
-            'address1' => 'required|string|max:255',
-            'address2' => 'nullable|string|max:255',
-            'zip_code' => 'required|string|max:20',
-            'country_id' => 'required|integer|exists:countries,id',
-            'county_id' => 'required|integer|exists:counties,id',
-            'city_id' => 'required|integer|exists:cities,id',
-            'delivery_option' => 'required|in:self_pickup,courier',
-            'subtotal' => 'required|numeric|min:0',
-            'tax' => 'required|numeric|min:0',
-            'delivery_charge' => 'required|numeric|min:0',
-            'total_amount' => 'required|numeric|min:0',
-        ]);
-
-        DB::beginTransaction();
-
-        try {
-            $customerId = $request->header('id');
-            $mealOrders = $request->meal_orders;
-            
-            // Get customer with credit balance
-            $customer = User::with('creditTransactions')->find($customerId);
-            if (!$customer) {
+            $order = MealOrder::with([
+                'items.mealType', 
+                'items.product.nutrient',
+                'items.client:id,firstName,lastName',
+                'mealShippingAddress.country',
+                'mealShippingAddress.county', 
+                'mealShippingAddress.city'
+            ])->find($id);
+
+            if (!$order) {
                 return response()->json([
                     'status' => 'failed',
-                    'message' => 'Customer not found.',
+                    'message' => 'Meal order not found.',
                 ], 404);
             }
 
-            // Get TAX_RATE from config
-            $taxRate = (float) config('services.tax_rate', 0.10);
-
-            // Calculate overall totals
-            $overallSubtotal = 0;
-            foreach ($mealOrders as $item) {
-                $overallSubtotal += $item['total_price'];
-            }
-            $overallTax = $overallSubtotal * $taxRate;
-
-            // Generate order numbers
-            $orderNumber = 'MO-' . Str::upper(Str::random(8)) . '-' . time();
-            $invoiceNo = 'INV-' . Str::upper(Str::random(6)) . '-' . time();
-
-            // ✅ Prepare customer shipping address for distance calculation
-            $customerShippingAddress = [
-                'city_id'  => $request->city_id,
-                'address1' => $request->address1,
-                'zip_code' => $request->zip_code,
-            ];
-
-            // ✅ FIXED: Use EXACT same grouping logic as MealCartController
-            $totalCalculatedDeliveryCharge = 0;
-            $chargesPerDate = [];
-            
-            // Group by meal_date first (EXACTLY like MealCartController)
-            $mealOrdersByDate = [];
-            foreach ($mealOrders as $item) {
-                $date = $item['meal_date'];
-                if (!isset($mealOrdersByDate[$date])) {
-                    $mealOrdersByDate[$date] = [];
-                }
-                $mealOrdersByDate[$date][] = $item;
-            }
-
-            // NEW: Store delivery charge ledger data
-            $deliveryLedgerData = [];
-
-            // Calculate delivery charges per date (EXACTLY like MealCartController)
-            foreach ($mealOrdersByDate as $date => $itemsForDate) {
-                $chargesPerClientMealType = [];
-                $dateCharge = 0;
-
-                foreach ($itemsForDate as $item) {
-                    $product = Product::find($item['product_id']);
-                    if (!$product) continue;
-
-                    $client = User::find($product->client_id);
-                    $mealType = MealType::find($item['meal_type_id']);
-                    
-                    if (!$client || !$mealType) continue;
-
-                    // Key: client_id + meal_type_id to avoid double counting (EXACTLY like MealCartController)
-                    $key = $client->id . '_' . $mealType->id;
-
-                    if (isset($chargesPerClientMealType[$key])) {
-                        // Already counted this client + meal type for this date
-                        continue;
-                    }
-
-                    // Ensure client has valid address
-                    if (!$client->city_id || !$client->address1 || !$client->zip_code) continue;
-
-                    $clientAddress = [
-                        'city_id'  => $client->city_id,
-                        'address1' => $client->address1,
-                        'zip_code' => $client->zip_code,
-                    ];
-
-                    // Calculate distance
-                    $distance = $this->getDistanceBetweenLocations($clientAddress, $customerShippingAddress);
-                    if ($distance === null) continue;
-
-                    // Get delivery charge for this client + meal type
-                    $deliveryCharge = MealDeliveryCharge::where('client_id', $client->id)
-                        ->where('meal_type_id', $mealType->id)
-                        ->first();
-
-                    if (!$deliveryCharge) continue;
-
-                    // Determine charge based on distance (EXACTLY like MealCartController)
-                    if ($distance <= 2) {
-                        $charge = $deliveryCharge->inside_city_2km;
-                        $category = 'inside_city_2km';
-                    } elseif ($distance <= 5) {
-                        $charge = $deliveryCharge->inside_city_5km;
-                        $category = 'inside_city_5km';
-                    } elseif ($distance <= 10) {
-                        $charge = $deliveryCharge->inside_city_10km;
-                        $category = 'inside_city_10km';
-                    } else {
-                        $charge = $deliveryCharge->inside_city_above_10km;
-                        $category = 'inside_city_above_10km';
-                    }
-
-                    // Store charge for this client + meal type (counted once)
-                    $chargesPerClientMealType[$key] = $charge;
-                    $dateCharge += $charge;
-
-                    // Store delivery ledger data
-                    $deliveryLedgerData[] = [
-                        'client_id' => $client->id,
-                        'meal_type_id' => $mealType->id,
-                        'delivery_date' => $date,
-                        'delivery_charge' => $charge,
-                        'distance_km' => $distance,
-                        'distance_category' => $category,
-                    ];
-                }
-
-                $chargesPerDate[$date] = $dateCharge;
-                $totalCalculatedDeliveryCharge += $dateCharge;
-            }
-
-            // ✅ Use the CALCULATED delivery charge instead of frontend provided charge
-            $calculatedDeliveryCharge = $totalCalculatedDeliveryCharge;
-            $overallTotal = $overallSubtotal + $overallTax + $calculatedDeliveryCharge;
-
-            // Calculate customer's current credit balance
-            $currentBalance = $this->calculateCustomerCreditBalance($customerId);
-
-            // Check if customer has sufficient credit
-            if ($currentBalance < $overallTotal) {
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'Insufficient credit balance. Please add funds to your wallet.',
-                    'data' => [
-                        'current_balance' => $currentBalance,
-                        'order_total' => $overallTotal,
-                        'shortfall' => $overallTotal - $currentBalance
-                    ]
-                ], 400);
-            }
-
-            // Create main meal order with CALCULATED delivery charge
-            $mealOrder = MealOrder::create([
-                'customer_id' => $customerId,
-                'order_number' => $orderNumber,
-                'invoice_no' => $invoiceNo,
-                'status' => 'completed',
-                'delivery_type' => $request->delivery_option,
-                'delivery_fee' => $calculatedDeliveryCharge, // ✅ Use calculated charge
-                'subtotal' => $overallSubtotal,
-                'tax' => $overallTax,
-                'payable_amount' => $overallTotal,
-                'paid_amount' => $overallTotal, // Full amount paid from credit
-                'payment_type' => 'courier',
-                'payment_method' => 'wallet',
-                'payment_status' => 'paid',
-                'currency' => 'USD',
-                'transaction_id' => 'CREDIT-' . Str::upper(Str::random(10)),
-            ]);
-
-            // Create shipping address
-            MealShippingAddress::create([
-                'meal_order_id' => $mealOrder->id,
-                'name' => $request->name,
-                'email' => $request->email,
-                'phone' => $request->phone,
-                'address1' => $request->address1,
-                'address2' => $request->address2,
-                'zip_code' => $request->zip_code,
-                'country_id' => $request->country_id,
-                'county_id' => $request->county_id,
-                'city_id' => $request->city_id,
-                'latitude' => null,
-                'longitude' => null,
-            ]);
-
-            $allOrderItems = [];
-
-            // ✅ FIXED: Calculate client delivery fees using the SAME logic
-            $clientDeliveryFees = [];
-            $clientSubtotals = [];
-            $clientTaxes = [];
-
-            // Re-calculate delivery fees per client using the same grouping logic
-            foreach ($mealOrdersByDate as $date => $itemsForDate) {
-                $calculatedClientsForDate = []; // Track which clients we've calculated for this date
-                
-                foreach ($itemsForDate as $item) {
-                    $product = Product::find($item['product_id']);
-                    if (!$product) continue;
-
-                    $clientId = $product->client_id;
-                    $mealTypeId = $item['meal_type_id'];
-                    
-                    $key = $clientId . '_' . $mealTypeId;
-
-                    // Skip if already calculated this client+meal_type for this date
-                    if (isset($calculatedClientsForDate[$key])) {
-                        continue;
-                    }
-
-                    $client = User::find($clientId);
-                    $mealType = MealType::find($mealTypeId);
-                    
-                    if (!$client || !$mealType) continue;
-
-                    // Ensure client has valid address
-                    if (!$client->city_id || !$client->address1 || !$client->zip_code) continue;
-
-                    $clientAddress = [
-                        'city_id'  => $client->city_id,
-                        'address1' => $client->address1,
-                        'zip_code' => $client->zip_code,
-                    ];
-
-                    // Calculate distance
-                    $distance = $this->getDistanceBetweenLocations($clientAddress, $customerShippingAddress);
-                    if ($distance === null) continue;
-
-                    // Get delivery charge
-                    $deliveryCharge = MealDeliveryCharge::where('client_id', $clientId)
-                        ->where('meal_type_id', $mealTypeId)
-                        ->first();
-
-                    if (!$deliveryCharge) continue;
-
-                    // Determine charge based on distance
-                    if ($distance <= 2) {
-                        $charge = $deliveryCharge->inside_city_2km;
-                    } elseif ($distance <= 5) {
-                        $charge = $deliveryCharge->inside_city_5km;
-                    } elseif ($distance <= 10) {
-                        $charge = $deliveryCharge->inside_city_10km;
-                    } else {
-                        $charge = $deliveryCharge->inside_city_above_10km;
-                    }
-
-                    // Add to client delivery fees
-                    if (!isset($clientDeliveryFees[$clientId])) {
-                        $clientDeliveryFees[$clientId] = 0;
-                    }
-                    $clientDeliveryFees[$clientId] += $charge;
-                    
-                    // Mark as calculated for this date
-                    $calculatedClientsForDate[$key] = true;
-                }
-            }
-
-            // NEW: Create DeliveryChargeLedger records for each unique client+meal_type+date combination
-            $deliveryLedgers = [];
-            foreach ($deliveryLedgerData as $ledgerItem) {
-                $chargeKey = DeliveryChargeLedger::generateChargeKey(
-                    $mealOrder->id,
-                    $ledgerItem['client_id'],
-                    $ledgerItem['meal_type_id'],
-                    $ledgerItem['delivery_date']
-                );
-
-                // Create delivery charge ledger record
-                $deliveryLedger = DeliveryChargeLedger::create([
-                    'meal_order_id' => $mealOrder->id,
-                    'customer_id' => $customerId,
-                    'client_id' => $ledgerItem['client_id'],
-                    'delivery_person_id' => null, // Will be assigned later
-                    'meal_type_id' => $ledgerItem['meal_type_id'],
-                    'delivery_date' => $ledgerItem['delivery_date'],
-                    'delivery_charge' => $ledgerItem['delivery_charge'],
-                    'distance_km' => $ledgerItem['distance_km'],
-                    'distance_category' => $ledgerItem['distance_category'],
-                    'payment_status' => 'due', // Delivery person payment is still due
-                    'is_charge_counted' => true,
-                    'charge_key' => $chargeKey,
-                ]);
-
-                $deliveryLedgers[] = $deliveryLedger;
-            }
-
-            // Process meal items and calculate subtotals/taxes per client
-            foreach ($mealOrders as $item) {
-                $product = Product::find($item['product_id']);
-                if (!$product) continue;
-
-                $clientId = $product->client_id;
-                $mealTypeId = $item['meal_type_id'];
-                $mealDate = $item['meal_date'];
-                $mealTime = $item['meal_time'] ?? null;
-
-                // Initialize client data if not exists
-                if (!isset($clientSubtotals[$clientId])) {
-                    $clientSubtotals[$clientId] = 0;
-                    $clientTaxes[$clientId] = 0;
-                }
-
-                // Add to subtotal and tax
-                $clientSubtotals[$clientId] += $item['total_price'];
-                $clientTaxes[$clientId] += $item['total_price'] * $taxRate;
-
-                // Find the corresponding delivery charge ledger for this item
-                $deliveryLedger = collect($deliveryLedgers)->first(function ($ledger) use ($clientId, $mealTypeId, $mealDate) {
-                    return $ledger->client_id == $clientId 
-                        && $ledger->meal_type_id == $mealTypeId 
-                        && $ledger->delivery_date == $mealDate;
+            // Group items by meal date and meal type
+            $groupedItems = $order->items->groupBy(function($item) {
+                return $item->meal_date;
+            })->map(function($dayItems) {
+                return $dayItems->groupBy(function($item) {
+                    return $item->mealType->name ?? 'Other';
                 });
+            });
 
-                // Create order item with reference to delivery charge ledger
-                $orderItem = MealOrderItem::create([
-                    'meal_order_id' => $mealOrder->id,
-                    'client_id' => $clientId,
-                    'meal_type_id' => $item['meal_type_id'],
-                    'product_id' => $item['product_id'],
-                    'meal_date' => $item['meal_date'],
-                    'meal_time' => $mealTime,
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'total_price' => $item['total_price'],
-                    'delivery_charge_ledger_id' => $deliveryLedger ? $deliveryLedger->id : null,
-                    'delivery_charge' => $deliveryLedger ? $deliveryLedger->delivery_charge : 0,
-                ]);
+            // Total calories
+            $totalCalories = $order->items->sum(function ($item) {
+                return ($item->product->nutrient->calories ?? 0) * $item->quantity;
+            });
 
-                $allOrderItems[] = $orderItem;
-            }
+            // Calories by meal type
+            $caloriesByMealType = $order->items->groupBy(function ($item) {
+                return $item->mealType->name ?? 'Other';
+            })->map(function ($group) {
+                return $group->sum(function ($item) {
+                    return ($item->product->nutrient->calories ?? 0) * $item->quantity;
+                });
+            });
 
-            // ✅ Create ClientMealOrder records with PROPER delivery fees
-            foreach ($clientSubtotals as $clientId => $subtotal) {
-                $deliveryFee = $clientDeliveryFees[$clientId] ?? 0;
-                $tax = $clientTaxes[$clientId] ?? 0;
-                $total = $subtotal + $tax + $deliveryFee;
-
-                ClientMealOrder::create([
-                    'meal_order_id' => $mealOrder->id,
-                    'client_id' => $clientId,
-                    'subtotal' => $subtotal,
-                    'tax' => $tax,
-                    'delivery_fee' => $deliveryFee,
-                    'payable_amount' => $total,
-                    'paid_amount' => $total, // Full amount paid for this client
-                    'payment_status' => 'paid',
-                ]);
-            }
-
-            // ✅ Create credit transaction for the payment
-            $newBalance = $currentBalance - $overallTotal;
-            
-            CreditTransaction::create([
-                'customer_id' => $customerId,
-                'type' => 'debit',
-                'method' => 'credit',
-                'amount' => $overallTotal,
-                'balance_after' => $newBalance,
-                'transaction_id' => $mealOrder->transaction_id,
-                'currency' => 'USD',
-                'description' => "Payment for meal order #{$orderNumber}",
-            ]);
-
-            DB::commit();
-
-            // Notify customer
-            $customer = User::find($customerId);
-            if ($customer) {
-                $customer->notify(new NewMealOrderNotification($mealOrder));
-            }
-
-            // Notify each client
-            foreach ($mealOrder->clientMealOrders as $clientMealOrder) {
-                $client = User::find($clientMealOrder->client_id);
-                if ($client) {
-                    $client->notify(new NewMealOrderNotification($clientMealOrder));
-                }
-            }
-
-            // Load relationships for the response
-            $mealOrder->load(['items', 'clientMealOrders', 'mealShippingAddress']);
+            // Calculate summary from order data
+            $summary = [
+                'subtotal' => floatval($order->subtotal ?? 0),
+                'tax' => floatval($order->tax ?? 0),
+                'delivery_fee' => floatval($order->delivery_fee ?? 0),
+                'total' => floatval($order->payable_amount ?? 0),
+                'total_items' => $order->items->sum('quantity')
+            ];
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Credit meal order placed successfully!',
                 'data' => [
-                    'meal_order' => $mealOrder,
-                    'order_items' => $allOrderItems,
-                    'total_items' => count($allOrderItems),
-                    'total_clients' => count($clientSubtotals),
-                    'delivery_ledgers_created' => count($deliveryLedgers),
-                    'tax_rate_used' => $taxRate,
-                    'credit_balance' => [
-                        'previous_balance' => $currentBalance,
-                        'amount_used' => $overallTotal,
-                        'new_balance' => $newBalance,
+                    'order' => $order,
+                    'summary' => $summary,
+                    'meal_cart' => $groupedItems,
+                    'nutrition' => [
+                        'total_calories' => $totalCalories,
+                        'calories_by_meal_type' => $caloriesByMealType,
                     ],
-                    'delivery_calculation' => [
-                        'calculated_total' => $calculatedDeliveryCharge,
-                        'frontend_provided' => $request->delivery_charge,
-                        'details_per_date' => $chargesPerDate,
-                    ],
-                ],
-                'redirect_url' => '/user/meal-order'
-            ], 201);
+                    'shipping_address' => $order->mealShippingAddress
+                ]
+            ], 200);
 
         } catch (Exception $e) {
-            DB::rollBack();
-            \Log::error('Credit meal order creation error: ' . $e->getMessage());
-            \Log::error($e->getTraceAsString());
             return response()->json([
-                'status' => 'failed',
-                'message' => 'Unable to place credit meal order.',
-                'error' => $e->getMessage(),
+                'status' => 'error',
+                'message' => $e->getMessage(),
             ], 500);
         }
     }
+}
 
 
-in above code public function storeByCash(Request $request) is working fine. Now give me full updated code public function storeByCredit(Request $request) only.
+
+Below is view.blade.php.From above method respnse below code is working fine.But i have removed MealDelivery model from database.from provided updated model relation give me updated method and below code to show delivery status from MealDeliveryStatusHistory model and also show meal time from MealOrderItem model(per date,per meal type,per client) properly in below code.dont change page design.Give me updated full below code and above method separately so i can copy paste.
+
+
+@extends('frontend.components.dashboard.dashboard-master')
+@section('dashboard-content')
+<div class="container">
+    <div class="card shadow-sm border-0 mt-3">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0"><i class="mdi mdi-silverware-fork-knife me-2"></i>Meal Order Details</h5>
+            <a href="{{ url()->previous() }}" class="btn btn-light btn-sm">
+                <i class="mdi mdi-arrow-left me-1"></i> Back
+            </a>
+        </div>
+        <div class="card-body">
+            <!-- Order Header -->
+            <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
+                <div>
+                    <h4 class="mb-1" id="mealPlanTitle">Order Details</h4>
+                    <p class="mb-0 text-muted" id="orderNumberText"></p>
+                </div>
+                <div>
+                    <span class="badge bg-success fs-6" id="orderStatusText"></span>
+                </div>
+            </div>
+<!-- Calories Statistics Card -->
+<div class="container-xxl flex-grow-1 container-p-y mb-4">
+    <div class="row">
+        <div class="col-xl-12 col-12 mb-4">
+            <div class="card">
+                <div class="card-header header-elements">
+                    <h5 class="card-title mb-0">Calories Statistics</h5>
+                    <div class="card-action-element ms-auto py-0">
+                        <div class="dropdown">
+                            <button type="button" class="btn dropdown-toggle px-0" data-bs-toggle="dropdown" aria-expanded="false" id="dateRangeDropdown">
+                                <i class="mdi mdi-calendar-month-outline"></i> Last 7 Days
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a href="javascript:void(0);" class="dropdown-item d-flex align-items-center" onclick="changeDateRange('today', 'Today')">Today</a></li>
+                                <li><a href="javascript:void(0);" class="dropdown-item d-flex align-items-center" onclick="changeDateRange('yesterday', 'Yesterday')">Yesterday</a></li>
+                                <li><a href="javascript:void(0);" class="dropdown-item d-flex align-items-center" onclick="changeDateRange('7days', 'Last 7 Days')">Last 7 Days</a></li>
+                                <li><hr class="dropdown-divider" /></li>
+                                <li><a href="javascript:void(0);" class="dropdown-item d-flex align-items-center" onclick="changeDateRange('current_month', 'Current Month')">Current Month</a></li>
+                                <li><a href="javascript:void(0);" class="dropdown-item d-flex align-items-center" onclick="changeDateRange('last_month', 'Last Month')">Last Month</a></li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <canvas id="barChart" style="width:100%; height:200px;"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+            <div class="row">
+                <!-- Order Items (Left) -->
+                <div class="col-lg-8 mb-4">
+                    <div class="accordion" id="mealOrderAccordion"></div>
+                </div>
+
+                <!-- Summary & Address (Right) -->
+                <div class="col-lg-4">
+                    <div class="border rounded p-3 shadow-sm mb-4" id="meal-summary"></div>
+                    <div class="border rounded p-3 shadow-sm mb-4" id="nutrition-summary"></div>
+                    <div class="border rounded p-3 shadow-sm" id="shipping-address"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+let barChartInstance = null;
+let mealTypeBreakdown = {};
+let currentRange = '7days';
+
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadMealOrderDetails();
+    await loadDailyCalories("7days");
+});
+
+async function loadMealOrderDetails() {
+    try {
+        showLoader();
+        const orderId = window.location.pathname.split('/').pop();
+        const response = await axios.get(`/user/get/meal-order/details/${orderId}`);
+
+        if (response.status === 200 && response.data.status === 'success') {
+            const mealCart = response.data.data.meal_cart;
+            const summary = response.data.data.summary;
+            const nutrition = response.data.data.nutrition;
+            const shippingAddress = response.data.data.shipping_address;
+            const order = response.data.data.order;
+
+            // Update header information
+            document.getElementById('mealPlanTitle').textContent = `Order #${order.order_number}`;
+            document.getElementById('orderNumberText').textContent = `${summary.total_items} items • ${order.status}`;
+            document.getElementById('orderStatusText').textContent = order.status;
+
+            renderMealOrderItems(mealCart);
+            renderMealSummary(summary);
+            renderNutritionSummary(nutrition);
+            renderShippingAddress(shippingAddress);
+        } else {
+            document.getElementById('mealOrderAccordion').innerHTML = `<div class="alert alert-info">Order not found.</div>`;
+        }
+    } catch (error) {
+        console.error(error);
+        errorToast('Failed to load order details');
+    } finally {
+        hideLoader();
+    }
+}
+
+function renderMealOrderItems(mealCart) {
+    const container = document.getElementById('mealOrderAccordion');
+    container.innerHTML = '';
+
+    const dates = Object.keys(mealCart);
+    if (dates.length === 0) {
+        container.innerHTML = `<div class="alert alert-info">No items found in this order.</div>`;
+        return;
+    }
+
+    dates.forEach((date, index) => {
+        const dayItems = mealCart[date];
+        const collapseId = `mealDay${index}`;
+
+        const formattedDate = new Date(date).toLocaleDateString('en-US', {
+            weekday: 'long',
+            month: 'short',
+            day: 'numeric'
+        });
+
+        const mealTypes = Object.keys(dayItems);
+        let mealTypeHtml = '';
+
+        mealTypes.forEach(type => {
+            const typeTitle = toTitleCase(type);
+            const items = dayItems[type];
+
+            mealTypeHtml += `<h6 class="mt-3 text-primary">${typeTitle} (${items.length} items)</h6><ul class="list-group mb-3">`;
+
+            items.forEach(item => {
+                const productName = toTitleCase(item.product?.name || '');
+                const img = item.product?.image ? `/upload/product/small/${item.product.image}` : '/upload/no_image.jpg';
+                const clientName = item.client ? `${item.client.firstName} ${item.client.lastName}` : 'Unknown Provider';
+
+                mealTypeHtml += `
+                    <li class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div class="d-flex align-items-center gap-3">
+                                <img src="${img}" alt="${productName}" class="rounded" style="width:60px;height:60px;object-fit:cover;">
+                                <div>
+                                    <strong>${productName}</strong><br>
+                                    <small class="text-muted">$${parseFloat(item.unit_price || 0).toFixed(2)} each × ${item.quantity || 0}</small><br>
+                                    <small class="text-info">Provider: ${clientName}</small>
+                                </div>
+                            </div>
+                            <div class="text-end">
+                                <strong>$${parseFloat(item.total_price || 0).toFixed(2)}</strong>
+                            </div>
+                        </div>
+                    </li>
+                `;
+            });
+
+            mealTypeHtml += '</ul>';
+        });
+
+        const block = `
+            <div class="accordion-item shadow-sm mb-3">
+                <h2 class="accordion-header">
+                    <button class="accordion-button ${index !== 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                        ${formattedDate}
+                    </button>
+                </h2>
+                <div id="${collapseId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#mealOrderAccordion">
+                    <div class="accordion-body">${mealTypeHtml}</div>
+                </div>
+            </div>
+        `;
+
+        container.insertAdjacentHTML('beforeend', block);
+    });
+}
+
+function renderMealSummary(summary) {
+    const container = document.getElementById('meal-summary');
+    if (!summary) {
+        container.innerHTML = `<div class="alert alert-warning">No summary data available.</div>`;
+        return;
+    }
+    
+    // Convert to numbers to ensure toFixed works
+    const subtotal = parseFloat(summary.subtotal || 0);
+    const tax = parseFloat(summary.tax || 0);
+    const deliveryFee = parseFloat(summary.delivery_fee || 0);
+    const total = parseFloat(summary.total || 0);
+    
+    container.innerHTML = `
+        <h5 class="mb-3">Price Summary</h5>
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item d-flex justify-content-between">
+                Subtotal: <span>$${subtotal.toFixed(2)}</span>
+            </li>
+            ${deliveryFee > 0 ? `
+            <li class="list-group-item d-flex justify-content-between">
+                Delivery Fee: <span>$${deliveryFee.toFixed(2)}</span>
+            </li>
+            ` : ''}
+            <li class="list-group-item d-flex justify-content-between">
+                Tax: <span>$${tax.toFixed(2)}</span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between fw-bold">
+                Total: <span>$${total.toFixed(2)}</span>
+            </li>
+        </ul>
+    `;
+}
+
+function renderNutritionSummary(nutrition) {
+    const container = document.getElementById('nutrition-summary');
+    if (!nutrition) {
+        container.innerHTML = `<div class="alert alert-warning">No nutrition data available.</div>`;
+        return;
+    }
+    
+    let caloriesByTypeHtml = '';
+    
+    if (nutrition.calories_by_meal_type) {
+        Object.entries(nutrition.calories_by_meal_type).forEach(([mealType, calories]) => {
+            const caloriesValue = parseInt(calories || 0);
+            caloriesByTypeHtml += `
+                <li class="list-group-item d-flex justify-content-between">
+                    ${toTitleCase(mealType)}: <span>${caloriesValue} cal</span>
+                </li>
+            `;
+        });
+    }
+
+    const totalCalories = parseInt(nutrition.total_calories || 0);
+    
+    container.innerHTML = `
+        <h5 class="mb-3">Nutrition Summary</h5>
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item d-flex justify-content-between fw-bold">
+                Total Calories: <span>${totalCalories} cal</span>
+            </li>
+            ${caloriesByTypeHtml}
+        </ul>
+    `;
+}
+
+function renderShippingAddress(shippingAddress) {
+    const container = document.getElementById('shipping-address');
+    
+    if (!shippingAddress) {
+        container.innerHTML = `
+            <h5 class="mb-3">Shipping Address</h5>
+            <p class="text-muted">No shipping address provided.</p>
+        `;
+        return;
+    }
+
+    const addressLines = [
+        shippingAddress.name,
+        shippingAddress.email,
+        shippingAddress.phone,
+        shippingAddress.address1,
+        shippingAddress.address2,
+        `${shippingAddress.city?.name || ''}${shippingAddress.county?.name ? ', ' + shippingAddress.county.name : ''}${shippingAddress.country?.name ? ', ' + shippingAddress.country.name : ''}`,
+        shippingAddress.zip_code
+    ].filter(Boolean);
+
+    container.innerHTML = `
+        <h5 class="mb-3">Shipping Address</h5>
+        <address class="mb-0">
+            ${addressLines.map(line => `<p class="mb-1">${line}</p>`).join('')}
+        </address>
+    `;
+}
+
+function changeDateRange(range, displayText) {
+    currentRange = range;
+    document.getElementById('dateRangeDropdown').innerHTML = `<i class="mdi mdi-calendar-month-outline"></i> ${displayText}`;
+    loadDailyCalories(range);
+}
+
+async function loadDailyCalories(range) {
+    try {
+        showLoader();
+        const res = await axios.get(`/user/get/calories/history?range=${range}`);
+
+        if (res.data.status === "success") {
+            mealTypeBreakdown = { ...res.data.meal_type_breakdown };
+            renderBarChart(res.data.dates, res.data.calories, res.data.calories_unit, res.data.total_calories_sum, range);
+        } else {
+            errorToast(res.data.message);
+        }
+    } catch (err) {
+        errorToast('Failed to load calories data');
+    } finally {
+        hideLoader();
+    }
+}
+
+function renderBarChart(labels, data, unit, totalCalories, range) {
+    mealTypeBreakdown = mealTypeBreakdown || {};
+    const ctx = document.getElementById("barChart").getContext("2d");
+
+    // Destroy previous chart
+    if (barChartInstance) {
+        barChartInstance.destroy();
+        barChartInstance = null;
+    }
+
+    // Format labels based on range
+    const formattedLabels = formatChartLabels(labels, range);
+
+    barChartInstance = new Chart(ctx, {
+        type: "line",
+        data: {
+            labels: formattedLabels,
+            datasets: [{
+                label: `Total Calories: ${totalCalories} ${unit}`,
+                data: data,
+                backgroundColor: "rgba(54, 162, 235, 0.2)",
+                borderColor: "rgba(54, 162, 235, 1)",
+                borderWidth: 3,
+                tension: 0.4,
+                fill: true,
+                pointBackgroundColor: "rgba(54, 162, 235, 1)",
+                pointBorderColor: "#fff",
+                pointBorderWidth: 2,
+                pointRadius: 5,
+                pointHoverRadius: 7
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: { 
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: `Calories (${unit})`
+                    },
+                    grid: {
+                        color: "rgba(0, 0, 0, 0.1)"
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Date'
+                    },
+                    grid: {
+                        color: "rgba(0, 0, 0, 0.1)"
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        callback: function(value, index, values) {
+                            // For months with many dates, show every nth label to avoid overcrowding
+                            const totalLabels = this.getLabels().length;
+                            if (totalLabels > 15 && (index % 2 === 0 || index === 0 || index === totalLabels - 1)) {
+                                return formattedLabels[index];
+                            } else if (totalLabels <= 15) {
+                                return formattedLabels[index];
+                            }
+                            return '';
+                        }
+                    }
+                }
+            },
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        usePointStyle: true,
+                        padding: 20
+                    }
+                },
+                tooltip: {
+                    backgroundColor: "rgba(0, 0, 0, 0.8)",
+                    titleColor: "#fff",
+                    bodyColor: "#fff",
+                    borderColor: "rgba(54, 162, 235, 1)",
+                    borderWidth: 1,
+                    padding: 12,
+                    displayColors: false,
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            // Show full date in tooltip title
+                            const index = tooltipItems[0].dataIndex;
+                            const date = new Date(labels[index]);
+                            if (!isNaN(date.getTime())) {
+                                return date.toLocaleDateString('en-US', {
+                                    weekday: 'long',
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                });
+                            }
+                            return 'Unknown Date';
+                        },
+                        label: function(context) {
+                            const date = labels[context.dataIndex];
+                            const mealTypes = mealTypeBreakdown[date] || {};
+                            const lines = [];
+
+                            lines.push(`Total: ${context.parsed.y} ${unit}`);
+
+                            // Add meal type breakdown
+                            Object.entries(mealTypes).forEach(([type, cal]) => {
+                                lines.push(`${type}: ${cal} ${unit}`);
+                            });
+
+                            // If no meal type data, show message
+                            if (Object.keys(mealTypes).length === 0) {
+                                lines.push('No meal type data available');
+                            }
+
+                            return lines;
+                        }
+                    }
+                }
+            },
+            interaction: {
+                intersect: false,
+                mode: 'index'
+            },
+            animations: {
+                tension: {
+                    duration: 1000,
+                    easing: 'linear'
+                }
+            }
+        }
+    });
+}
+
+function formatChartLabels(labels, range) {
+    if (!labels || labels.length === 0) return labels;
+
+    // Sort labels chronologically
+    const sortedLabels = [...labels].sort((a, b) => new Date(a) - new Date(b));
+
+    // Always use the same format: "Weekday, Month Day" (e.g., "Mon, Dec 1")
+    return sortedLabels.map(label => {
+        const date = new Date(label);
+        return date.toLocaleDateString('en-US', {
+            weekday: 'short',
+            month: 'short',
+            day: 'numeric'
+        });
+    });
+}
+
+function toTitleCase(str) {
+    if (!str) return "";
+    return str.trim().toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+}
+
+// Utility functions
+function showLoader() {
+    // Implement your loader show logic
+    console.log('Loading...');
+}
+
+function hideLoader() {
+    // Implement your loader hide logic
+    console.log('Loading complete');
+}
+
+function errorToast(message) {
+    // Implement your toast notification
+    alert('Error: ' + message);
+}
+</script>
+
+<style>
+.hover-card {
+    transition: all 0.3s ease;
+}
+.hover-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.15);
+}
+.accordion-button:not(.collapsed) {
+    background-color: #e3f2fd;
+    color: #0d6efd;
+}
+</style>
+@endsection

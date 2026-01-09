@@ -1,5 +1,3 @@
-@extends('frontend.components.dashboard.dashboard-master')
-@section('dashboard-content')
 <div class="container">
     <div class="card shadow-sm border-0 mt-3">
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
@@ -19,36 +17,6 @@
                     <span class="badge bg-success fs-6" id="orderStatusText"></span>
                 </div>
             </div>
-<!-- Calories Statistics Card -->
-<div class="container-xxl flex-grow-1 container-p-y mb-4">
-    <div class="row">
-        <div class="col-xl-12 col-12 mb-4">
-            <div class="card">
-                <div class="card-header header-elements">
-                    <h5 class="card-title mb-0">Calories Statistics</h5>
-                    <div class="card-action-element ms-auto py-0">
-                        <div class="dropdown">
-                            <button type="button" class="btn dropdown-toggle px-0" data-bs-toggle="dropdown" aria-expanded="false" id="dateRangeDropdown">
-                                <i class="mdi mdi-calendar-month-outline"></i> Last 7 Days
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end">
-                                <li><a href="javascript:void(0);" class="dropdown-item d-flex align-items-center" onclick="changeDateRange('today', 'Today')">Today</a></li>
-                                <li><a href="javascript:void(0);" class="dropdown-item d-flex align-items-center" onclick="changeDateRange('yesterday', 'Yesterday')">Yesterday</a></li>
-                                <li><a href="javascript:void(0);" class="dropdown-item d-flex align-items-center" onclick="changeDateRange('7days', 'Last 7 Days')">Last 7 Days</a></li>
-                                <li><hr class="dropdown-divider" /></li>
-                                <li><a href="javascript:void(0);" class="dropdown-item d-flex align-items-center" onclick="changeDateRange('current_month', 'Current Month')">Current Month</a></li>
-                                <li><a href="javascript:void(0);" class="dropdown-item d-flex align-items-center" onclick="changeDateRange('last_month', 'Last Month')">Last Month</a></li>
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-                <div class="card-body">
-                    <canvas id="barChart" style="width:100%; height:200px;"></canvas>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
 
             <div class="row">
                 <!-- Order Items (Left) -->
@@ -67,22 +35,16 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-let barChartInstance = null;
-let mealTypeBreakdown = {};
-let currentRange = '7days';
-
 document.addEventListener('DOMContentLoaded', async function() {
     await loadMealOrderDetails();
-    await loadDailyCalories("7days");
 });
 
 async function loadMealOrderDetails() {
     try {
         showLoader();
         const orderId = window.location.pathname.split('/').pop();
-        const response = await axios.get(`/user/get/meal-order/details/${orderId}`);
+        const response = await axios.get(`/admin/get/meal-order/details/${orderId}`);
 
         if (response.status === 200 && response.data.status === 'success') {
             const mealCart = response.data.data.meal_cart;
@@ -90,13 +52,25 @@ async function loadMealOrderDetails() {
             const nutrition = response.data.data.nutrition;
             const shippingAddress = response.data.data.shipping_address;
             const order = response.data.data.order;
+            const items = response.data.data.items;
+
+            // Debug: Log all items to see meal_time
+            console.log('=== DEBUG: All Items ===');
+            items.forEach((item, index) => {
+                console.log(`Item ${index}:`, {
+                    date: item.meal_date,
+                    type: item.meal_type?.name,
+                    time: item.meal_time,
+                    hasTime: !!item.meal_time
+                });
+            });
 
             // Update header information
             document.getElementById('mealPlanTitle').textContent = `Order #${order.order_number}`;
             document.getElementById('orderNumberText').textContent = `${summary.total_items} items • ${order.status}`;
             document.getElementById('orderStatusText').textContent = order.status;
 
-            renderMealOrderItems(mealCart);
+            renderMealOrderItems(mealCart, items);
             renderMealSummary(summary);
             renderNutritionSummary(nutrition);
             renderShippingAddress(shippingAddress);
@@ -111,7 +85,7 @@ async function loadMealOrderDetails() {
     }
 }
 
-function renderMealOrderItems(mealCart) {
+function renderMealOrderItems(mealCart, allItems) {
     const container = document.getElementById('mealOrderAccordion');
     container.innerHTML = '';
 
@@ -137,8 +111,20 @@ function renderMealOrderItems(mealCart) {
         mealTypes.forEach(type => {
             const typeTitle = toTitleCase(type);
             const items = dayItems[type];
+            
+            // Find meal time for this date and meal type
+            const mealTime = findMealTime(date, type, allItems);
+            
+            console.log(`Finding meal time for ${date} - ${type}:`, mealTime);
 
-            mealTypeHtml += `<h6 class="mt-3 text-primary">${typeTitle} (${items.length} items)</h6><ul class="list-group mb-3">`;
+            mealTypeHtml += `
+                <div class="meal-type-section mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="text-primary mb-0">${typeTitle} (${items.length} items)</h6>
+                        ${mealTime ? `<span class="badge bg-light text-dark"><i class="mdi mdi-clock-outline me-1"></i>Delivery time: ${mealTime}</span>` : '<span class="badge bg-warning text-dark"><i class="mdi mdi-clock-outline me-1"></i>No delivery time set</span>'}
+                    </div>
+                    <ul class="list-group mb-3">
+            `;
 
             items.forEach(item => {
                 const productName = toTitleCase(item.product?.name || '');
@@ -164,7 +150,10 @@ function renderMealOrderItems(mealCart) {
                 `;
             });
 
-            mealTypeHtml += '</ul>';
+            mealTypeHtml += `
+                    </ul>
+                </div>
+            `;
         });
 
         const block = `
@@ -182,6 +171,87 @@ function renderMealOrderItems(mealCart) {
 
         container.insertAdjacentHTML('beforeend', block);
     });
+}
+
+function findMealTime(date, mealType, allItems) {
+    if (!allItems || !Array.isArray(allItems)) {
+        console.log('No allItems array provided');
+        return null;
+    }
+    
+    console.log(`Looking for meal time: date=${date}, mealType=${mealType}`);
+    console.log('All items count:', allItems.length);
+    
+    // Find ALL items that match date and meal type (for debugging)
+    const matchingItems = allItems.filter(item => {
+        const itemDate = item.meal_date;
+        const itemMealTypeName = item.meal_type?.name || 'Other';
+        
+        console.log(`Checking item: date=${itemDate}, type=${itemMealTypeName}, time=${item.meal_time}`);
+        
+        return itemDate === date && itemMealTypeName === mealType;
+    });
+    
+    console.log(`Found ${matchingItems.length} matching items`);
+    
+    if (matchingItems.length > 0) {
+        // Get the first matching item with a meal_time
+        const itemWithTime = matchingItems.find(item => item.meal_time);
+        
+        if (itemWithTime) {
+            console.log('Item with meal_time found:', itemWithTime.meal_time);
+            return formatMealTime(itemWithTime.meal_time);
+        } else {
+            console.log('No matching item has meal_time');
+        }
+    }
+    
+    return null;
+}
+
+function formatMealTime(timeString) {
+    if (!timeString) {
+        console.log('formatMealTime: No time string provided');
+        return '';
+    }
+    
+    console.log('formatMealTime input:', timeString);
+    
+    try {
+        // If it's already in 12-hour format with AM/PM, return as-is
+        if (timeString.toLowerCase().includes('am') || timeString.toLowerCase().includes('pm')) {
+            return timeString;
+        }
+        
+        // Handle time formats like "08:00:00" (with seconds) or "08:00" (without seconds)
+        const timeParts = timeString.split(':');
+        
+        if (timeParts.length >= 2) {
+            let hour = parseInt(timeParts[0], 10);
+            let minute = parseInt(timeParts[1], 10);
+            
+            // Validate hour and minute
+            if (isNaN(hour) || isNaN(minute)) {
+                console.log('Invalid hour or minute:', hour, minute);
+                return timeString;
+            }
+            
+            // Convert to 12-hour format
+            const period = hour >= 12 ? 'pm' : 'am';
+            const displayHour = hour % 12 || 12; // Convert 0 to 12 for midnight
+            const displayMinute = minute.toString().padStart(2, '0');
+            
+            const result = `${displayHour}:${displayMinute} ${period}`;
+            console.log('Formatted result:', result);
+            return result;
+        }
+        
+        console.log('Unexpected time format:', timeString);
+        return timeString; // Return as-is if format is unknown
+    } catch (e) {
+        console.error('Error formatting time:', e, 'Input:', timeString);
+        return timeString; // Return as-is if parsing fails
+    }
 }
 
 function renderMealSummary(summary) {
@@ -280,191 +350,12 @@ function renderShippingAddress(shippingAddress) {
     `;
 }
 
-function changeDateRange(range, displayText) {
-    currentRange = range;
-    document.getElementById('dateRangeDropdown').innerHTML = `<i class="mdi mdi-calendar-month-outline"></i> ${displayText}`;
-    loadDailyCalories(range);
-}
-
-async function loadDailyCalories(range) {
-    try {
-        showLoader();
-        const res = await axios.get(`/user/get/calories/history?range=${range}`);
-
-        if (res.data.status === "success") {
-            mealTypeBreakdown = { ...res.data.meal_type_breakdown };
-            renderBarChart(res.data.dates, res.data.calories, res.data.calories_unit, res.data.total_calories_sum, range);
-        } else {
-            errorToast(res.data.message);
-        }
-    } catch (err) {
-        errorToast('Failed to load calories data');
-    } finally {
-        hideLoader();
-    }
-}
-
-function renderBarChart(labels, data, unit, totalCalories, range) {
-    mealTypeBreakdown = mealTypeBreakdown || {};
-    const ctx = document.getElementById("barChart").getContext("2d");
-
-    // Destroy previous chart
-    if (barChartInstance) {
-        barChartInstance.destroy();
-        barChartInstance = null;
-    }
-
-    // Format labels based on range
-    const formattedLabels = formatChartLabels(labels, range);
-
-    barChartInstance = new Chart(ctx, {
-        type: "line",
-        data: {
-            labels: formattedLabels,
-            datasets: [{
-                label: `Total Calories: ${totalCalories} ${unit}`,
-                data: data,
-                backgroundColor: "rgba(54, 162, 235, 0.2)",
-                borderColor: "rgba(54, 162, 235, 1)",
-                borderWidth: 3,
-                tension: 0.4,
-                fill: true,
-                pointBackgroundColor: "rgba(54, 162, 235, 1)",
-                pointBorderColor: "#fff",
-                pointBorderWidth: 2,
-                pointRadius: 5,
-                pointHoverRadius: 7
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            scales: {
-                y: { 
-                    beginAtZero: true,
-                    title: {
-                        display: true,
-                        text: `Calories (${unit})`
-                    },
-                    grid: {
-                        color: "rgba(0, 0, 0, 0.1)"
-                    }
-                },
-                x: {
-                    title: {
-                        display: true,
-                        text: 'Date'
-                    },
-                    grid: {
-                        color: "rgba(0, 0, 0, 0.1)"
-                    },
-                    ticks: {
-                        maxRotation: 45,
-                        minRotation: 45,
-                        callback: function(value, index, values) {
-                            // For months with many dates, show every nth label to avoid overcrowding
-                            const totalLabels = this.getLabels().length;
-                            if (totalLabels > 15 && (index % 2 === 0 || index === 0 || index === totalLabels - 1)) {
-                                return formattedLabels[index];
-                            } else if (totalLabels <= 15) {
-                                return formattedLabels[index];
-                            }
-                            return '';
-                        }
-                    }
-                }
-            },
-            plugins: {
-                legend: {
-                    display: true,
-                    position: 'top',
-                    labels: {
-                        usePointStyle: true,
-                        padding: 20
-                    }
-                },
-                tooltip: {
-                    backgroundColor: "rgba(0, 0, 0, 0.8)",
-                    titleColor: "#fff",
-                    bodyColor: "#fff",
-                    borderColor: "rgba(54, 162, 235, 1)",
-                    borderWidth: 1,
-                    padding: 12,
-                    displayColors: false,
-                    callbacks: {
-                        title: function(tooltipItems) {
-                            // Show full date in tooltip title
-                            const index = tooltipItems[0].dataIndex;
-                            const date = new Date(labels[index]);
-                            if (!isNaN(date.getTime())) {
-                                return date.toLocaleDateString('en-US', {
-                                    weekday: 'long',
-                                    year: 'numeric',
-                                    month: 'long',
-                                    day: 'numeric'
-                                });
-                            }
-                            return 'Unknown Date';
-                        },
-                        label: function(context) {
-                            const date = labels[context.dataIndex];
-                            const mealTypes = mealTypeBreakdown[date] || {};
-                            const lines = [];
-
-                            lines.push(`Total: ${context.parsed.y} ${unit}`);
-
-                            // Add meal type breakdown
-                            Object.entries(mealTypes).forEach(([type, cal]) => {
-                                lines.push(`${type}: ${cal} ${unit}`);
-                            });
-
-                            // If no meal type data, show message
-                            if (Object.keys(mealTypes).length === 0) {
-                                lines.push('No meal type data available');
-                            }
-
-                            return lines;
-                        }
-                    }
-                }
-            },
-            interaction: {
-                intersect: false,
-                mode: 'index'
-            },
-            animations: {
-                tension: {
-                    duration: 1000,
-                    easing: 'linear'
-                }
-            }
-        }
-    });
-}
-
-function formatChartLabels(labels, range) {
-    if (!labels || labels.length === 0) return labels;
-
-    // Sort labels chronologically
-    const sortedLabels = [...labels].sort((a, b) => new Date(a) - new Date(b));
-
-    // Always use the same format: "Weekday, Month Day" (e.g., "Mon, Dec 1")
-    return sortedLabels.map(label => {
-        const date = new Date(label);
-        return date.toLocaleDateString('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric'
-        });
-    });
-}
-
 function toTitleCase(str) {
     if (!str) return "";
     return str.trim().toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
 }
 
-// Utility functions
+// Utility functions (make sure these exist in your global scope)
 function showLoader() {
     // Implement your loader show logic
     console.log('Loading...');
@@ -493,5 +384,8 @@ function errorToast(message) {
     background-color: #e3f2fd;
     color: #0d6efd;
 }
+.meal-type-section {
+    border-left: 3px solid #0d6efd;
+    padding-left: 15px;
+}
 </style>
-@endsection

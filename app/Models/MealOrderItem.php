@@ -33,22 +33,4 @@ class MealOrderItem extends Model
     {
         return $this->belongsTo(DeliveryChargeLedger::class, 'delivery_charge_ledger_id');
     }
-
-    // Helper method to get delivery status through DeliveryChargeLedger
-    public function getDeliveryStatusAttribute()
-    {
-        return $this->deliveryChargeLedger->delivery_status ?? null;
-    }
-
-    // Helper method to get delivery person through DeliveryChargeLedger
-    public function getDeliveryPersonAttribute()
-    {
-        return $this->deliveryChargeLedger->deliveryPerson ?? null;
-    }
-
-    // Helper method to get tracking number through DeliveryChargeLedger
-    public function getTrackingNumberAttribute()
-    {
-        return $this->deliveryChargeLedger->order_tracking ?? null;
-    }
 }

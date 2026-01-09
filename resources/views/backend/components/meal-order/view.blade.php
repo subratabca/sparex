@@ -28,6 +28,7 @@
                 <div class="col-lg-4">
                     <div class="border rounded p-3 shadow-sm mb-4" id="meal-summary"></div>
                     <div class="border rounded p-3 shadow-sm mb-4" id="nutrition-summary"></div>
+                    <div class="border rounded p-3 shadow-sm mb-4" id="delivery-summary"></div>
                     <div class="border rounded p-3 shadow-sm" id="shipping-address"></div>
                 </div>
             </div>
@@ -35,6 +36,8 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
     await loadMealOrderDetails();
@@ -47,45 +50,38 @@ async function loadMealOrderDetails() {
         const response = await axios.get(`/admin/get/meal-order/details/${orderId}`);
 
         if (response.status === 200 && response.data.status === 'success') {
-            const mealCart = response.data.data.meal_cart;
-            const summary = response.data.data.summary;
-            const nutrition = response.data.data.nutrition;
-            const shippingAddress = response.data.data.shipping_address;
-            const order = response.data.data.order;
-            const items = response.data.data.items;
-
-            // Debug: Log all items to see meal_time
-            console.log('=== DEBUG: All Items ===');
-            items.forEach((item, index) => {
-                console.log(`Item ${index}:`, {
-                    date: item.meal_date,
-                    type: item.meal_type?.name,
-                    time: item.meal_time,
-                    hasTime: !!item.meal_time
-                });
-            });
+            const data = response.data.data;
+            const mealCart = data.meal_cart;
+            const summary = data.summary;
+            const nutrition = data.nutrition;
+            const shippingAddress = data.shipping_address;
+            const order = data.order;
+            const items = data.items;
+            const deliveryStatuses = data.delivery_statuses || {};
+            const deliveryLedgers = data.delivery_charge_ledgers || [];
 
             // Update header information
             document.getElementById('mealPlanTitle').textContent = `Order #${order.order_number}`;
             document.getElementById('orderNumberText').textContent = `${summary.total_items} items • ${order.status}`;
             document.getElementById('orderStatusText').textContent = order.status;
 
-            renderMealOrderItems(mealCart, items);
+            renderMealOrderItems(mealCart, items, deliveryStatuses);
             renderMealSummary(summary);
             renderNutritionSummary(nutrition);
+            renderDeliverySummary(deliveryLedgers, deliveryStatuses);
             renderShippingAddress(shippingAddress);
         } else {
             document.getElementById('mealOrderAccordion').innerHTML = `<div class="alert alert-info">Order not found.</div>`;
         }
     } catch (error) {
-        console.error(error);
+        console.error('Error loading order details:', error);
         errorToast('Failed to load order details');
     } finally {
         hideLoader();
     }
 }
 
-function renderMealOrderItems(mealCart, allItems) {
+function renderMealOrderItems(mealCart, allItems, deliveryStatuses) {
     const container = document.getElementById('mealOrderAccordion');
     container.innerHTML = '';
 
@@ -115,14 +111,41 @@ function renderMealOrderItems(mealCart, allItems) {
             // Find meal time for this date and meal type
             const mealTime = findMealTime(date, type, allItems);
             
-            console.log(`Finding meal time for ${date} - ${type}:`, mealTime);
+            // Get delivery info from the first item (all items in group share same delivery info)
+            const deliveryInfo = items[0]?.delivery_info || {
+                delivery_status: 'pending',
+                delivery_status_label: 'Pending',
+                delivery_person_name: 'Not Assigned'
+            };
+            
+            const deliveryBadgeClass = getDeliveryBadgeClass(deliveryInfo.delivery_status);
+            const deliveryStatusLabel = deliveryInfo.delivery_status_label || deliveryStatuses[deliveryInfo.delivery_status] || 'Pending';
 
             mealTypeHtml += `
                 <div class="meal-type-section mb-4">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h6 class="text-primary mb-0">${typeTitle} (${items.length} items)</h6>
-                        ${mealTime ? `<span class="badge bg-light text-dark"><i class="mdi mdi-clock-outline me-1"></i>Delivery time: ${mealTime}</span>` : '<span class="badge bg-warning text-dark"><i class="mdi mdi-clock-outline me-1"></i>No delivery time set</span>'}
+                        <div class="d-flex align-items-center gap-2">
+                            ${mealTime ? `<span class="badge bg-light text-dark"><i class="mdi mdi-clock-outline me-1"></i>${mealTime}</span>` : ''}
+                            <span class="badge ${deliveryBadgeClass}">${deliveryStatusLabel}</span>
+                        </div>
                     </div>
+                    ${deliveryInfo.delivery_person_name !== 'Not Assigned' ? `
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="mdi mdi-account-circle me-1"></i>
+                                Delivery Person: ${deliveryInfo.delivery_person_name}
+                            </small>
+                        </div>
+                    ` : ''}
+                    ${deliveryInfo.order_tracking ? `
+                        <div class="mb-2">
+                            <small class="text-muted">
+                                <i class="mdi mdi-truck-delivery me-1"></i>
+                                Tracking: ${deliveryInfo.order_tracking}
+                            </small>
+                        </div>
+                    ` : ''}
                     <ul class="list-group mb-3">
             `;
 
@@ -138,12 +161,12 @@ function renderMealOrderItems(mealCart, allItems) {
                                 <img src="${img}" alt="${productName}" class="rounded" style="width:60px;height:60px;object-fit:cover;">
                                 <div>
                                     <strong>${productName}</strong><br>
-                                    <small class="text-muted">$${parseFloat(item.unit_price || 0).toFixed(2)} each × ${item.quantity || 0}</small><br>
+                                    <small class="text-muted">${formatCurrency(item.unit_price || 0)} each × ${item.quantity || 0}</small><br>
                                     <small class="text-info">Provider: ${clientName}</small>
                                 </div>
                             </div>
                             <div class="text-end">
-                                <strong>$${parseFloat(item.total_price || 0).toFixed(2)}</strong>
+                                <strong>${formatCurrency(item.total_price || 0)}</strong>
                             </div>
                         </div>
                     </li>
@@ -173,36 +196,80 @@ function renderMealOrderItems(mealCart, allItems) {
     });
 }
 
+function renderDeliverySummary(deliveryLedgers, deliveryStatuses) {
+    const container = document.getElementById('delivery-summary');
+    
+    if (!deliveryLedgers || deliveryLedgers.length === 0) {
+        container.innerHTML = `
+            <h5 class="mb-3">Delivery Status</h5>
+            <p class="text-muted">No delivery information available.</p>
+        `;
+        return;
+    }
+
+    // Count statuses
+    const statusCount = {};
+    deliveryLedgers.forEach(ledger => {
+        const status = ledger.delivery_status || 'pending';
+        statusCount[status] = (statusCount[status] || 0) + 1;
+    });
+
+    let statusHtml = '';
+    const statusOrder = ['delivered', 'arrived', 'on_the_way', 'picked_up', 'ready_for_pickup', 'preparing', 'accept_order', 'pending', 'cancelled'];
+    
+    statusOrder.forEach(status => {
+        if (statusCount[status]) {
+            const label = deliveryStatuses[status] || toTitleCase(status);
+            const count = statusCount[status];
+            const badgeClass = getDeliveryBadgeClass(status);
+            
+            statusHtml += `
+                <div class="col-12">
+                    <div class="d-flex justify-content-between align-items-center p-2 border rounded mb-2">
+                        <div class="d-flex align-items-center">
+                            <span class="badge ${badgeClass} me-2">${count}</span>
+                            <span>${label}</span>
+                        </div>
+                        <small class="text-muted">${deliveryLedgers.length} total</small>
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    container.innerHTML = `
+        <h5 class="mb-3">Delivery Summary</h5>
+        <div class="row g-2">
+            ${statusHtml}
+        </div>
+        <div class="mt-3">
+            <small class="text-muted">
+                <i class="mdi mdi-information-outline me-1"></i>
+                ${deliveryLedgers.length} delivery group(s) for this order
+            </small>
+        </div>
+    `;
+}
+
 function findMealTime(date, mealType, allItems) {
     if (!allItems || !Array.isArray(allItems)) {
-        console.log('No allItems array provided');
         return null;
     }
     
-    console.log(`Looking for meal time: date=${date}, mealType=${mealType}`);
-    console.log('All items count:', allItems.length);
-    
-    // Find ALL items that match date and meal type (for debugging)
+    // Find ALL items that match date and meal type
     const matchingItems = allItems.filter(item => {
         const itemDate = item.meal_date;
         const itemMealTypeName = item.meal_type?.name || 'Other';
         
-        console.log(`Checking item: date=${itemDate}, type=${itemMealTypeName}, time=${item.meal_time}`);
-        
         return itemDate === date && itemMealTypeName === mealType;
     });
-    
-    console.log(`Found ${matchingItems.length} matching items`);
     
     if (matchingItems.length > 0) {
         // Get the first matching item with a meal_time
         const itemWithTime = matchingItems.find(item => item.meal_time);
         
         if (itemWithTime) {
-            console.log('Item with meal_time found:', itemWithTime.meal_time);
             return formatMealTime(itemWithTime.meal_time);
-        } else {
-            console.log('No matching item has meal_time');
         }
     }
     
@@ -211,11 +278,8 @@ function findMealTime(date, mealType, allItems) {
 
 function formatMealTime(timeString) {
     if (!timeString) {
-        console.log('formatMealTime: No time string provided');
         return '';
     }
-    
-    console.log('formatMealTime input:', timeString);
     
     try {
         // If it's already in 12-hour format with AM/PM, return as-is
@@ -232,7 +296,6 @@ function formatMealTime(timeString) {
             
             // Validate hour and minute
             if (isNaN(hour) || isNaN(minute)) {
-                console.log('Invalid hour or minute:', hour, minute);
                 return timeString;
             }
             
@@ -241,12 +304,9 @@ function formatMealTime(timeString) {
             const displayHour = hour % 12 || 12; // Convert 0 to 12 for midnight
             const displayMinute = minute.toString().padStart(2, '0');
             
-            const result = `${displayHour}:${displayMinute} ${period}`;
-            console.log('Formatted result:', result);
-            return result;
+            return `${displayHour}:${displayMinute} ${period}`;
         }
         
-        console.log('Unexpected time format:', timeString);
         return timeString; // Return as-is if format is unknown
     } catch (e) {
         console.error('Error formatting time:', e, 'Input:', timeString);
@@ -271,18 +331,18 @@ function renderMealSummary(summary) {
         <h5 class="mb-3">Price Summary</h5>
         <ul class="list-group list-group-flush">
             <li class="list-group-item d-flex justify-content-between">
-                Subtotal: <span>$${subtotal.toFixed(2)}</span>
+                Subtotal: <span>${formatCurrency(subtotal)}</span>
             </li>
             ${deliveryFee > 0 ? `
             <li class="list-group-item d-flex justify-content-between">
-                Delivery Fee: <span>$${deliveryFee.toFixed(2)}</span>
+                Delivery Fee: <span>${formatCurrency(deliveryFee)}</span>
             </li>
             ` : ''}
             <li class="list-group-item d-flex justify-content-between">
-                Tax: <span>$${tax.toFixed(2)}</span>
+                Tax: <span>${formatCurrency(tax)}</span>
             </li>
             <li class="list-group-item d-flex justify-content-between fw-bold">
-                Total: <span>$${total.toFixed(2)}</span>
+                Total: <span>${formatCurrency(total)}</span>
             </li>
         </ul>
     `;
@@ -350,25 +410,70 @@ function renderShippingAddress(shippingAddress) {
     `;
 }
 
+function getDeliveryBadgeClass(status) {
+    switch(status) {
+        case 'delivered': return 'bg-success';
+        case 'arrived': return 'bg-primary';
+        case 'on_the_way': return 'bg-info';
+        case 'picked_up': return 'bg-info';
+        case 'ready_for_pickup': return 'bg-warning';
+        case 'preparing': return 'bg-warning';
+        case 'accept_order': return 'bg-secondary';
+        case 'pending': return 'bg-secondary';
+        case 'cancelled': return 'bg-dark';
+        default: return 'bg-secondary';
+    }
+}
+
 function toTitleCase(str) {
     if (!str) return "";
     return str.trim().toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
 }
 
-// Utility functions (make sure these exist in your global scope)
+function formatCurrency(amount) {
+    const numAmount = parseFloat(amount) || 0;
+    return new Intl.NumberFormat('en-GB', {
+        style: 'currency',
+        currency: 'GBP'
+    }).format(numAmount);
+}
+
+// Utility functions
 function showLoader() {
     // Implement your loader show logic
-    console.log('Loading...');
+    const loader = document.createElement('div');
+    loader.id = 'loadingOverlay';
+    loader.className = 'loading-overlay';
+    loader.innerHTML = `
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    `;
+    document.body.appendChild(loader);
 }
 
 function hideLoader() {
     // Implement your loader hide logic
-    console.log('Loading complete');
+    const loader = document.getElementById('loadingOverlay');
+    if (loader) {
+        loader.remove();
+    }
 }
 
 function errorToast(message) {
     // Implement your toast notification
-    alert('Error: ' + message);
+    if (typeof Toastify !== 'undefined') {
+        Toastify({
+            text: message,
+            duration: 3000,
+            close: true,
+            gravity: "top",
+            position: "right",
+            backgroundColor: "#dc3545",
+        }).showToast();
+    } else {
+        alert('Error: ' + message);
+    }
 }
 </script>
 
@@ -387,5 +492,17 @@ function errorToast(message) {
 .meal-type-section {
     border-left: 3px solid #0d6efd;
     padding-left: 15px;
+}
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
 }
 </style>

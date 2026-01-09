@@ -18,7 +18,8 @@ use App\Models\MealShippingAddress;
 use App\Models\MealDeliveryCharge;
 use App\Models\CreditTransaction;
 use App\Models\User;
-
+use App\Models\DeliveryChargeLedger;
+use App\Models\MealDeliveryStatusHistory;
 
 class AdminMealOrderController extends Controller
 {
@@ -203,6 +204,165 @@ class AdminMealOrderController extends Controller
     }
 
     public function getMealOrderDetails($id)
+    {
+        try {
+            $order = MealOrder::with([
+                'items.mealType', 
+                'items.product.nutrient',
+                'items.client:id,firstName,lastName',
+                'mealShippingAddress.country',
+                'mealShippingAddress.county', 
+                'mealShippingAddress.city',
+                'deliveryChargeLedgers.mealType',
+                'deliveryChargeLedgers.deliveryPerson:id,firstName,lastName',
+                'deliveryChargeLedgers.statusHistories' => function($query) {
+                    $query->latest()->take(5);
+                }
+            ])->find($id);
+
+            if (!$order) {
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'Meal order not found.',
+                ], 404);
+            }
+
+            // Get delivery charge ledgers grouped by meal type and date
+            $deliveryLedgers = DeliveryChargeLedger::where('meal_order_id', $id)
+                ->with(['mealType', 'deliveryPerson:id,firstName,lastName'])
+                ->get()
+                ->groupBy(function($ledger) {
+                    return $ledger->delivery_date . '_' . $ledger->meal_type_id;
+                });
+
+            // Group items by meal date and meal type with delivery status
+            $groupedItems = $order->items->groupBy(function($item) {
+                return $item->meal_date;
+            })->map(function($dayItems, $date) use ($deliveryLedgers) {
+                return $dayItems->groupBy(function($item) use ($date, $deliveryLedgers) {
+                    $mealTypeName = $item->mealType->name ?? 'Other';
+                    
+                    // Find delivery ledger for this date and meal type
+                    $ledgerKey = $date . '_' . $item->meal_type_id;
+                    $deliveryLedger = isset($deliveryLedgers[$ledgerKey]) ? $deliveryLedgers[$ledgerKey]->first() : null;
+                    
+                    // Add delivery info to the group
+                    $item->delivery_info = $deliveryLedger ? [
+                        'delivery_status' => $deliveryLedger->delivery_status,
+                        'delivery_status_label' => DeliveryChargeLedger::STATUS_LABELS[$deliveryLedger->delivery_status] ?? 'Pending',
+                        'delivery_person_name' => $deliveryLedger->deliveryPerson ? 
+                            $deliveryLedger->deliveryPerson->firstName . ' ' . $deliveryLedger->deliveryPerson->lastName : 
+                            'Not Assigned',
+                        'order_tracking' => $deliveryLedger->order_tracking,
+                        'delivery_charge' => $deliveryLedger->delivery_charge,
+                        'payment_status' => $deliveryLedger->payment_status
+                    ] : [
+                        'delivery_status' => 'pending',
+                        'delivery_status_label' => 'Pending',
+                        'delivery_person_name' => 'Not Assigned',
+                        'order_tracking' => null,
+                        'delivery_charge' => 0,
+                        'payment_status' => 'due'
+                    ];
+                    
+                    return $mealTypeName;
+                });
+            });
+
+            // Total calories
+            $totalCalories = $order->items->sum(function ($item) {
+                return ($item->product->nutrient->calories ?? 0) * $item->quantity;
+            });
+
+            // Calories by meal type
+            $caloriesByMealType = $order->items->groupBy(function ($item) {
+                return $item->mealType->name ?? 'Other';
+            })->map(function ($group) {
+                return $group->sum(function ($item) {
+                    return ($item->product->nutrient->calories ?? 0) * $item->quantity;
+                });
+            });
+
+            // Calculate summary from order data
+            $summary = [
+                'subtotal' => floatval($order->subtotal ?? 0),
+                'tax' => floatval($order->tax ?? 0),
+                'delivery_fee' => floatval($order->delivery_fee ?? 0),
+                'total' => floatval($order->payable_amount ?? 0),
+                'total_items' => $order->items->sum('quantity')
+            ];
+
+            // Get all delivery statuses for the UI
+            $deliveryStatuses = DeliveryChargeLedger::STATUS_LABELS;
+
+            return response()->json([
+                'status' => 'success',
+                'data' => [
+                    'order' => $order,
+                    'summary' => $summary,
+                    'meal_cart' => $groupedItems,
+                    'nutrition' => [
+                        'total_calories' => $totalCalories,
+                        'calories_by_meal_type' => $caloriesByMealType,
+                    ],
+                    'shipping_address' => $order->mealShippingAddress,
+                    'items' => $order->items->map(function($item) {
+                        return [
+                            'id' => $item->id,
+                            'meal_date' => $item->meal_date,
+                            'meal_time' => $item->meal_time,
+                            'meal_type' => $item->mealType ? [
+                                'id' => $item->mealType->id,
+                                'name' => $item->mealType->name
+                            ] : null,
+                            'product' => $item->product,
+                            'client' => $item->client,
+                            'quantity' => $item->quantity,
+                            'unit_price' => $item->unit_price,
+                            'total_price' => $item->total_price,
+                            'delivery_info' => $item->delivery_info ?? null
+                        ];
+                    }),
+                    'delivery_statuses' => $deliveryStatuses,
+                    'delivery_charge_ledgers' => $order->deliveryChargeLedgers->map(function($ledger) use ($deliveryStatuses) {
+                        return [
+                            'id' => $ledger->id,
+                            'delivery_date' => $ledger->delivery_date,
+                            'meal_type_id' => $ledger->meal_type_id,
+                            'meal_type_name' => $ledger->mealType->name ?? 'Unknown',
+                            'delivery_status' => $ledger->delivery_status,
+                            'delivery_status_label' => $deliveryStatuses[$ledger->delivery_status] ?? 'Unknown',
+                            'delivery_person' => $ledger->deliveryPerson ? 
+                                $ledger->deliveryPerson->firstName . ' ' . $ledger->deliveryPerson->lastName : 
+                                'Not Assigned',
+                            'order_tracking' => $ledger->order_tracking,
+                            'delivery_charge' => floatval($ledger->delivery_charge ?? 0),
+                            'payment_status' => $ledger->payment_status,
+                            'status_histories' => $ledger->statusHistories->map(function($history) {
+                                return [
+                                    'delivery_status' => $history->delivery_status,
+                                    'status_label' => $history->status_label,
+                                    'notes' => $history->notes,
+                                    'updated_by_label' => $history->updated_by_label,
+                                    'created_at' => $history->created_at->format('Y-m-d H:i:s')
+                                ];
+                            })
+                        ];
+                    })
+                ]
+            ], 200);
+
+        } catch (Exception $e) {
+            \Log::error('Error in AdminMealOrderController::getMealOrderDetails: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+    public function getMealOrderDetails333($id)
     {
         try {
             $order = MealOrder::with([

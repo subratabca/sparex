@@ -19,7 +19,6 @@ use App\Models\MealShippingAddress;
 use App\Models\MealDeliveryCharge;
 use App\Models\CreditTransaction;
 use App\Models\User;
-use App\Models\MealDelivery;
 use App\Models\DeliveryChargeLedger;
 use App\Models\MealDeliveryStatusHistory;
 use Exception;
@@ -222,13 +221,7 @@ class ClientMealOrderController extends Controller
                 'mealType:id,name',
                 'product:id,name,image,price',
                 'client:id,firstName,lastName',
-                'mealDelivery' => function($query) {
-                    $query->select('id', 'meal_order_item_id', 'delivery_person_id', 
-                                  'estimated_delivery_time', 'actual_delivery_time', 'tracking_code',
-                                  'pickup_time', 'handover_time');
-                },
-                'mealDelivery.deliveryPerson:id,firstName,lastName,mobile',
-                'deliveryPerson:id,firstName,lastName,mobile'
+                'deliveryChargeLedger.deliveryPerson:id,firstName,lastName,mobile'
             ])
             ->where('client_id', $client_id)
             ->where('meal_order_id', $order_id)
@@ -245,23 +238,16 @@ class ClientMealOrderController extends Controller
             $deliveryChargeLedgers = DeliveryChargeLedger::with([
                 'mealType:id,name',
                 'deliveryPerson:id,firstName,lastName',
+                'statusHistories' => function($query) {
+                    $query->latest()->take(5);
+                }
             ])
             ->where('meal_order_id', $order_id)
             ->where('client_id', $client_id)
             ->get();
 
-            // Get all delivery statuses from MealOrderItem model
-            $deliveryStatuses = [
-                MealOrderItem::STATUS_PENDING => 'Pending',
-                MealOrderItem::STATUS_ACCEPT_ORDER => 'Accept Order',
-                MealOrderItem::STATUS_PREPARING => 'Preparing',
-                MealOrderItem::STATUS_READY_FOR_PICKUP => 'Ready for Pickup',
-                MealOrderItem::STATUS_PICKED_UP => 'Picked Up',
-                MealOrderItem::STATUS_ON_THE_WAY => 'On the Way',
-                MealOrderItem::STATUS_ARRIVED => 'Arrived',
-                MealOrderItem::STATUS_DELIVERED => 'Delivered',
-                MealOrderItem::STATUS_CANCELLED => 'Cancelled',
-            ];
+            // Get delivery statuses from DeliveryChargeLedger model
+            $deliveryStatuses = DeliveryChargeLedger::STATUS_LABELS;
 
             // If no ClientMealOrder exists, create a virtual one from the items
             if (!$clientMealOrder) {
@@ -307,32 +293,42 @@ class ClientMealOrderController extends Controller
                 }
                 
                 if (!isset($groupedItems[$mealDate][$mealTypeName])) {
+                    // Find delivery charge ledger for this meal type and date
+                    $deliveryChargeLedger = $deliveryChargeLedgers->first(function($ledger) use ($mealTypeId, $mealDate) {
+                        return $ledger->meal_type_id == $mealTypeId && 
+                               $ledger->delivery_date == $mealDate;
+                    });
+                    
+                    $deliveryStatus = $deliveryChargeLedger ? $deliveryChargeLedger->delivery_status : 'pending';
+                    $deliveryPersonName = $deliveryChargeLedger && $deliveryChargeLedger->deliveryPerson ? 
+                        $deliveryChargeLedger->deliveryPerson->firstName . ' ' . $deliveryChargeLedger->deliveryPerson->lastName : 
+                        'Not Assigned';
+                    
                     $groupedItems[$mealDate][$mealTypeName] = [
                         'items' => [],
                         'meal_type_id' => $mealTypeId,
                         'client_id' => $item->client_id,
                         'meal_date' => $mealDate,
-                        'delivery_status' => $item->delivery_status,
-                        'delivery_status_label' => $deliveryStatuses[$item->delivery_status] ?? ucfirst($item->delivery_status),
-                        'delivery_person_name' => null,
-                        'meal_delivery_ids' => [],
+                        'delivery_status' => $deliveryStatus,
+                        'delivery_status_label' => $deliveryStatuses[$deliveryStatus] ?? ucfirst($deliveryStatus),
+                        'delivery_person_name' => $deliveryPersonName,
+                        'delivery_charge_ledger_id' => $deliveryChargeLedger ? $deliveryChargeLedger->id : null,
                         'total_price' => 0
                     ];
                 }
                 
-                // Get delivery status for this individual item
-                $deliveryStatus = $item->delivery_status ?? null;
+                // Get delivery status for this individual item from delivery charge ledger
+                $itemDeliveryChargeLedger = $item->deliveryChargeLedger;
+                $deliveryStatus = $itemDeliveryChargeLedger ? $itemDeliveryChargeLedger->delivery_status : 'pending';
                 $deliveryStatusLabel = $deliveryStatuses[$deliveryStatus] ?? ucfirst($deliveryStatus);
                 $deliveryPersonName = null;
-                $mealDeliveryId = null;
+                $deliveryChargeLedgerId = null;
                 
-                if ($item->mealDelivery) {
-                    if ($item->mealDelivery->deliveryPerson) {
-                        $deliveryPersonName = $item->mealDelivery->deliveryPerson->firstName . ' ' . $item->mealDelivery->deliveryPerson->lastName;
+                if ($itemDeliveryChargeLedger) {
+                    if ($itemDeliveryChargeLedger->deliveryPerson) {
+                        $deliveryPersonName = $itemDeliveryChargeLedger->deliveryPerson->firstName . ' ' . $itemDeliveryChargeLedger->deliveryPerson->lastName;
                     }
-                    $mealDeliveryId = $item->mealDelivery->id;
-                } elseif ($item->deliveryPerson) {
-                    $deliveryPersonName = $item->deliveryPerson->firstName . ' ' . $item->deliveryPerson->lastName;
+                    $deliveryChargeLedgerId = $itemDeliveryChargeLedger->id;
                 }
                 
                 // Add item to the group
@@ -350,22 +346,12 @@ class ClientMealOrderController extends Controller
                     'delivery_status' => $deliveryStatus,
                     'delivery_status_label' => $deliveryStatusLabel,
                     'delivery_person_name' => $deliveryPersonName,
-                    'meal_delivery_id' => $mealDeliveryId,
-                    'has_delivery_record' => !is_null($mealDeliveryId)
+                    'delivery_charge_ledger_id' => $deliveryChargeLedgerId,
+                    'has_delivery_record' => !is_null($deliveryChargeLedgerId)
                 ];
                 
                 // Add to group total price
                 $groupedItems[$mealDate][$mealTypeName]['total_price'] += $item->total_price;
-                
-                // Store meal delivery IDs for this group
-                if ($mealDeliveryId) {
-                    $groupedItems[$mealDate][$mealTypeName]['meal_delivery_ids'][] = $mealDeliveryId;
-                }
-                
-                // Track delivery person for the group
-                if ($deliveryPersonName && !$groupedItems[$mealDate][$mealTypeName]['delivery_person_name']) {
-                    $groupedItems[$mealDate][$mealTypeName]['delivery_person_name'] = $deliveryPersonName;
-                }
                 
                 $totalAmount += $item->total_price;
             }
@@ -409,7 +395,7 @@ class ClientMealOrderController extends Controller
                     'image' => $order->customer->image ?? null,
                 ],
                 'items' => $groupedItems,
-                'delivery_charge_ledgers' => $deliveryChargeLedgers->map(function($ledger) {
+                'delivery_charge_ledgers' => $deliveryChargeLedgers->map(function($ledger) use ($deliveryStatuses) {
                     return [
                         'id' => $ledger->id,
                         'meal_type_id' => $ledger->meal_type_id,
@@ -417,9 +403,20 @@ class ClientMealOrderController extends Controller
                         'delivery_charge' => $ledger->delivery_charge,
                         'delivery_person_id' => $ledger->delivery_person_id,
                         'delivery_person_name' => $ledger->deliveryPerson ? $ledger->deliveryPerson->firstName . ' ' . $ledger->deliveryPerson->lastName : null,
+                        'delivery_status' => $ledger->delivery_status,
+                        'delivery_status_label' => $deliveryStatuses[$ledger->delivery_status] ?? 'Unknown',
                         'payment_status' => $ledger->payment_status,
                         'delivery_date' => $ledger->delivery_date,
                         'is_charge_counted' => $ledger->is_charge_counted,
+                        'order_tracking' => $ledger->order_tracking,
+                        'status_histories' => $ledger->statusHistories->map(function($history) {
+                            return [
+                                'delivery_status' => $history->delivery_status,
+                                'notes' => $history->notes,
+                                'updated_by_label' => $history->updated_by_label,
+                                'created_at' => $history->created_at->format('Y-m-d H:i:s')
+                            ];
+                        })
                     ];
                 }),
                 'delivery_statuses' => $deliveryStatuses,
@@ -446,7 +443,7 @@ class ClientMealOrderController extends Controller
                         'meal_time' => $item->meal_time,
                         'meal_type_id' => $item->meal_type_id,
                         'meal_type_name' => $item->mealType ? $item->mealType->name : 'Other',
-                        'delivery_status' => $item->delivery_status,
+                        'delivery_status' => $item->deliveryChargeLedger ? $item->deliveryChargeLedger->delivery_status : 'pending',
                     ];
                 })->toArray()
             ];
@@ -457,6 +454,9 @@ class ClientMealOrderController extends Controller
             ], 200);
 
         } catch (Exception $e) {
+            \Log::error('Error in getMealOrderDetails: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            
             return response()->json([
                 'status' => 'failed',
                 'message' => 'An error occurred while retrieving payment details.',

@@ -200,7 +200,11 @@
         </div>
     </div>
 </div>
+<!-- Same HTML structure above -->
+
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+<link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 <script>
 // Toast notification functions
 function successToast(message) {
@@ -226,17 +230,14 @@ function errorToast(message) {
 }
 
 function showLoader() {
-    const loader = document.getElementById('bouncing-loader');
-    if (loader) {
-        loader.style.display = 'flex';
-    }
+    document.getElementById('loadingSpinner').style.display = 'block';
+    document.getElementById('mainContent').style.display = 'none';
+    document.getElementById('errorMessage').style.display = 'none';
 }
 
 function hideLoader() {
-    const loader = document.getElementById('bouncing-loader');
-    if (loader) {
-        loader.style.display = 'none';
-    }
+    document.getElementById('loadingSpinner').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
 }
 
 function handleError(error) {
@@ -259,6 +260,14 @@ function handleError(error) {
         message = error.message;
     }
     errorToast(message);
+    
+    // Show error message in UI
+    const errorDiv = document.getElementById('errorMessage');
+    const errorText = document.getElementById('errorText');
+    if (errorDiv && errorText) {
+        errorText.textContent = message;
+        errorDiv.style.display = 'block';
+    }
 }
 
 document.addEventListener('DOMContentLoaded', async function() {
@@ -276,7 +285,7 @@ async function loadClientPaymentDetails() {
             console.log('Data received:', data);
             
             // Store delivery statuses globally
-            window.deliveryStatuses = data.delivery_statuses;
+            window.deliveryStatuses = data.delivery_statuses || {};
             window.currentOrderData = data;
             
             // Update header information
@@ -310,8 +319,15 @@ async function loadClientPaymentDetails() {
 }
 
 function updateCustomerInfo(customer) {
-    document.getElementById('customerName').textContent = customer.name;
-    document.getElementById('customerEmail').textContent = `Email: ${customer.email}`;
+    if (!customer) {
+        document.getElementById('customerName').textContent = 'Unknown Customer';
+        document.getElementById('customerEmail').textContent = `Email: N/A`;
+        document.getElementById('customerPhone').textContent = `Phone: N/A`;
+        return;
+    }
+    
+    document.getElementById('customerName').textContent = customer.name || `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || 'Unknown Customer';
+    document.getElementById('customerEmail').textContent = `Email: ${customer.email || 'N/A'}`;
     document.getElementById('customerPhone').textContent = `Phone: ${customer.mobile || 'N/A'}`;
     
     if (customer.image) {
@@ -320,7 +336,7 @@ function updateCustomerInfo(customer) {
 }
 
 function updatePaymentInfo(clientMealOrder) {
-    const paymentStatus = clientMealOrder.payment_status;
+    const paymentStatus = clientMealOrder?.payment_status || 'unknown';
     const badge = document.getElementById('paymentStatusBadge');
     
     // Set badge color based on payment status
@@ -338,14 +354,16 @@ function updatePaymentInfo(clientMealOrder) {
     badge.textContent = paymentStatus ? toTitleCase(paymentStatus) : 'Unknown';
     
     // Update amounts
-    document.getElementById('payableAmount').textContent = formatCurrency(clientMealOrder.payable_amount || 0);
-    document.getElementById('paidAmount').textContent = formatCurrency(clientMealOrder.paid_amount || 0);
+    document.getElementById('payableAmount').textContent = formatCurrency(clientMealOrder?.payable_amount || 0);
+    document.getElementById('paidAmount').textContent = formatCurrency(clientMealOrder?.paid_amount || 0);
     document.getElementById('balanceAmount').textContent = formatCurrency(
-        (clientMealOrder.payable_amount || 0) - (clientMealOrder.paid_amount || 0)
+        (clientMealOrder?.payable_amount || 0) - (clientMealOrder?.paid_amount || 0)
     );
 }
 
 function updateSummaryStats(summary) {
+    if (!summary) return;
+    
     // Update price breakdown
     document.getElementById('summarySubtotal').textContent = formatCurrency(summary.subtotal || 0);
     document.getElementById('summaryTax').textContent = formatCurrency(summary.tax || 0);
@@ -372,7 +390,7 @@ function updateDeliverySummary(data) {
     
     // Count delivery statuses across all groups
     const statusCount = {};
-    let totalItems = data.summary.total_items || 0;
+    let totalItems = data.summary?.total_items || 0;
     
     // Count statuses from grouped items
     Object.values(data.items).forEach(dateItems => {
@@ -384,7 +402,7 @@ function updateDeliverySummary(data) {
     
     // Create HTML for status summary
     let html = `<div class="text-start mb-3">
-                    <p class="mb-2"><strong>Total Groups:</strong> ${data.summary.total_groups || 0}</p>
+                    <p class="mb-2"><strong>Total Groups:</strong> ${data.summary?.total_groups || 0}</p>
                     <p class="mb-2"><strong>Total Items:</strong> ${totalItems}</p>
                 </div>`;
     
@@ -397,7 +415,7 @@ function updateDeliverySummary(data) {
     
     statusOrder.forEach(status => {
         if (statusCount[status]) {
-            const label = data.delivery_statuses[status] || toTitleCase(status);
+            const label = data.delivery_statuses?.[status] || toTitleCase(status);
             const count = statusCount[status];
             const percentage = totalItems > 0 ? ((count / totalItems) * 100).toFixed(1) : '0.0';
             const badgeClass = getDeliveryBadgeClass(status);
@@ -431,8 +449,8 @@ function renderMealOrderItems(items, dates, itemsWithTime = []) {
     
     let html = '';
     
-    // Sort dates in descending order (newest first)
-    dates.sort((a, b) => new Date(b) - new Date(a));
+    // Sort dates in ascending order
+    dates.sort((a, b) => new Date(a) - new Date(b));
     
     dates.forEach((date, index) => {
         const dayItems = items[date];
@@ -459,7 +477,7 @@ function renderMealOrderItems(items, dates, itemsWithTime = []) {
             const typeTotal = group.total_price || itemsList.reduce((sum, item) => sum + parseFloat(item.total_price || 0), 0);
             
             const deliveryStatus = group.delivery_status || 'pending';
-            const deliveryStatusLabel = group.delivery_status_label || window.deliveryStatuses[deliveryStatus] || toTitleCase(deliveryStatus);
+            const deliveryStatusLabel = group.delivery_status_label || window.deliveryStatuses?.[deliveryStatus] || toTitleCase(deliveryStatus);
             const deliveryBadgeClass = getDeliveryBadgeClass(deliveryStatus);
             const deliveryPerson = group.delivery_person_name || 'Not Assigned';
             
@@ -512,7 +530,7 @@ function renderMealOrderItems(items, dates, itemsWithTime = []) {
             `;
 
             itemsList.forEach(item => {
-                const productName = toTitleCase(item.product_name || '');
+                const productName = toTitleCase(item.product_name || 'Unknown Product');
                 const img = item.product_image ? `/upload/product/small/${item.product_image}` : '/upload/no_image.jpg';
 
                 mealTypeHtml += `
@@ -523,7 +541,7 @@ function renderMealOrderItems(items, dates, itemsWithTime = []) {
                                 <div>
                                     <strong>${productName}</strong><br>
                                     <small class="text-muted">${formatCurrency(item.unit_price || 0)} each × ${item.quantity || 0}</small><br>
-                                    <small class="text-info">Provider: ${item.client_name}</small>
+                                    <small class="text-info">Provider: ${item.client_name || 'Unknown'}</small>
                                 </div>
                             </div>
                             <div class="text-end">
