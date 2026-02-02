@@ -28,9 +28,4 @@ class MealOrderItem extends Model
         return $this->belongsTo(Product::class, 'product_id');
     }
 
-    // Delivery details are now handled through DeliveryChargeLedger
-    public function deliveryChargeLedger()
-    {
-        return $this->belongsTo(DeliveryChargeLedger::class, 'delivery_charge_ledger_id');
-    }
 }

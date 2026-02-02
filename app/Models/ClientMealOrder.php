@@ -20,8 +20,8 @@ class ClientMealOrder extends Model
 
     public function mealOrderItems()
     {
-        return $this->hasMany(MealOrderItem::class, 'client_id', 'client_id')
-                    ->where('order_id', $this->order_id);
+        return $this->hasMany(MealOrderItem::class, 'meal_order_id', 'meal_order_id')
+                    ->where('client_id', $this->client_id);
     }
 
     public function deliveryChargeLedgers()

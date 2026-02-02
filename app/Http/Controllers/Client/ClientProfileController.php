@@ -23,12 +23,12 @@ use DB;
 
 class ClientProfileController extends Controller
 {
-    public function ProfilePage()
+    public function profilePage()
     { 
         return view('client.pages.profile.profile-page');
     }
 
-    public function Profile(Request $request)
+    public function profile(Request $request)
     {
         try {
             $email = $request->header('email');

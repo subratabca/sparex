@@ -1,14 +1,16 @@
 <!--Add Credit Limit Modal -->
-<div class="modal fade" id="creditLimitModal" tabindex="-1" aria-labelledby="creditLimitModalLabel" aria-hidden="true">
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg">
             
             <div class="modal-header bg-info text-white">
-                <h5 class="modal-title fw-semibold" id="creditLimitModalLabel">Add Credit Limit</h5>
+                <h5 class="modal-title fw-semibold" id="paymentModalLabel">Add Payment</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
 
             <div class="modal-body">
+                <input type="hidden" id="ledgerID"/>
+                <input type="hidden" id="deiveryChargeID"/>
 
                 <!-- Payment Method -->
                 <div class="mb-3">
@@ -232,7 +234,16 @@ function getCountryCode(countryName) {
 }
 
 // Initialize Stripe for credit modal when modal is shown
-document.getElementById('creditLimitModal').addEventListener('shown.bs.modal', function () {
+document.getElementById('paymentModal').addEventListener('shown.bs.modal', function () {
+    // Set default cash payment
+    document.getElementById('creditCash').checked = true;
+    document.getElementById('cashAmountField').style.display = "block";
+    document.getElementById('stripePaymentField').style.display = "none";
+    document.getElementById('paypalPaymentField').style.display = "none";
+
+    // Pre-fill cash amount from hidden delivery charge
+    const deliveryCharge = document.getElementById('deiveryChargeID').value || '';
+    document.getElementById('creditAmount').value = deliveryCharge;
     // Initialize Stripe for credit modal
     if (!creditStripe) {
         creditStripe = Stripe('pk_test_51JHjNRSDYO1wlylS2t9Mdffvf6gXo7BhEkupXMj17tAoMteZHKKlP1ZooX6eaEZjOf6SHp8rJ2141rsuapAFLB3i00vysBKwyd');
@@ -317,7 +328,7 @@ document.querySelectorAll('input[name="credit_payment"]').forEach(radio => {
 async function loadUserProfileForCredit() {
     try {
         showLoader();
-        const userResponse = await axios.get('/user/get/profile/info');
+        const userResponse = await axios.get('/client/profile/info');
         
         if (userResponse.data && userResponse.data.data) {
             userProfileData = userResponse.data.data;
@@ -578,6 +589,7 @@ function isValidEmail(email) {
 }
 
 async function processCashPayment() {
+    const ledgerID = document.getElementById('ledgerID').value;
     const amount = document.getElementById('creditAmount').value.trim();
     const errorText = document.getElementById('amountError');
 
@@ -596,14 +608,15 @@ async function processCashPayment() {
 
     errorText.style.display = "none";
 
-    const response = await axios.post("/user/store/credit/by/cash", {
+    const response = await axios.post("/client/store/meal-delivery/payment/by/cash", {
         payment_method: 'cash',
+        ledger_id: ledgerID,
         amount: parseFloat(amount).toFixed(2)
     });
 
     if (response.status === 200) {
-        successToast("Credit request submitted successfully! The amount will be added after verification.");
-        document.getElementById('creditLimitModal').querySelector(".btn-close").click();
+        successToast("Payment submitted successfully! The amount will be added after verification.");
+        document.getElementById('paymentModal').querySelector(".btn-close").click();
         window.location.reload(); 
     }
 }
@@ -683,7 +696,7 @@ async function processStripePayment() {
         customer_phone: billingData.phone
     };
 
-    const paymentIntentResponse = await axios.post('/user/create-payment-intent', {
+    const paymentIntentResponse = await axios.post('/client/meal-delivery/create-payment-intent', {
         amount: paymentAmount,
         currency: 'usd',
         description: `Credit Top-up - $${parseFloat(amount).toFixed(2)}`,
@@ -757,7 +770,7 @@ async function processStripePayment() {
         if (response.status === 200) {
             successToast(`$${parseFloat(amount).toFixed(2)} credit added successfully!`);
             // Close modal
-            document.getElementById('creditLimitModal').querySelector(".btn-close").click();
+            document.getElementById('paymentModal').querySelector(".btn-close").click();
             window.location.reload();
         }
     } else {

@@ -649,16 +649,6 @@ function capitalizeWords(str) {
         return segments[segments.length - 1];
     }
 
-    function showLoader() {
-        document.getElementById('loading-spinner').classList.remove('d-none');
-        document.getElementById('content-area').style.opacity = '0.5';
-    }
-
-    function hideLoader() {
-        document.getElementById('loading-spinner').classList.add('d-none');
-        document.getElementById('content-area').style.opacity = '1';
-    }
-
 
     function handleError(error) {
         let message = "An unexpected error occurred.";

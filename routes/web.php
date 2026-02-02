@@ -8,10 +8,7 @@ use App\Http\Middleware\DeliveryTokenVerificationMiddleware;
 //Common Controller
 use App\Http\Controllers\Common\CommonController;
 
-// Admin
-use App\Http\Controllers\Backend\Auth\AdminAuthController;
-use App\Http\Controllers\Backend\AdminProfileController; 
-use App\Http\Controllers\Backend\AdminDashboardController;
+
 use App\Http\Controllers\Backend\AdminProductController;
 use App\Http\Controllers\Backend\AdminOrderController;
 use App\Http\Controllers\Backend\ClientListController;
@@ -37,7 +34,9 @@ use App\Http\Controllers\Backend\CategoryController;
 use App\Http\Controllers\Backend\HeroController;
 use App\Http\Controllers\Backend\AdminAuditController;
 use App\Http\Controllers\Backend\AdminChartReportController;
-use App\Http\Controllers\Backend\ActivationController;
+use App\Http\Controllers\Backend\DeliveryActivationController;
+use App\Http\Controllers\Backend\Auth\AdminAuthController;
+use App\Http\Controllers\Backend\AdminDashboardController;
 
 // Client
 use App\Http\Controllers\Client\Auth\ClientAuthController;
@@ -48,7 +47,6 @@ use App\Http\Controllers\Client\ClientDeliveryChargeController;
 use App\Http\Controllers\Client\CouponController;
 use App\Http\Controllers\Client\ClientProductController;
 use App\Http\Controllers\Client\ClientOrderController;
-use App\Http\Controllers\Client\ClientMealOrderController;
 use App\Http\Controllers\Client\ClientNotificationController;
 use App\Http\Controllers\Client\ClientReportController;
 use App\Http\Controllers\Client\ClientComplaintController;
@@ -57,6 +55,9 @@ use App\Http\Controllers\Client\ClientBannedController;
 use App\Http\Controllers\Client\ClientFollowerController;
 use App\Http\Controllers\Client\ClientProductUploadTermsConditionsController;
 use App\Http\Controllers\Client\ClientCustomerListController;
+
+use App\Http\Controllers\Client\ClientMealOrderController;
+use App\Http\Controllers\Client\ClientDeliveryPaymentController;
 
 // Delivery
 use App\Http\Controllers\Delivery\Auth\DeliveryAuthController;
@@ -385,7 +386,7 @@ Route::prefix('admin')->group(function () {
 });
 
 Route::prefix('admin')->middleware([AdminTokenVerificationMiddleware::class])->group(function () {
-    Route::controller(ActivationController::class)->group(function () {
+    Route::controller(DeliveryActivationController::class)->group(function () {
         Route::get('/delivery-persons', 'listPage')->name('admin.delivery.persons');
         Route::get('/get/delivery-person/list','getList');
 
@@ -734,6 +735,7 @@ Route::prefix('client')->middleware([ClientTokenVerificationMiddleware::class])-
         Route::get('/get/meal-order/{order_id}/date/{date}', 'getMealOrderDetailsByDate');
 
         Route::post('/update/delivery-status/{orderId}', 'updateDeliveryStatus');
+        Route::post('/check/delivery-acceptance/{orderId}', 'checkDeliveryAcceptance');
     });
 
     Route::controller(ClientDashboardController::class)->group(function () {
@@ -743,8 +745,8 @@ Route::prefix('client')->middleware([ClientTokenVerificationMiddleware::class])-
     });
 
     Route::controller(ClientProfileController::class)->group(function () {
-        Route::get('/update/profile','ProfilePage');
-        Route::get('/profile/info','Profile');
+        Route::get('/update/profile','profilePage');
+        Route::get('/profile/info','profile');
         Route::post('/profile/update','UpdateProfile');
         Route::get('/update/password','PasswordPage');
         Route::post('/password/update','UpdatePassword');
@@ -915,6 +917,17 @@ Route::prefix('client')->middleware([ClientTokenVerificationMiddleware::class])-
         Route::get('/product/upload/terms-conditions/{name}','productUploadTermsConditionsPage');
         Route::get('/product/upload/terms-conditions/info/{name}','productUploadTermsConditionsInfo');
     });
+
+    Route::controller(ClientDeliveryPaymentController::class)->group(function () {
+        Route::get('/payments','index')->name('client.delivery.paypents');
+        Route::get('/get/meal-order/payments','getMealOrderPayments');
+
+
+        Route::post('/store/meal-delivery/payment/by/stripe','storeByStripe');
+
+        Route::post('/meal-delivery/create-payment-intent', 'createPaymentIntent');
+        Route::post('/store/meal-delivery/payment/by/cash','storeByCash');
+    });
 });
 
 
@@ -969,14 +982,28 @@ Route::prefix('delivery')->middleware([DeliveryTokenVerificationMiddleware::clas
     });
 
     Route::controller(DeliveryNotificationController::class)->group(function () {
-        Route::get('/notification/list', 'notificationPage')->name('delivery.notifications');
+        Route::get('/notification/list', 'index')->name('delivery.notifications');
+        Route::get('/get/notification/list', 'getNotificationList');
         Route::get('/limited/notification/list', 'limitedNotificationList');
-        Route::get('/notification/list/info', 'notificationList');
+
+        Route::get('/view/notification/{notificationId}', 'view');
+        Route::get('/get/notification/details/{notificationId}', 'showNotificationDetails')->name('delivery.notification.details');
+
         Route::get('/markAsRead', 'markAsRead')->name('delivery.markRead');
         Route::delete('/delete/notification/{notificationId}', 'deleteNotification');
     });
 
     Route::controller(DeliveryMealOrderController::class)->group(function () {
-        Route::post('/update/delivery-status/{orderId}', 'updateDeliveryStatus');
+        Route::post('/check/meal/delivery/availability', 'checkDeliveryAvailability');
+        Route::post('/accept/meal/delivery', 'acceptDelivery');
+
+        Route::post('/check/delivery-status/{deliveryChargeLedgerId}', 'checkDeliveryStatus');
+        Route::post('/update/delivery-status/{deliveryChargeLedgerId}', 'updateDeliveryStatus');
+
+        Route::get('/meal-order','index')->name('delivery.meal.orders');
+        Route::get('/get/meal-orders','getMealOrders');
+
+        Route::get('/meal-order/details/{delivery_charge_ledger_id}','view');
+        Route::get('/get/meal-order/details/{delivery_charge_ledger_id}','getMealOrderDetails');
     });
 });

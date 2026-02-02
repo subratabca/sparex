@@ -33,8 +33,6 @@ return new class extends Migration
             $table->string('distance_category')->nullable(); 
             
             $table->enum('payment_status', ['due', 'paid', 'cancelled'])->default('due');
-            $table->timestamp('payment_date')->nullable();
-            $table->text('payment_notes')->nullable();
             
             $table->boolean('is_charge_counted')->default(true);
             $table->string('charge_key')->unique(); 

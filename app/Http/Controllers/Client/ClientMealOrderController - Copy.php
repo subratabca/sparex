@@ -3,9 +3,8 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Notifications\Delivery\NewDeliveryAvailableNotification;
-use App\Notifications\Delivery\OrderReadyForPickupNotification;
-use App\Notifications\MealOrder\OrderAcceptedByRestaurantNotification;
+use App\Notifications\Delivery\DeliveryAssignmentNotification;
+use App\Notifications\Delivery\PickupNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
@@ -23,7 +22,6 @@ use App\Models\User;
 use App\Models\DeliveryChargeLedger;
 use App\Models\MealDeliveryStatusHistory;
 use Exception;
-use Carbon\Carbon;
 
 
 class ClientMealOrderController extends Controller
@@ -223,6 +221,7 @@ class ClientMealOrderController extends Controller
                 'mealType:id,name',
                 'product:id,name,image,price',
                 'client:id,firstName,lastName',
+                'deliveryChargeLedger.deliveryPerson:id,firstName,lastName,mobile'
             ])
             ->where('client_id', $client_id)
             ->where('meal_order_id', $order_id)
@@ -249,13 +248,6 @@ class ClientMealOrderController extends Controller
 
             // Get delivery statuses from DeliveryChargeLedger model
             $deliveryStatuses = DeliveryChargeLedger::STATUS_LABELS;
-
-            // Create a lookup array for delivery charge ledgers by meal_type_id and delivery_date
-            $deliveryLedgerLookup = [];
-            foreach ($deliveryChargeLedgers as $ledger) {
-                $key = $ledger->meal_type_id . '_' . $ledger->delivery_date;
-                $deliveryLedgerLookup[$key] = $ledger;
-            }
 
             // If no ClientMealOrder exists, create a virtual one from the items
             if (!$clientMealOrder) {
@@ -301,9 +293,11 @@ class ClientMealOrderController extends Controller
                 }
                 
                 if (!isset($groupedItems[$mealDate][$mealTypeName])) {
-                    // Find delivery charge ledger for this meal type and date using lookup
-                    $lookupKey = $mealTypeId . '_' . $mealDate;
-                    $deliveryChargeLedger = $deliveryLedgerLookup[$lookupKey] ?? null;
+                    // Find delivery charge ledger for this meal type and date
+                    $deliveryChargeLedger = $deliveryChargeLedgers->first(function($ledger) use ($mealTypeId, $mealDate) {
+                        return $ledger->meal_type_id == $mealTypeId && 
+                               $ledger->delivery_date == $mealDate;
+                    });
                     
                     $deliveryStatus = $deliveryChargeLedger ? $deliveryChargeLedger->delivery_status : 'pending';
                     $deliveryPersonName = $deliveryChargeLedger && $deliveryChargeLedger->deliveryPerson ? 
@@ -323,9 +317,8 @@ class ClientMealOrderController extends Controller
                     ];
                 }
                 
-                // Get delivery status for this individual item from delivery charge ledger lookup
-                $lookupKey = $item->meal_type_id . '_' . $item->meal_date;
-                $itemDeliveryChargeLedger = $deliveryLedgerLookup[$lookupKey] ?? null;
+                // Get delivery status for this individual item from delivery charge ledger
+                $itemDeliveryChargeLedger = $item->deliveryChargeLedger;
                 $deliveryStatus = $itemDeliveryChargeLedger ? $itemDeliveryChargeLedger->delivery_status : 'pending';
                 $deliveryStatusLabel = $deliveryStatuses[$deliveryStatus] ?? ucfirst($deliveryStatus);
                 $deliveryPersonName = null;
@@ -443,17 +436,14 @@ class ClientMealOrderController extends Controller
                 ],
                 'meal_types' => $mealTypes,
                 'dates' => array_keys($groupedItems),
-                'items_with_time' => $mealOrderItems->map(function($item) use ($deliveryLedgerLookup) {
-                    $lookupKey = $item->meal_type_id . '_' . $item->meal_date;
-                    $deliveryChargeLedger = $deliveryLedgerLookup[$lookupKey] ?? null;
-                    
+                'items_with_time' => $mealOrderItems->map(function($item) {
                     return [
                         'id' => $item->id,
                         'meal_date' => $item->meal_date,
                         'meal_time' => $item->meal_time,
                         'meal_type_id' => $item->meal_type_id,
                         'meal_type_name' => $item->mealType ? $item->mealType->name : 'Other',
-                        'delivery_status' => $deliveryChargeLedger ? $deliveryChargeLedger->delivery_status : 'pending',
+                        'delivery_status' => $item->deliveryChargeLedger ? $item->deliveryChargeLedger->delivery_status : 'pending',
                     ];
                 })->toArray()
             ];
@@ -482,7 +472,7 @@ class ClientMealOrderController extends Controller
             
             // Validate client exists
             $client = User::where('id', $client_id)->first();
-            if (!$client) {
+            if (!$client || !$client->isClient()) {
                 return response()->json([
                     'status' => 'failed',
                     'message' => 'Unauthorized access. Client not found.'
@@ -495,8 +485,8 @@ class ClientMealOrderController extends Controller
                 'delivery_status' => 'required|in:pending,accept_order,preparing,ready_for_pickup,cancelled',
                 'notes' => 'nullable|string|max:500',
                 'pickup_time' => 'nullable|date_format:Y-m-d\TH:i',
-                'meal_date' => 'required|date',
-                'meal_type_id' => 'required|exists:meal_types,id'
+                'meal_date' => 'nullable|date',
+                'meal_type_id' => 'nullable|exists:meal_types,id'
             ]);
 
             // Parse comma-separated item IDs
@@ -518,752 +508,85 @@ class ClientMealOrderController extends Controller
             $newStatus = $request->delivery_status;
             $notes = $request->notes;
             $pickupTime = $request->pickup_time;
-            $mealDate = $request->meal_date;
-            $mealTypeId = $request->meal_type_id;
 
-            // Find the DeliveryChargeLedger for this client, meal_type, and delivery date
-            $deliveryLedger = DeliveryChargeLedger::where('meal_order_id', $orderId)
-                ->where('client_id', $client_id)
-                ->where('meal_type_id', $mealTypeId)
-                ->whereDate('delivery_date', $mealDate)
-                ->first();
-
-            if (!$deliveryLedger) {
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'Delivery record not found for the specified date and meal type.'
-                ], 404);
-            }
-
-            // Get meal order and customer details
-            $mealOrder = MealOrder::find($orderId);
-            $customer = User::find($mealOrder->customer_id);
-            $mealType = MealType::find($mealTypeId);
-            $mealShippingAddress = MealShippingAddress::where('meal_order_id', $orderId)->first();
-
-            // Define client's valid status transitions
-            $validClientTransitions = [
+            // Check if status transition is valid for client
+            $invalidTransitions = [];
+            $validTransitions = [
                 'pending' => ['accept_order', 'cancelled'],
-                'accept_order' => ['preparing', 'cancelled'],
-                'preparing' => ['ready_for_pickup', 'cancelled'],
+                'accept_order' => ['preparing'],
+                'preparing' => ['ready_for_pickup'],
             ];
-
-            $currentStatus = $deliveryLedger->delivery_status;
-            
-            // Check if this is a valid transition for client
-            if (!isset($validClientTransitions[$currentStatus]) || 
-                !in_array($newStatus, $validClientTransitions[$currentStatus])) {
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => "Cannot change status from {$currentStatus} to {$newStatus}."
-                ], 400);
-            }
-
-            // Special validation for accept_order -> preparing transition
-            if ($currentStatus === 'accept_order' && $newStatus === 'preparing') {
-                if (!$deliveryLedger->delivery_person_id) {
-                    return response()->json([
-                        'status' => 'failed',
-                        'message' => 'Cannot change to preparing. No delivery person has accepted the order yet.'
-                    ], 400);
-                }
-            }
-
-            // Special validation for preparing -> ready_for_pickup transition
-            if ($currentStatus === 'preparing' && $newStatus === 'ready_for_pickup') {
-                if (!$deliveryLedger->delivery_person_id) {
-                    return response()->json([
-                        'status' => 'failed',
-                        'message' => 'Cannot change to ready_for_pickup. No delivery person has accepted the order yet.'
-                    ], 400);
-                }
-            }
 
             DB::beginTransaction();
 
-            try {
-                // Store old status for notification logic
-                $oldStatus = $deliveryLedger->delivery_status;
+            foreach ($mealOrderItems as $item) {
+                $currentStatus = $item->delivery_status;
                 
-                // Update the delivery ledger status
-                $deliveryLedger->delivery_status = $newStatus;
-                $deliveryLedger->save();
+                // Check if this is a valid transition for client
+                if (!isset($validTransitions[$currentStatus]) || 
+                    !in_array($newStatus, $validTransitions[$currentStatus])) {
+                    $invalidTransitions[] = "Item #{$item->id}: Cannot change from {$currentStatus} to {$newStatus}";
+                    continue;
+                }
 
-                // Prepare status history data
-                $statusHistoryData = [
-                    'delivery_charge_ledger_id' => $deliveryLedger->id,
+                // Update the meal order item status
+                $item->delivery_status = $newStatus;
+                
+                // If changing to ready_for_pickup, update handover_time
+                if ($newStatus === 'ready_for_pickup') {
+                    $item->handover_time = now();
+                }
+                
+                $item->save();
+
+                // Prepare meal delivery data
+                $mealDeliveryData = [
+                    'delivery_person_id' => $item->delivery_person_id,
+                ];
+
+                // Only add pickup_time when status is preparing or ready_for_pickup
+                if ($newStatus === 'preparing' || $newStatus === 'ready_for_pickup') {
+                    if ($pickupTime) {
+                        $mealDeliveryData['pickup_time'] = $pickupTime;
+                    }
+                }
+
+                // Only add handover_time when status is ready_for_pickup
+                if ($newStatus === 'ready_for_pickup') {
+                    $mealDeliveryData['handover_time'] = now();
+                }
+
+                // Create or update meal delivery record
+                $mealDelivery = MealDelivery::updateOrCreate(
+                    ['meal_order_item_id' => $item->id],
+                    $mealDeliveryData
+                );
+
+                // Create status history
+                MealDeliveryStatusHistory::create([
+                    'meal_delivery_id' => $mealDelivery->id,
                     'delivery_status' => $newStatus,
                     'notes' => $notes,
                     'updated_by_id' => $client_id,
                     'updated_by_type' => 'client'
-                ];
+                ]);
+            }
 
-                // If changing to ready_for_pickup and pickup_time is provided, set pick_up_at (scheduled pickup time)
-                if ($newStatus === 'ready_for_pickup') {
-                    if ($pickupTime) {
-                        // Since you imported Carbon\Carbon at the top, you can use:
-                        $statusHistoryData['pick_up_at'] = Carbon::createFromFormat('Y-m-d\TH:i', $pickupTime);
-                    } else {
-                        // Default to now + 1 hour if no pickup time provided
-                        $statusHistoryData['pick_up_at'] = now()->addHour();
-                    }
-                }
+            DB::commit();
 
-                // Create status history
-                MealDeliveryStatusHistory::create($statusHistoryData);
-
-                // Send notifications based on status change
-                $notificationSent = false;
-                $customerNotified = false;
-                
-                if ($oldStatus === 'pending' && $newStatus === 'accept_order') {
-                    // Send notification ONLY to customer that order is accepted (no email)
-                    if ($customer) {
-                        $customerNotified = $this->sendCustomerNotification($customer, $deliveryLedger, $mealType, $client, $mealOrderItems);
-                    }
-                    
-                    // Broadcast notification to all delivery persons about new order (no email)
-                    $deliveryNotificationsSent = $this->sendBroadcastNotificationToDeliveryPersons($deliveryLedger, $mealOrderItems);
-                    $notificationSent = true;
-                }
-
-                if ($oldStatus === 'preparing' && $newStatus === 'ready_for_pickup') {
-                    // Notify assigned delivery person that order is ready for pickup
-                    if ($deliveryLedger->delivery_person_id) {
-                        $notificationResult = $this->sendReadyForPickupNotification($deliveryLedger, $pickupTime,$mealOrderItems);
-                        $notificationSent = $notificationResult;
-                    }
-                }
-                DB::commit();
-
+            if (!empty($invalidTransitions)) {
                 return response()->json([
-                    'status' => 'success',
-                    'message' => 'Delivery status updated successfully.',
-                    'data' => [
-                        'delivery_ledger_id' => $deliveryLedger->id,
-                        'tracking_number' => $deliveryLedger->order_tracking,
-                        'old_status' => $oldStatus,
-                        'new_status' => $newStatus,
-                        'scheduled_pickup_time' => ($newStatus === 'ready_for_pickup') ? ($pickupTime ?: now()->addHour()->format('Y-m-d H:i:s')) : null,
-                        'notification_sent' => $notificationSent,
-                        'customer_notified' => $customerNotified,
-                        'delivery_person_assigned' => !is_null($deliveryLedger->delivery_person_id),
-                        'items_updated' => $mealOrderItems->count(),
-                        'item_ids' => $itemIds
-                    ]
+                    'status' => 'partial',
+                    'message' => 'Some items could not be updated.',
+                    'invalid_transitions' => $invalidTransitions,
+                    'updated_items' => count($mealOrderItems) - count($invalidTransitions)
                 ], 200);
-
-            } catch (Exception $e) {
-                DB::rollBack();
-                throw $e;
-            }
-
-        } catch (ValidationException $e) {
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'Validation error.',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (Exception $e) {
-            \Log::error('Error updating delivery status: ' . $e->getMessage());
-            \Log::error($e->getTraceAsString());
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'An error occurred while updating delivery status.',
-                'error' => env('APP_DEBUG') ? $e->getMessage() : null
-            ], 500);
-        }
-    }
-
-    private function sendCustomerNotification($customer, $deliveryLedger, $mealType, $client, $mealOrderItems)
-    {
-        try {
-            // Create the notification using the notification class
-            $notification = new \App\Notifications\MealOrder\OrderAcceptedByRestaurantNotification(
-                $deliveryLedger,
-                MealOrder::find($deliveryLedger->meal_order_id),
-                $mealType,
-                $client,
-                $mealOrderItems,
-                null // or fetch shipping address if needed
-            );
-            
-            $customer->notify($notification);
-            return true;
-        } catch (Exception $e) {
-            return false;
-        }
-    }
-
-    private function sendBroadcastNotificationToDeliveryPersons(DeliveryChargeLedger $ledger, $mealOrderItems)
-    {
-        try {
-            $deliveryPersons = User::where('role', 'delivery')
-                ->get();
-
-            if ($deliveryPersons->isEmpty()) {
-                return 0;
-            }
-
-            // Get client details
-            $client = $ledger->client;
-            if (!$client) {
-                \Log::error('Client not found for ledger ID: ' . $ledger->id);
-                return 0;
-            }
-
-            // Get customer and shipping address
-            $customer = $ledger->customer;
-            $mealShippingAddress = MealShippingAddress::where('meal_order_id', $ledger->meal_order_id)->first();
-            $mealOrder = $ledger->mealOrder;
-            $mealType = $ledger->mealType;
-
-            // Calculate items count
-            $itemsCount = $mealOrderItems->count();
-            $mealTime = $mealOrderItems->first()->meal_time ?? null;
-
-            // Prepare notification data
-            $notificationData = [
-                'delivery_charge_ledger_id' => $ledger->id,
-                'order_tracking' => $ledger->order_tracking,
-                'meal_order_id' => $ledger->meal_order_id,
-                'order_number' => $mealOrder ? $mealOrder->order_number : 'N/A',
-                'client_id' => $client->id,
-                'client_email' => $client->email,
-                'client_name' => $client->firstName . ' ' . $client->lastName,
-                'client_mobile' => $client->mobile,
-                'client_address' => [
-                    'address1' => $client->address1,
-                    'address2' => $client->address2,
-                    'city' => $client->city ? $client->city->name : null,
-                    'county' => $client->county ? $client->county->name : null,
-                    'country' => $client->country ? $client->country->name : null,
-                    'zip_code' => $client->zip_code,
-                    'latitude' => $client->latitude,
-                    'longitude' => $client->longitude
-                ],
-                'delivery_address' => $mealShippingAddress ? [
-                    'name' => $mealShippingAddress->name,
-                    'email' => $mealShippingAddress->email,
-                    'phone' => $mealShippingAddress->phone,
-                    'address1' => $mealShippingAddress->address1,
-                    'address2' => $mealShippingAddress->address2,
-                    'city' => $mealShippingAddress->city ? $mealShippingAddress->city->name : null,
-                    'county' => $mealShippingAddress->county ? $mealShippingAddress->county->name : null,
-                    'country' => $mealShippingAddress->country ? $mealShippingAddress->country->name : null,
-                    'zip_code' => $mealShippingAddress->zip_code,
-                    'latitude' => $mealShippingAddress->latitude,
-                    'longitude' => $mealShippingAddress->longitude
-                ] : null,
-                'delivery_details' => [
-                    'delivery_date' => $ledger->delivery_date,
-                    'meal_time' => $mealTime,
-                    'delivery_charge' => $ledger->delivery_charge,
-                    'distance_km' => $ledger->distance_km,
-                    'distance_category' => $ledger->distance_category,
-                    'meal_type' => $mealType ? $mealType->name : null,
-                    'meal_type_id' => $ledger->meal_type_id
-                ],
-                'customer_details' => $customer ? [
-                    'name' => $customer->firstName . ' ' . $customer->lastName,
-                    'mobile' => $customer->mobile,
-                    'email' => $customer->email
-                ] : null,
-                'items_count' => $itemsCount,
-                'items' => $mealOrderItems->map(function($item) {
-                    return [
-                        'product_name' => $item->product->name ?? 'N/A',
-                        'quantity' => $item->quantity,
-                        'price' => $item->price,
-                        'meal_time' => $item->meal_time,
-                    ];
-                })->toArray(),
-                'action_url' => '/api/delivery/accept/' . $ledger->id,
-                'notification_type' => 'new_delivery_available',
-                'created_at' => now()->toDateTimeString(),
-                'accept_deadline' => now()->addHours(2)->toDateTimeString()
-            ];
-
-            // Send notification to all delivery persons (NO EMAIL)
-            $sentCount = 0;
-            foreach ($deliveryPersons as $deliveryPerson) {
-                try {
-                    // Use the notification class but only database channel (no email)
-                    // The notification class has been updated to only use database
-                    $deliveryPerson->notify(new NewDeliveryAvailableNotification($notificationData));
-                    
-                    $sentCount++;
-                    
-                    \Log::info('New delivery notification saved to database for delivery person ID: ' . $deliveryPerson->id);
-                    
-                } catch (Exception $e) {
-                    \Log::error('Failed to send notification to delivery person ' . $deliveryPerson->id . ': ' . $e->getMessage());
-                    continue;
-                }
-            }
-
-            \Log::info('Broadcast notification sent to ' . $sentCount . ' delivery persons for ledger ID: ' . $ledger->id);
-            return $sentCount;
-
-        } catch (Exception $e) {
-            \Log::error('Error in sendBroadcastNotificationToDeliveryPersons: ' . $e->getMessage());
-            \Log::error($e->getTraceAsString());
-            return 0;
-        }
-    }
-
-    private function sendReadyForPickupNotification(DeliveryChargeLedger $ledger, $scheduledPickupTime = null, $mealOrderItems)
-    {
-        try {
-            $deliveryPerson = $ledger->deliveryPerson;
-            if (!$deliveryPerson) {
-                \Log::warning('No delivery person assigned for ledger ID: ' . $ledger->id);
-                return;
-            }
-
-            $client = $ledger->client;
-            $mealShippingAddress = MealShippingAddress::where('meal_order_id', $ledger->meal_order_id)->first();
-            $mealOrder = $ledger->mealOrder;
-            $mealType = $ledger->mealType;
-            $customer = $ledger->customer;
-            $itemsCount = $mealOrderItems->count();
-
-            // Get the latest status history to get the scheduled pickup time
-            $latestStatus = MealDeliveryStatusHistory::where('delivery_charge_ledger_id', $ledger->id)
-                ->where('delivery_status', 'ready_for_pickup')
-                ->latest()
-                ->first();
-
-            $scheduledTime = $latestStatus ? $latestStatus->pick_up_at : $scheduledPickupTime;
-            $mealTime = null;
-
-            if ($mealOrderItems && $mealOrderItems->isNotEmpty()) {
-                $mealTime = $mealOrderItems->first()->meal_time;
-            } else {
-                // Fallback: Fetch meal_time from meal_order_items table
-                $mealOrderItem = MealOrderItem::where('meal_order_id', $ledger->meal_order_id)
-                    ->where('client_id', $ledger->client_id)
-                    ->where('meal_type_id', $ledger->meal_type_id)
-                    ->whereDate('meal_date', $ledger->delivery_date)
-                    ->first();
-                $mealTime = $mealOrderItem->meal_time ?? null;
-            }
-
-            $notificationData = [
-                'delivery_charge_ledger_id' => $ledger->id,
-                'order_tracking' => $ledger->order_tracking,
-                'meal_order_id' => $ledger->meal_order_id,
-                'order_number' => $mealOrder ? $mealOrder->order_number : 'N/A',
-                'client_id' => $client->id,
-                'client_email' => $client->email,
-                'client_name' => $client->firstName . ' ' . $client->lastName,
-                'client_mobile' => $client->mobile,
-                'client_address' => [
-                    'address1' => $client->address1,
-                    'address2' => $client->address2,
-                    'city' => $client->city ? $client->city->name : null,
-                    'county' => $client->county ? $client->county->name : null,
-                    'country' => $client->country ? $client->country->name : null,
-                    'zip_code' => $client->zip_code,
-                    'latitude' => $client->latitude,
-                    'longitude' => $client->longitude
-                ],
-                'delivery_address' => $mealShippingAddress ? [
-                    'name' => $mealShippingAddress->name,
-                    'phone' => $mealShippingAddress->phone,
-                    'address1' => $mealShippingAddress->address1,
-                    'address2' => $mealShippingAddress->address2,
-                    'city' => $mealShippingAddress->city ? $mealShippingAddress->city->name : null,
-                    'zip_code' => $mealShippingAddress->zip_code,
-                    'latitude' => $mealShippingAddress->latitude,
-                    'longitude' => $mealShippingAddress->longitude
-                ] : null,
-                'delivery_details' => [
-                    'scheduled_pickup_time' => $scheduledTime,
-                    'pick_up_at' => $scheduledTime, // For backward compatibility
-                    'delivery_date' => $ledger->delivery_date,
-                    'delivery_charge' => $ledger->delivery_charge,
-                    'distance_km' => $ledger->distance_km,
-                    'meal_type' => $mealType ? $mealType->name : null,
-                    'meal_time' => $mealTime,
-                ],
-                'customer_details' => $customer ? [
-                    'name' => $customer->firstName . ' ' . $customer->lastName,
-                    'mobile' => $customer->mobile,
-                    'email' => $customer->email
-                ] : null,
-                'items_count' => $itemsCount,
-                'items' => $mealOrderItems->map(function($item) {
-                    return [
-                        'product_name' => $item->product->name ?? 'N/A',
-                        'quantity' => $item->quantity,
-                        'price' => $item->price,
-                        'meal_time' => $item->meal_time,
-                    ];
-                })->toArray(),
-                'action_url' => '/api/delivery/order-details/' . $ledger->id,
-                'notification_type' => 'order_ready_for_pickup',
-                'created_at' => now()->toDateTimeString()
-            ];
-
-            // Send notification
-            $deliveryPerson->notify(new OrderReadyForPickupNotification($notificationData));
-            
-            \Log::info('Ready for pickup notification sent to delivery person ID: ' . $deliveryPerson->id . 
-                       ' with scheduled pickup time: ' . $scheduledTime);
-
-        } catch (Exception $e) {
-            \Log::error('Error in sendReadyForPickupNotification: ' . $e->getMessage());
-        }
-    }
-
-    public function checkDeliveryAcceptance(Request $request, $orderId)
-    {
-        try {
-            $client_id = $request->header('id');
-            
-            // Validate client exists
-            $client = User::where('id', $client_id)->first();
-            if (!$client || !$client->isClient()) {
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'Unauthorized access.'
-                ], 403);
-            }
-
-            // Validate request
-            $request->validate([
-                'meal_date' => 'required|date',
-                'meal_type_id' => 'required|exists:meal_types,id'
-            ]);
-
-            $mealDate = $request->meal_date;
-            $mealTypeId = $request->meal_type_id;
-
-            // Get the delivery ledger for this client, order, meal type and date
-            $deliveryLedger = DeliveryChargeLedger::where('meal_order_id', $orderId)
-                ->where('client_id', $client_id)
-                ->where('meal_type_id', $mealTypeId)
-                ->whereDate('delivery_date', $mealDate)
-                ->with('deliveryPerson:id,firstName,lastName')
-                ->first();
-
-            if (!$deliveryLedger) {
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'Delivery record not found.'
-                ], 404);
-            }
-
-            // Get all meal order items for this group to count items
-            $mealOrderItems = MealOrderItem::where('meal_order_id', $orderId)
-                ->where('client_id', $client_id)
-                ->where('meal_type_id', $mealTypeId)
-                ->whereDate('meal_date', $mealDate)
-                ->get();
-
-            // Determine allowed status transitions based on current status
-            $allowedNextStatuses = $this->getAllowedNextStatuses($deliveryLedger->delivery_status);
-
-            // Check if delivery person has accepted
-            $deliveryPersonAssigned = !is_null($deliveryLedger->delivery_person_id);
-            $deliveryPersonName = $deliveryPersonAssigned && $deliveryLedger->deliveryPerson ? 
-                $deliveryLedger->deliveryPerson->firstName . ' ' . $deliveryLedger->deliveryPerson->lastName : 
-                null;
-
-            // Determine which status transitions are blocked due to lack of delivery person
-            $blockedStatuses = [];
-            $allowedStatuses = [];
-            
-            foreach ($allowedNextStatuses as $nextStatus) {
-                $isBlocked = $this->isStatusBlockedWithoutDeliveryPerson($deliveryLedger->delivery_status, $nextStatus, $deliveryPersonAssigned);
-                
-                if ($isBlocked) {
-                    $blockedStatuses[] = $nextStatus;
-                } else {
-                    $allowedStatuses[] = $nextStatus;
-                }
             }
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Delivery acceptance status retrieved.',
-                'data' => [
-                    'delivery_ledger_id' => $deliveryLedger->id,
-                    'delivery_status' => $deliveryLedger->delivery_status,
-                    'order_tracking' => $deliveryLedger->order_tracking,
-                    'delivery_person_assigned' => $deliveryPersonAssigned,
-                    'delivery_person_id' => $deliveryLedger->delivery_person_id,
-                    'delivery_person_name' => $deliveryPersonName,
-                    'delivery_date' => $deliveryLedger->delivery_date,
-                    'meal_type_id' => $deliveryLedger->meal_type_id,
-                    'item_count' => $mealOrderItems->count(),
-                    
-                    // Frontend validation helpers
-                    'can_update_to_preparing' => $deliveryLedger->delivery_status === 'accept_order' && 
-                                                 $deliveryPersonAssigned,
-                    'can_update_to_ready_for_pickup' => $deliveryLedger->delivery_status === 'preparing' && 
-                                                       $deliveryPersonAssigned,
-                    
-                    // Complete status transition information
-                    'current_status' => $deliveryLedger->delivery_status,
-                    'allowed_next_statuses' => $allowedStatuses,
-                    'blocked_statuses' => $blockedStatuses,
-                    'blocked_reason' => !$deliveryPersonAssigned && !empty($blockedStatuses) ? 
-                        'No delivery person has accepted this order yet.' : null,
-                    
-                    // For display purposes
-                    'status_labels' => [
-                        'pending' => 'Pending',
-                        'accept_order' => 'Accept Order',
-                        'preparing' => 'Preparing',
-                        'ready_for_pickup' => 'Ready for Pickup',
-                        'picked_up' => 'Picked Up',
-                        'on_the_way' => 'On the Way',
-                        'arrived' => 'Arrived',
-                        'delivered' => 'Delivered',
-                        'cancelled' => 'Cancelled'
-                    ]
-                ]
+                'message' => 'Delivery status updated successfully for ' . count($mealOrderItems) . ' item(s).'
             ], 200);
-
-        } catch (\Illuminate\Validation\ValidationException $e) {
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'Validation error.',
-                'errors' => $e->errors()
-            ], 422);
-        } catch (Exception $e) {
-            \Log::error('Error checking delivery acceptance: ' . $e->getMessage());
-            \Log::error($e->getTraceAsString());
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'An error occurred while checking delivery acceptance.',
-                'error' => env('APP_DEBUG') ? $e->getMessage() : null
-            ], 500);
-        }
-    }
-
-    private function getAllowedNextStatuses($currentStatus)
-    {
-        $clientTransitions = [
-            'pending' => ['accept_order', 'cancelled'],
-            'accept_order' => ['preparing', 'cancelled'],
-            'preparing' => ['ready_for_pickup', 'cancelled'],
-            'ready_for_pickup' => [], // Delivery person takes over from here
-            'picked_up' => [], // Delivery person only
-            'on_the_way' => [], // Delivery person only
-            'arrived' => [], // Delivery person only
-            'delivered' => [], // Final status
-            'cancelled' => [], // Final status
-        ];
-
-        return $clientTransitions[$currentStatus] ?? [];
-    }
-
-    private function isStatusBlockedWithoutDeliveryPerson($currentStatus, $nextStatus, $hasDeliveryPerson)
-    {
-        // Statuses that require delivery person assignment
-        $requireDeliveryPerson = [
-            'accept_order' => ['preparing', 'ready_for_pickup'],
-            'preparing' => ['ready_for_pickup'],
-        ];
-
-        // Check if the transition requires delivery person
-        if (isset($requireDeliveryPerson[$currentStatus]) && 
-            in_array($nextStatus, $requireDeliveryPerson[$currentStatus]) &&
-            !$hasDeliveryPerson) {
-            return true;
-        }
-
-        return false;
-    }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    public function updateDeliveryStatus1111(Request $request, $orderId)
-    {
-        try {
-            $client_id = $request->header('id');
-            
-            // Validate client exists
-            $client = User::where('id', $client_id)->first();
-            if (!$client || !$client->isClient()) {
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'Unauthorized access. Client not found.'
-                ], 403);
-            }
-
-            // Validate request
-            $request->validate([
-                'meal_order_item_id' => 'required|string',
-                'delivery_status' => 'required|in:pending,accept_order,preparing,ready_for_pickup,cancelled',
-                'notes' => 'nullable|string|max:500',
-                'pickup_time' => 'nullable|date_format:Y-m-d\TH:i',
-                'meal_date' => 'required|date',
-                'meal_type_id' => 'required|exists:meal_types,id'
-            ]);
-
-            // Parse comma-separated item IDs
-            $itemIds = explode(',', $request->meal_order_item_id);
-            
-            // Check if all items belong to this client and order
-            $mealOrderItems = MealOrderItem::whereIn('id', $itemIds)
-                ->where('meal_order_id', $orderId)
-                ->where('client_id', $client_id)
-                ->get();
-
-            if ($mealOrderItems->isEmpty()) {
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'No items found or unauthorized access.'
-                ], 404);
-            }
-
-            $newStatus = $request->delivery_status;
-            $notes = $request->notes;
-            $pickupTime = $request->pickup_time;
-            $mealDate = $request->meal_date;
-            $mealTypeId = $request->meal_type_id;
-
-            // Find the DeliveryChargeLedger for this client, meal_type, and delivery date
-            $deliveryLedger = DeliveryChargeLedger::where('meal_order_id', $orderId)
-                ->where('client_id', $client_id)
-                ->where('meal_type_id', $mealTypeId)
-                ->whereDate('delivery_date', $mealDate)
-                ->first();
-
-            if (!$deliveryLedger) {
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'Delivery record not found for the specified date and meal type.'
-                ], 404);
-            }
-
-            // Define client's valid status transitions
-            $validClientTransitions = [
-                'pending' => ['accept_order', 'cancelled'],
-                'accept_order' => ['preparing', 'cancelled'],
-                'preparing' => ['ready_for_pickup', 'cancelled'],
-            ];
-
-            $currentStatus = $deliveryLedger->delivery_status;
-            
-            // Check if this is a valid transition for client
-            if (!isset($validClientTransitions[$currentStatus]) || 
-                !in_array($newStatus, $validClientTransitions[$currentStatus])) {
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => "Cannot change status from {$currentStatus} to {$newStatus}."
-                ], 400);
-            }
-
-            // Special validation for accept_order -> preparing transition
-            if ($currentStatus === 'accept_order' && $newStatus === 'preparing') {
-                if (!$deliveryLedger->delivery_person_id) {
-                    return response()->json([
-                        'status' => 'failed',
-                        'message' => 'Cannot change to preparing. No delivery person has accepted the order yet.'
-                    ], 400);
-                }
-            }
-
-            // Special validation for preparing -> ready_for_pickup transition
-            if ($currentStatus === 'preparing' && $newStatus === 'ready_for_pickup') {
-                if (!$deliveryLedger->delivery_person_id) {
-                    return response()->json([
-                        'status' => 'failed',
-                        'message' => 'Cannot change to ready_for_pickup. No delivery person has accepted the order yet.'
-                    ], 400);
-                }
-            }
-
-            DB::beginTransaction();
-
-            try {
-                // Store old status for notification logic
-                $oldStatus = $deliveryLedger->delivery_status;
-                
-                // Update the delivery ledger status
-                $deliveryLedger->delivery_status = $newStatus;
-                
-                // If changing to ready_for_pickup and pickup_time is provided, update picked_up_at
-                if ($newStatus === 'ready_for_pickup') {
-                    if ($pickupTime) {
-                        $deliveryLedger->picked_up_at = $pickupTime;
-                    } else {
-                        $deliveryLedger->picked_up_at = now();
-                    }
-                }
-                
-                $deliveryLedger->save();
-
-                // Update delivery_charge_ledger_id for all items
-                foreach ($mealOrderItems as $item) {
-                    if (!$item->delivery_charge_ledger_id) {
-                        $item->delivery_charge_ledger_id = $deliveryLedger->id;
-                        $item->save();
-                    }
-                }
-
-                // Create status history
-                MealDeliveryStatusHistory::create([
-                    'delivery_charge_ledger_id' => $deliveryLedger->id,
-                    'delivery_status' => $newStatus,
-                    'notes' => $notes,
-                    'picked_up_at' => ($newStatus === 'ready_for_pickup') ? $deliveryLedger->picked_up_at : null,
-                    'updated_by_id' => $client_id,
-                    'updated_by_type' => 'client'
-                ]);
-
-                // Send notifications based on status change
-                $notificationSent = false;
-                
-                if ($oldStatus === 'pending' && $newStatus === 'accept_order') {
-                    // Broadcast notification to all delivery persons about new order
-                    $this->sendBroadcastNotificationToDeliveryPersons($deliveryLedger);
-                    $notificationSent = true;
-                }
-                
-                if ($oldStatus === 'preparing' && $newStatus === 'ready_for_pickup') {
-                    // Notify assigned delivery person that order is ready for pickup
-                    if ($deliveryLedger->delivery_person_id) {
-                        $this->sendReadyForPickupNotification($deliveryLedger);
-                        $notificationSent = true;
-                    }
-                }
-
-                DB::commit();
-
-                return response()->json([
-                    'status' => 'success',
-                    'message' => 'Delivery status updated successfully.',
-                    'data' => [
-                        'delivery_ledger_id' => $deliveryLedger->id,
-                        'tracking_number' => $deliveryLedger->order_tracking,
-                        'old_status' => $oldStatus,
-                        'new_status' => $newStatus,
-                        'notification_sent' => $notificationSent,
-                        'delivery_person_assigned' => !is_null($deliveryLedger->delivery_person_id)
-                    ]
-                ], 200);
-
-            } catch (Exception $e) {
-                DB::rollBack();
-                throw $e;
-            }
 
         } catch (ValidationException $e) {
             DB::rollBack();
@@ -1274,8 +597,6 @@ class ClientMealOrderController extends Controller
             ], 422);
         } catch (Exception $e) {
             DB::rollBack();
-            \Log::error('Error updating delivery status: ' . $e->getMessage());
-            \Log::error($e->getTraceAsString());
             return response()->json([
                 'status' => 'failed',
                 'message' => 'An error occurred while updating delivery status.',

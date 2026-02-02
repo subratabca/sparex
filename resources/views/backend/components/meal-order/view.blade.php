@@ -36,8 +36,7 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
 <script>
 document.addEventListener('DOMContentLoaded', async function() {
     await loadMealOrderDetails();
@@ -438,43 +437,7 @@ function formatCurrency(amount) {
     }).format(numAmount);
 }
 
-// Utility functions
-function showLoader() {
-    // Implement your loader show logic
-    const loader = document.createElement('div');
-    loader.id = 'loadingOverlay';
-    loader.className = 'loading-overlay';
-    loader.innerHTML = `
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-    `;
-    document.body.appendChild(loader);
-}
 
-function hideLoader() {
-    // Implement your loader hide logic
-    const loader = document.getElementById('loadingOverlay');
-    if (loader) {
-        loader.remove();
-    }
-}
-
-function errorToast(message) {
-    // Implement your toast notification
-    if (typeof Toastify !== 'undefined') {
-        Toastify({
-            text: message,
-            duration: 3000,
-            close: true,
-            gravity: "top",
-            position: "right",
-            backgroundColor: "#dc3545",
-        }).showToast();
-    } else {
-        alert('Error: ' + message);
-    }
-}
 </script>
 
 <style>

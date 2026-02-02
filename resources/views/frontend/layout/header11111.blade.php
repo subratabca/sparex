@@ -318,163 +318,6 @@ function getNotificationLink(notification) {
     notificationsContainer.innerHTML = notificationsHTML;
 }
 
-async function displayNotifications222(unreadNotifications, readNotifications) {
-    const notificationsContainer = document.querySelector('.dropdown-notifications-list ul');
-    let notificationsHTML = '';
-
-    if ((unreadNotifications && unreadNotifications.length === 0) &&
-        (readNotifications && readNotifications.length === 0)) {
-        notificationsContainer.innerHTML = '<li class="list-group-item">No notifications</li>';
-        return;
-    }
-
-    function getNotificationLink(notification) {
-        if (!notification || !notification.data) {
-            return '#';
-        }
-        
-        const data = notification.data;
-        
-        // Check if data is a string (JSON) and parse it
-        let parsedData = data;
-        if (typeof data === 'string') {
-            try {
-                parsedData = JSON.parse(data);
-            } catch (e) {
-                console.error('Error parsing notification data:', e);
-                return '#';
-            }
-        }
-        
-        // Extract from nested data structure
-        const notificationData = parsedData.data || parsedData;
-        
-        // Check for different notification types
-        if (notificationData.meal_order_id) {
-            return `/user/meal-order/details/${notificationData.meal_order_id}?notification_id=${notification.id}`;
-        } else if (notificationData.order_id) {
-            return `/user/order/details/${notificationData.order_id}?notification_id=${notification.id}`;
-        } else if (notificationData.customer_id) {
-            return `/user/details/${notificationData.customer_id}?notification_id=${notification.id}`;
-        } else if (notificationData.complaint_id) {
-            return `/user/complaint/details/${notificationData.complaint_id}?notification_id=${notification.id}`;
-        } else if (notificationData.customer_complain_id) {
-            return `/user/customer-complain-details/${notificationData.customer_complain_id}?notification_id=${notification.id}`;
-        }
-        
-        // Fallback: try direct properties if nested structure doesn't exist
-        if (data.meal_order_id) {
-            return `/user/meal-order/details/${data.meal_order_id}?notification_id=${notification.id}`;
-        } else if (data.order_id) {
-            return `/user/order/details/${data.order_id}?notification_id=${notification.id}`;
-        } else if (data.customer_id) {
-            return `/user/details/${data.customer_id}?notification_id=${notification.id}`;
-        } else if (data.complaint_id) {
-            return `/user/complaint/details/${data.complaint_id}?notification_id=${notification.id}`;
-        } else if (data.customer_complain_id) {
-            return `/user/customer-complain-details/${data.customer_complain_id}?notification_id=${notification.id}`;
-        }
-        
-        return '#';
-    }
-
-    function getNotificationTitle(notification) {
-        if (!notification || !notification.data) {
-            return 'Notification';
-        }
-        
-        const data = notification.data;
-        let parsedData = data;
-        
-        // Check if data is a string (JSON) and parse it
-        if (typeof data === 'string') {
-            try {
-                parsedData = JSON.parse(data);
-            } catch (e) {
-                console.error('Error parsing notification data:', e);
-                return 'Notification';
-            }
-        }
-        
-        // Return the title from the parsed data
-        return parsedData.title || parsedData.message || 'Notification';
-    }
-
-    function getNotificationMessage(notification) {
-        if (!notification || !notification.data) {
-            return '';
-        }
-        
-        const data = notification.data;
-        let parsedData = data;
-        
-        // Check if data is a string (JSON) and parse it
-        if (typeof data === 'string') {
-            try {
-                parsedData = JSON.parse(data);
-            } catch (e) {
-                console.error('Error parsing notification data:', e);
-                return '';
-            }
-        }
-        
-        // Return the message from the parsed data
-        return parsedData.message || '';
-    }
-
-    if (unreadNotifications && unreadNotifications.length > 0) {
-        unreadNotifications.forEach(notification => {
-            const link = getNotificationLink(notification);
-            const title = getNotificationTitle(notification);
-            const message = getNotificationMessage(notification);
-            
-            notificationsHTML += `
-                <li class="list-group-item list-group-item-action dropdown-notifications-item">
-                    <div class="d-flex gap-2">
-                        <a href="${link}">
-                            <div class="d-flex flex-column flex-grow-1 overflow-hidden w-px-200">
-                                <h6 class="mb-1 text-truncate"><strong>${title}</strong></h6>
-                                ${message ? `<small class="text-truncate text-muted">${message}</small>` : ''}
-                                <small class="text-truncate text-body">${new Date(notification.created_at).toLocaleString()}</small>
-                            </div>
-                        </a>
-                        <div class="flex-shrink-0 dropdown-notifications-actions">
-                            <small class="text-muted">Unread</small>
-                        </div>
-                    </div>
-                    <button class="delete-notification-btn btn btn-danger btn-sm mt-2" onclick="deleteNotification('${notification.id}')">Delete</button>
-                </li>`;
-        });
-    }
-
-    if (readNotifications && readNotifications.length > 0) {
-        readNotifications.forEach(notification => {
-            const link = getNotificationLink(notification);
-            const title = getNotificationTitle(notification);
-            const message = getNotificationMessage(notification);
-            
-            notificationsHTML += `
-                <li class="list-group-item list-group-item-action dropdown-notifications-item">
-                    <div class="d-flex gap-2">
-                        <a href="${link}">
-                            <div class="d-flex flex-column flex-grow-1 overflow-hidden w-px-200">
-                                <h6 class="mb-1 text-truncate">${title}</h6>
-                                ${message ? `<small class="text-truncate text-muted">${message}</small>` : ''}
-                                <small class="text-truncate text-body">${new Date(notification.created_at).toLocaleString()}</small>
-                            </div>
-                        </a>
-                        <div class="flex-shrink-0 dropdown-notifications-actions">
-                            <small class="text-muted">Read</small>
-                        </div>
-                    </div>
-                    <button class="delete-notification-btn btn btn-danger btn-sm mt-2" onclick="deleteNotification('${notification.id}')">Delete</button>
-                </li>`;
-        });
-    }
-
-    notificationsContainer.innerHTML = notificationsHTML;
-}
-
 async function deleteNotification(notificationId) {
     try {
         const response = await axios.delete(`/user/delete/notification/${notificationId}`);
@@ -566,6 +409,30 @@ async function updateWishlistCount() {
                 wishlistItemElem.style.display = 'block';
             } else {
                 wishlistItemElem.style.display = 'none';
+            }
+        }
+    } catch (error) {
+        handleError(error);
+    } finally {
+        hideLoader();
+    }
+}
+
+async function updateMealCartCount() {
+    try {
+        const res = await axios.get('/user/meal-cart/count');
+        if (res.status === 200) {
+            const count = res.data.count;
+            const cartCountElem = document.getElementById('mealCartCount');
+            const cartItemElem = document.getElementById('mealCartItem');
+            
+            if (count > 0) {
+                cartItemElem.style.display = 'block';
+                cartCountElem.innerText = count;
+                cartCountElem.style.display = 'inline-block';
+            } else {
+                cartItemElem.style.display = 'none';
+                cartCountElem.innerText = '0'; 
             }
         }
     } catch (error) {

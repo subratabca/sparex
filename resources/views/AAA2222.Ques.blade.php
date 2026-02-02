@@ -1,13 +1,106 @@
+<?php
 
-Client can change delivery_status from pending->accept_order->preparing->ready_for_pickup
+namespace App\Models;
 
-Delivery Man can change delivery_status from ready_for_pickup->picked_up->on_the_way->arrived','delivered'
+use Illuminate\Database\Eloquent\Model;
 
-when delivery_status is pending it will show accept_order and cancelled,when delivery_status is accept_order it will show preparing only,when delivery_status is preparing it will show ready_for_pickup only,  in your provide function openDeliveryStatusModalForGroup() modal in view.blade.php.when delivery_status is preparing in modal it will show a input field to give pick up time manually by client.So give me full updated part only.
+class DeliveryChargeLedger extends Model
+{
+    protected $fillable = ['meal_order_id','customer_id','client_id','delivery_person_id','meal_type_id','delivery_date','order_tracking','delivery_status','delivery_charge','distance_km','distance_category','payment_status','is_charge_counted','charge_key'];
 
+    protected $casts = [
+        'delivery_date' => 'date',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
 
+    // Delivery Status Constants
+    const STATUS_PENDING = 'pending';
+    const STATUS_ACCEPT_ORDER = 'accept_order';
+    const STATUS_PREPARING = 'preparing';
+    const STATUS_READY_FOR_PICKUP = 'ready_for_pickup';
+    const STATUS_PICKED_UP = 'picked_up';
+    const STATUS_ON_THE_WAY = 'on_the_way';
+    const STATUS_ARRIVED = 'arrived';
+    const STATUS_DELIVERED = 'delivered';
+    const STATUS_CANCELLED = 'cancelled';
 
+    // Payment Status
+    const PAYMENT_DUE = 'due';
+    const PAYMENT_PAID = 'paid';
+    const PAYMENT_CANCELLED = 'cancelled';
 
+    // Status labels
+    const STATUS_LABELS = [
+        self::STATUS_PENDING => 'Pending',
+        self::STATUS_ACCEPT_ORDER => 'Accept Order',
+        self::STATUS_PREPARING => 'Preparing',
+        self::STATUS_READY_FOR_PICKUP => 'Ready for Pickup',
+        self::STATUS_PICKED_UP => 'Picked Up',
+        self::STATUS_ON_THE_WAY => 'On the Way',
+        self::STATUS_ARRIVED => 'Arrived',
+        self::STATUS_DELIVERED => 'Delivered',
+        self::STATUS_CANCELLED => 'Cancelled',
+    ];
 
+    public function mealOrder()
+    {
+        return $this->belongsTo(MealOrder::class, 'meal_order_id');
+    }
 
-select status in dropdown will be disabled in your provide function openDeliveryStatusModalForGroup() modal.Give me this part only.
+    public function customer()
+    {
+        return $this->belongsTo(User::class, 'customer_id');
+    }
+
+    public function client()
+    {
+        return $this->belongsTo(User::class, 'client_id');
+    }
+
+    public function deliveryPerson()
+    {
+        return $this->belongsTo(User::class, 'delivery_person_id');
+    }
+
+    public function mealType()
+    {
+        return $this->belongsTo(MealType::class, 'meal_type_id');
+    }
+
+    public function paymentHistories()
+    {
+        return $this->hasMany(MealDeliveryPaymentHistory::class, 'delivery_charge_ledger_id');
+    }
+    
+    public function statusHistories()
+    {
+        return $this->hasMany(MealDeliveryStatusHistory::class, 'delivery_charge_ledger_id');
+    }
+
+    public static function generateChargeKey($mealOrderId, $clientId, $mealTypeId, $deliveryDate)
+    {
+        return "MO{$mealOrderId}_C{$clientId}_MT{$mealTypeId}_" . str_replace('-', '', $deliveryDate);
+    }
+
+    public static function generateTrackingNumber()
+    {
+        return 'DL' . strtoupper(\Illuminate\Support\Str::random(8)) . date('Ymd');
+    }
+
+}
+
+in above code why use below code:
+
+    // Status labels
+    const STATUS_LABELS = [
+        self::STATUS_PENDING => 'Pending',
+        self::STATUS_ACCEPT_ORDER => 'Accept Order',
+        self::STATUS_PREPARING => 'Preparing',
+        self::STATUS_READY_FOR_PICKUP => 'Ready for Pickup',
+        self::STATUS_PICKED_UP => 'Picked Up',
+        self::STATUS_ON_THE_WAY => 'On the Way',
+        self::STATUS_ARRIVED => 'Arrived',
+        self::STATUS_DELIVERED => 'Delivered',
+        self::STATUS_CANCELLED => 'Cancelled',
+    ];

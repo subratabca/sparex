@@ -206,8 +206,121 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 });
 
-
 function displayNotifications(unreadNotifications, readNotifications) {
+    const notificationsContainer = document.querySelector('.dropdown-notifications-list ul');
+    let notificationsHTML = '';
+
+    // No notifications case
+    if (
+        (!unreadNotifications || unreadNotifications.length === 0) &&
+        (!readNotifications || readNotifications.length === 0)
+    ) {
+        notificationsContainer.innerHTML =
+            '<li class="list-group-item">No notifications</li>';
+        return;
+    }
+
+    // Function to get notification link based on type
+    function getNotificationLink(notification) {
+        if (!notification.data) return '#';
+
+        const notificationId = notification.id; // Use only the notification ID
+        const data = notification.data;
+
+        switch (data.type) {
+            case 'meal_order':
+            case 'client_meal_order':
+                return `/client/meal-order/details/${data.meal_order_id}?notification_id=${notificationId}`;
+
+            case 'client_order':
+                return `/client/account/details/${data.client_id}?notification_id=${notificationId}`;
+
+            case 'order':
+                return `/client/order/details/${data.order_id}?notification_id=${notificationId}`;
+
+            case 'complaint':
+                return `/client/complaint/details/${data.complaint_id}?notification_id=${notificationId}`;
+
+            case 'product':
+                return `/client/product/details/${data.product_id}?notification_id=${notificationId}`;
+
+            case 'customer_complain':
+                return `/client/customer-complain/details/${data.customer_complain_id}?notification_id=${notificationId}`;
+
+            default:
+                return '#';
+        }
+    }
+
+    // Render unread notifications
+    if (unreadNotifications && unreadNotifications.length > 0) {
+        unreadNotifications.forEach(notification => {
+            const link = getNotificationLink(notification);
+
+            notificationsHTML += `
+                <li class="list-group-item list-group-item-action dropdown-notifications-item">
+                    <div class="d-flex gap-2">
+                        <a href="${link}">
+                            <div class="d-flex flex-column flex-grow-1 overflow-hidden w-px-200">
+                                <h6 class="mb-1 text-truncate">
+                                    <strong>${notification.data.data}</strong>
+                                </h6>
+                                <small class="text-truncate text-body">
+                                    ${new Date(notification.created_at).toLocaleString()}
+                                </small>
+                            </div>
+                        </a>
+                        <div class="flex-shrink-0 dropdown-notifications-actions">
+                            <small class="text-muted">Unread</small>
+                        </div>
+                    </div>
+                    <button
+                        class="delete-notification-btn btn btn-danger btn-sm mt-2"
+                        onclick="deleteNotification('${notification.id}')">
+                        Delete
+                    </button>
+                </li>
+            `;
+        });
+    }
+
+    // Render read notifications
+    if (readNotifications && readNotifications.length > 0) {
+        readNotifications.forEach(notification => {
+            const link = getNotificationLink(notification);
+
+            notificationsHTML += `
+                <li class="list-group-item list-group-item-action dropdown-notifications-item">
+                    <div class="d-flex gap-2">
+                        <a href="${link}">
+                            <div class="d-flex flex-column flex-grow-1 overflow-hidden w-px-200">
+                                <h6 class="mb-1 text-truncate">
+                                    ${notification.data.data}
+                                </h6>
+                                <small class="text-truncate text-body">
+                                    ${new Date(notification.created_at).toLocaleString()}
+                                </small>
+                            </div>
+                        </a>
+                        <div class="flex-shrink-0 dropdown-notifications-actions">
+                            <small class="text-muted">Read</small>
+                        </div>
+                    </div>
+                    <button
+                        class="delete-notification-btn btn btn-danger btn-sm mt-2"
+                        onclick="deleteNotification('${notification.id}')">
+                        Delete
+                    </button>
+                </li>
+            `;
+        });
+    }
+
+    notificationsContainer.innerHTML = notificationsHTML;
+}
+
+
+function displayNotifications11(unreadNotifications, readNotifications) {
     const notificationsContainer = document.querySelector('.dropdown-notifications-list ul');
     let notificationsHTML = '';
 
@@ -216,6 +329,7 @@ function displayNotifications(unreadNotifications, readNotifications) {
         notificationsContainer.innerHTML = '<li class="list-group-item">No notifications</li>';
         return;
     }
+
 
     function getNotificationLink(notification) {
         if (notification.data) {

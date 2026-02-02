@@ -16,8 +16,7 @@ return new class extends Migration
             $table->foreignId('delivery_charge_ledger_id')->nullable()->constrained('delivery_charge_ledgers')->onDelete('cascade');
             $table->enum('delivery_status', ['pending','accept_order','preparing','ready_for_pickup','picked_up','on_the_way','arrived','delivered','cancelled'
             ]);
-            $table->timestamp('picked_up_at')->nullable();
-            $table->timestamp('delivered_at')->nullable();
+            $table->timestamp('pick_up_at')->nullable();
             $table->text('notes')->nullable();
             $table->unsignedBigInteger('updated_by_id')->nullable();
             $table->string('updated_by_type')->nullable(); // 'client', 'delivery_person', 'system', 'customer'
@@ -27,8 +26,7 @@ return new class extends Migration
             $table->index('delivery_status', 'idx_mdsh_status');
             $table->index('created_at', 'idx_mdsh_created_at');
             $table->index('delivery_charge_ledger_id', 'idx_mdsh_delivery_charge_ledger');
-            $table->index(['delivery_status', 'picked_up_at'], 'idx_mdsh_status_picked_at');
-            $table->index(['delivery_status', 'delivered_at'], 'idx_mdsh_status_delivered_at');
+            $table->index(['delivery_status', 'pick_up_at'], 'idx_mdsh_status_pickup_at');
         });
     }
 

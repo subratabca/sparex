@@ -61,7 +61,6 @@
                 <div class="col-lg-4">
                     <div class="border rounded p-3 shadow-sm mb-4" id="meal-summary"></div>
                     <div class="border rounded p-3 shadow-sm mb-4" id="delivery-summary"></div>
-                    <div class="border rounded p-3 shadow-sm mb-4" id="nutrition-summary"></div>
                     <div class="border rounded p-3 shadow-sm" id="shipping-address"></div>
                 </div>
             </div>
@@ -91,11 +90,9 @@ async function loadMealOrderDetails() {
             const data = response.data.data;
             const items = data.items;
             const summary = data.summary;
-            const nutrition = data.nutrition;
             const shippingAddress = data.shipping_address;
             const order = data.order;
             const dates = data.dates;
-            const itemsWithTime = data.items_with_time;
             deliveryStatuses = data.delivery_statuses || {};
 
             // Update header information
@@ -103,10 +100,9 @@ async function loadMealOrderDetails() {
             document.getElementById('orderNumberText').textContent = `${summary.total_items} items • ${order.status}`;
             document.getElementById('orderStatusText').textContent = order.status;
 
-            renderMealOrderItems(items, dates, itemsWithTime);
+            renderMealOrderItems(items, dates);
             renderMealSummary(summary);
-            renderDeliverySummary(items, deliveryStatuses);
-            renderNutritionSummary(nutrition);
+            renderDeliverySummary(items);
             renderShippingAddress(shippingAddress);
         } else {
             document.getElementById('mealOrderAccordion').innerHTML = `<div class="alert alert-info">Order not found.</div>`;
@@ -119,7 +115,7 @@ async function loadMealOrderDetails() {
     }
 }
 
-function renderMealOrderItems(items, dates, itemsWithTime) {
+function renderMealOrderItems(items, dates) {
     const container = document.getElementById('mealOrderAccordion');
     container.innerHTML = '';
 
@@ -138,44 +134,49 @@ function renderMealOrderItems(items, dates, itemsWithTime) {
             day: 'numeric'
         });
 
-        const mealTypes = Object.keys(dayItems);
-        let mealTypeHtml = '';
+        const ledgerIds = Object.keys(dayItems);
+        let dayHtml = '';
 
-        mealTypes.forEach(type => {
-            const typeTitle = toTitleCase(type);
-            const group = dayItems[type];
+        ledgerIds.forEach(ledgerId => {
+            const group = dayItems[ledgerId];
             const itemsList = group.items || [];
+            const clientName = group.client_name || 'Unknown Provider';
+            const mealTypeName = group.meal_type_name || 'Other';
             
-            // Get meal time for this group
-            const mealTime = group.meal_time || getMealTimeForType(date, type, itemsWithTime);
+            // Get meal time
+            const mealTime = group.meal_time;
             const formattedMealTime = mealTime ? formatMealTime(mealTime) : '';
             
-            // Get delivery status info
+            // Get delivery info
             const deliveryStatus = group.delivery_status || 'pending';
             const deliveryStatusLabel = group.delivery_status_label || deliveryStatuses[deliveryStatus] || toTitleCase(deliveryStatus);
             const deliveryBadgeClass = getDeliveryBadgeClass(deliveryStatus);
             const deliveryPerson = group.delivery_person_name || 'Not Assigned';
             const orderTracking = group.order_tracking;
 
-            mealTypeHtml += `
+            dayHtml += `
                 <div class="meal-type-section mb-4">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="text-primary mb-0">${typeTitle} (${itemsList.length} items)</h6>
+                        <h6 class="text-primary mb-0">${clientName} (${itemsList.length} items)</h6>
                         <div class="d-flex align-items-center gap-2">
                             ${formattedMealTime ? `<span class="badge bg-light text-dark"><i class="mdi mdi-clock-outline me-1"></i>${formattedMealTime}</span>` : ''}
                             <span class="badge ${deliveryBadgeClass}">${deliveryStatusLabel}</span>
                         </div>
                     </div>
-                    ${deliveryPerson !== 'Not Assigned' ? `
-                        <div class="mb-2">
-                            <small class="text-muted">
-                                <i class="mdi mdi-account-circle me-1"></i>
-                                Delivery Person: ${deliveryPerson}
-                            </small>
-                        </div>
-                    ` : ''}
+                    <div class="mb-2">
+                        <small class="text-muted">
+                            <i class="mdi mdi-food me-1"></i>
+                            Meal Type: ${mealTypeName}
+                        </small>
+                    </div>
+                    <div class="mb-2">
+                        <small class="text-muted">
+                            <i class="mdi mdi-account-circle me-1"></i>
+                            Delivery Person: ${deliveryPerson}
+                        </small>
+                    </div>
                     ${orderTracking ? `
-                        <div class="mb-2">
+                        <div class="mb-3">
                             <small class="text-muted">
                                 <i class="mdi mdi-truck-delivery me-1"></i>
                                 Tracking: ${orderTracking}
@@ -189,15 +190,14 @@ function renderMealOrderItems(items, dates, itemsWithTime) {
                 const productName = toTitleCase(item.product_name || 'Unknown Product');
                 const img = item.product_image ? `/upload/product/small/${item.product_image}` : '/upload/no_image.jpg';
 
-                mealTypeHtml += `
+                dayHtml += `
                     <li class="list-group-item">
                         <div class="d-flex justify-content-between align-items-start">
                             <div class="d-flex align-items-center gap-3">
                                 <img src="${img}" alt="${productName}" class="rounded" style="width:60px;height:60px;object-fit:cover;">
                                 <div>
                                     <strong>${productName}</strong><br>
-                                    <small class="text-muted">${formatCurrency(item.unit_price || 0)} each × ${item.quantity || 0}</small><br>
-                                    <small class="text-info">Provider: ${item.client_name || 'Unknown'}</small>
+                                    <small class="text-muted">${formatCurrency(item.unit_price || 0)} each × ${item.quantity || 0}</small>
                                 </div>
                             </div>
                             <div class="text-end">
@@ -208,7 +208,7 @@ function renderMealOrderItems(items, dates, itemsWithTime) {
                 `;
             });
 
-            mealTypeHtml += `
+            dayHtml += `
                     </ul>
                 </div>
             `;
@@ -222,7 +222,7 @@ function renderMealOrderItems(items, dates, itemsWithTime) {
                     </button>
                 </h2>
                 <div id="${collapseId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#mealOrderAccordion">
-                    <div class="accordion-body">${mealTypeHtml}</div>
+                    <div class="accordion-body">${dayHtml}</div>
                 </div>
             </div>
         `;
@@ -231,7 +231,7 @@ function renderMealOrderItems(items, dates, itemsWithTime) {
     });
 }
 
-function renderDeliverySummary(items, deliveryStatuses) {
+function renderDeliverySummary(items) {
     const container = document.getElementById('delivery-summary');
     
     if (!items || Object.keys(items).length === 0) {
@@ -245,12 +245,17 @@ function renderDeliverySummary(items, deliveryStatuses) {
     // Count delivery statuses across all groups
     const statusCount = {};
     let totalGroups = 0;
+    let deliveryAssigned = 0;
 
     Object.values(items).forEach(dateItems => {
         Object.values(dateItems).forEach(group => {
             const status = group.delivery_status || 'pending';
             statusCount[status] = (statusCount[status] || 0) + 1;
             totalGroups++;
+            
+            if (group.delivery_person_name !== 'Not Assigned') {
+                deliveryAssigned++;
+            }
         });
     });
 
@@ -286,74 +291,10 @@ function renderDeliverySummary(items, deliveryStatuses) {
         <div class="mt-3">
             <small class="text-muted">
                 <i class="mdi mdi-information-outline me-1"></i>
-                ${totalGroups} delivery group(s) for this order
+                ${totalGroups} provider(s) • ${deliveryAssigned} with assigned delivery person
             </small>
         </div>
     `;
-}
-
-function getMealTimeForType(date, mealType, itemsWithTime) {
-    if (!itemsWithTime || !Array.isArray(itemsWithTime)) return null;
-    
-    const matchingItem = itemsWithTime.find(item => {
-        const itemDate = item.meal_date;
-        const itemMealTypeName = item.meal_type_name || 'Other';
-        
-        return itemDate === date && itemMealTypeName === mealType && item.meal_time;
-    });
-    
-    if (matchingItem && matchingItem.meal_time) {
-        return matchingItem.meal_time;
-    }
-    
-    return null;
-}
-
-function formatMealTime(timeString) {
-    if (!timeString) return '';
-    
-    try {
-        if (timeString.toLowerCase().includes('am') || timeString.toLowerCase().includes('pm')) {
-            return timeString;
-        }
-        
-        const timeParts = timeString.split(':');
-        
-        if (timeParts.length >= 2) {
-            let hour = parseInt(timeParts[0], 10);
-            let minute = parseInt(timeParts[1], 10);
-            
-            if (isNaN(hour) || isNaN(minute)) {
-                return timeString;
-            }
-            
-            const period = hour >= 12 ? 'pm' : 'am';
-            const displayHour = hour % 12 || 12;
-            const displayMinute = minute.toString().padStart(2, '0');
-            
-            return `${displayHour}:${displayMinute} ${period}`;
-        }
-        
-        return timeString;
-    } catch (e) {
-        console.error('Error formatting time:', e, 'Input:', timeString);
-        return timeString;
-    }
-}
-
-function getDeliveryBadgeClass(status) {
-    switch(status) {
-        case 'delivered': return 'bg-success';
-        case 'arrived': return 'bg-primary';
-        case 'on_the_way': return 'bg-info';
-        case 'picked_up': return 'bg-info';
-        case 'ready_for_pickup': return 'bg-warning';
-        case 'preparing': return 'bg-warning';
-        case 'accept_order': return 'bg-secondary';
-        case 'pending': return 'bg-secondary';
-        case 'cancelled': return 'bg-dark';
-        default: return 'bg-secondary';
-    }
 }
 
 function renderMealSummary(summary) {
@@ -386,39 +327,6 @@ function renderMealSummary(summary) {
             <li class="list-group-item d-flex justify-content-between fw-bold">
                 Total: <span>${formatCurrency(total)}</span>
             </li>
-        </ul>
-    `;
-}
-
-function renderNutritionSummary(nutrition) {
-    const container = document.getElementById('nutrition-summary');
-    if (!nutrition) {
-        container.innerHTML = `<div class="alert alert-warning">No nutrition data available.</div>`;
-        return;
-    }
-    
-    let caloriesByTypeHtml = '';
-    
-    if (nutrition.calories_by_meal_type) {
-        Object.entries(nutrition.calories_by_meal_type).forEach(([mealType, calories]) => {
-            const caloriesValue = parseInt(calories || 0);
-            caloriesByTypeHtml += `
-                <li class="list-group-item d-flex justify-content-between">
-                    ${toTitleCase(mealType)}: <span>${caloriesValue} cal</span>
-                </li>
-            `;
-        });
-    }
-
-    const totalCalories = parseInt(nutrition.total_calories || 0);
-    
-    container.innerHTML = `
-        <h5 class="mb-3">Nutrition Summary</h5>
-        <ul class="list-group list-group-flush">
-            <li class="list-group-item d-flex justify-content-between fw-bold">
-                Total Calories: <span>${totalCalories} cal</span>
-            </li>
-            ${caloriesByTypeHtml}
         </ul>
     `;
 }
@@ -625,6 +533,53 @@ function formatChartLabels(labels, range) {
     });
 }
 
+function formatMealTime(timeString) {
+    if (!timeString) return '';
+    
+    try {
+        if (timeString.toLowerCase().includes('am') || timeString.toLowerCase().includes('pm')) {
+            return timeString;
+        }
+        
+        const timeParts = timeString.split(':');
+        
+        if (timeParts.length >= 2) {
+            let hour = parseInt(timeParts[0], 10);
+            let minute = parseInt(timeParts[1], 10);
+            
+            if (isNaN(hour) || isNaN(minute)) {
+                return timeString;
+            }
+            
+            const period = hour >= 12 ? 'pm' : 'am';
+            const displayHour = hour % 12 || 12;
+            const displayMinute = minute.toString().padStart(2, '0');
+            
+            return `${displayHour}:${displayMinute} ${period}`;
+        }
+        
+        return timeString;
+    } catch (e) {
+        console.error('Error formatting time:', e, 'Input:', timeString);
+        return timeString;
+    }
+}
+
+function getDeliveryBadgeClass(status) {
+    switch(status) {
+        case 'delivered': return 'bg-success';
+        case 'arrived': return 'bg-primary';
+        case 'on_the_way': return 'bg-info';
+        case 'picked_up': return 'bg-info';
+        case 'ready_for_pickup': return 'bg-warning';
+        case 'preparing': return 'bg-warning';
+        case 'accept_order': return 'bg-secondary';
+        case 'pending': return 'bg-secondary';
+        case 'cancelled': return 'bg-dark';
+        default: return 'bg-secondary';
+    }
+}
+
 function toTitleCase(str) {
     if (!str) return "";
     return str.trim().toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
@@ -638,40 +593,7 @@ function formatCurrency(amount) {
     }).format(numAmount);
 }
 
-// Utility functions
-function showLoader() {
-    const loader = document.createElement('div');
-    loader.id = 'loadingOverlay';
-    loader.className = 'loading-overlay';
-    loader.innerHTML = `
-        <div class="spinner-border text-primary" role="status">
-            <span class="visually-hidden">Loading...</span>
-        </div>
-    `;
-    document.body.appendChild(loader);
-}
 
-function hideLoader() {
-    const loader = document.getElementById('loadingOverlay');
-    if (loader) {
-        loader.remove();
-    }
-}
-
-function errorToast(message) {
-    if (typeof Toastify !== 'undefined') {
-        Toastify({
-            text: message,
-            duration: 3000,
-            close: true,
-            gravity: "top",
-            position: "right",
-            backgroundColor: "#dc3545",
-        }).showToast();
-    } else {
-        alert('Error: ' + message);
-    }
-}
 </script>
 
 <style>

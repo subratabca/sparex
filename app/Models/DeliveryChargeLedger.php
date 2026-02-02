@@ -6,7 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class DeliveryChargeLedger extends Model
 {
-    protected $fillable = ['meal_order_id','customer_id','client_id','delivery_person_id','meal_type_id','delivery_date','order_tracking','delivery_status','delivery_charge','distance_km','distance_category','payment_status','payment_date','payment_notes','is_charge_counted','charge_key'
+    protected $fillable = ['meal_order_id','customer_id','client_id','delivery_person_id','meal_type_id','delivery_date','order_tracking','delivery_status','delivery_charge','distance_km','distance_category','payment_status','is_charge_counted','charge_key'];
+
+    protected $casts = [
+        'delivery_date' => 'date',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     // Delivery Status Constants
@@ -26,7 +31,7 @@ class DeliveryChargeLedger extends Model
     const PAYMENT_CANCELLED = 'cancelled';
 
     // Status labels
-    const STATUS_LABELS = [
+/*    const STATUS_LABELS = [
         self::STATUS_PENDING => 'Pending',
         self::STATUS_ACCEPT_ORDER => 'Accept Order',
         self::STATUS_PREPARING => 'Preparing',
@@ -36,9 +41,8 @@ class DeliveryChargeLedger extends Model
         self::STATUS_ARRIVED => 'Arrived',
         self::STATUS_DELIVERED => 'Delivered',
         self::STATUS_CANCELLED => 'Cancelled',
-    ];
+    ];*/
 
-    // Relationships
     public function mealOrder()
     {
         return $this->belongsTo(MealOrder::class, 'meal_order_id');
@@ -64,49 +68,24 @@ class DeliveryChargeLedger extends Model
         return $this->belongsTo(MealType::class, 'meal_type_id');
     }
 
-    public function mealOrderItems()
+    public function paymentHistories()
     {
-        return $this->hasMany(MealOrderItem::class, 'delivery_charge_ledger_id');
+        return $this->hasMany(MealDeliveryPaymentHistory::class, 'delivery_charge_ledger_id');
     }
-
+    
     public function statusHistories()
     {
         return $this->hasMany(MealDeliveryStatusHistory::class, 'delivery_charge_ledger_id');
     }
 
-    // Generate unique charge key
     public static function generateChargeKey($mealOrderId, $clientId, $mealTypeId, $deliveryDate)
     {
         return "MO{$mealOrderId}_C{$clientId}_MT{$mealTypeId}_" . str_replace('-', '', $deliveryDate);
     }
 
-    // Generate unique tracking number
     public static function generateTrackingNumber()
     {
         return 'DL' . strtoupper(\Illuminate\Support\Str::random(8)) . date('Ymd');
     }
 
-    // Status label helper
-    public function getStatusLabelAttribute()
-    {
-        return self::STATUS_LABELS[$this->delivery_status] ?? 'Unknown';
-    }
-
-    // Scope for active deliveries
-    public function scopeActive($query)
-    {
-        return $query->whereNotIn('delivery_status', [self::STATUS_DELIVERED, self::STATUS_CANCELLED]);
-    }
-
-    // Scope for pending deliveries
-    public function scopePending($query)
-    {
-        return $query->where('delivery_status', self::STATUS_PENDING);
-    }
-
-    // Scope for today's deliveries
-    public function scopeForToday($query)
-    {
-        return $query->whereDate('delivery_date', today());
-    }
 }

@@ -6,13 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class MealDeliveryStatusHistory extends Model
 {
-    protected $fillable = ['delivery_charge_ledger_id','delivery_status','picked_up_at','delivered_at','notes','updated_by_id','updated_by_type'
+    protected $fillable = ['delivery_charge_ledger_id','delivery_status','pick_up_at','notes','updated_by_id','updated_by_type'
     ];
 
     protected $casts = [
+        'pick_up_at' => 'datetime',
         'created_at' => 'datetime',
-        'picked_up_at' => 'datetime',
-        'delivered_at' => 'datetime'
+        'updated_at' => 'datetime',
     ];
 
     // Delivery Status Constants

@@ -30,6 +30,13 @@
         <div data-i18n="Dashboards">Dashboards</div>
       </a>
     </li>
+
+    <li class="menu-item {{ request()->routeIs('delivery.meal.orders*') ? 'active' : '' }}">
+      <a href="{{ route('delivery.meal.orders') }}" class="menu-link">
+        <i class="menu-icon tf-icons mdi mdi-food-fork-drink"></i>
+        <div data-i18n="Meal Orders">Meal Orders</div>
+      </a>
+    </li>
   </ul>
 </aside>
 

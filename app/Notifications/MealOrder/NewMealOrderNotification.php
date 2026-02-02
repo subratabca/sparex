@@ -8,6 +8,7 @@ use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 use App\Models\MealOrder;
 use App\Models\ClientMealOrder;
+use App\Models\DeliveryChargeLedger;
 
 class NewMealOrderNotification extends Notification
 {
@@ -15,6 +16,7 @@ class NewMealOrderNotification extends Notification
 
     private $notificationData;
     private $type; // 'meal_order', 'client_meal_order', or 'array'
+    private $deliveryLedgerLookup = [];
 
     public function __construct($data)
     {
@@ -31,6 +33,9 @@ class NewMealOrderNotification extends Notification
                     'deliveryChargeLedgers'
                 ])
             ];
+            
+            // Create lookup for delivery charge ledgers
+            $this->prepareDeliveryLedgerLookup($data->deliveryChargeLedgers ?? collect());
         } elseif ($data instanceof ClientMealOrder) {
             $this->type = 'client_meal_order';
             $this->notificationData = [
@@ -40,13 +45,20 @@ class NewMealOrderNotification extends Notification
                     'mealOrder.mealShippingAddress',
                     'mealOrder.deliveryChargeLedgers' => function($query) use ($data) {
                         $query->where('client_id', $data->client_id);
-                    },
-                    'mealOrder.items' => function($query) use ($data) {
-                        $query->where('client_id', $data->client_id)
-                            ->with(['product', 'mealType', 'deliveryChargeLedger']);
                     }
                 ])
             ];
+            
+            // Load meal order items separately without the non-existent relationship
+            $mealOrderItems = $data->mealOrder->items()
+                ->where('client_id', $data->client_id)
+                ->with(['product', 'mealType', 'client'])
+                ->get();
+                
+            $this->notificationData['client_meal_order']->mealOrder->setRelation('items', $mealOrderItems);
+            
+            // Create lookup for delivery charge ledgers
+            $this->prepareDeliveryLedgerLookup($data->mealOrder->deliveryChargeLedgers ?? collect());
         } elseif (is_array($data)) {
             $this->type = 'array';
             $this->notificationData = $data;
@@ -56,16 +68,41 @@ class NewMealOrderNotification extends Notification
                 if (!$this->notificationData['meal_order']->relationLoaded('customer')) {
                     $this->notificationData['meal_order']->load([
                         'customer',
-                        'mealShippingAddress'
+                        'mealShippingAddress',
+                        'deliveryChargeLedgers'
                     ]);
                 }
+                $this->prepareDeliveryLedgerLookup($this->notificationData['meal_order']->deliveryChargeLedgers ?? collect());
             }
             
             if (isset($this->notificationData['client_meal_order']) && $this->notificationData['client_meal_order'] instanceof ClientMealOrder) {
                 if (!$this->notificationData['client_meal_order']->relationLoaded('client')) {
                     $this->notificationData['client_meal_order']->load(['client', 'mealOrder']);
                 }
+                if ($this->notificationData['client_meal_order']->mealOrder && 
+                    !$this->notificationData['client_meal_order']->mealOrder->relationLoaded('deliveryChargeLedgers')) {
+                    $this->notificationData['client_meal_order']->mealOrder->load(['deliveryChargeLedgers' => function($query) {
+                        $query->where('client_id', $this->notificationData['client_meal_order']->client_id);
+                    }]);
+                }
+                $this->prepareDeliveryLedgerLookup($this->notificationData['client_meal_order']->mealOrder->deliveryChargeLedgers ?? collect());
             }
+        }
+    }
+
+    /**
+     * Create a lookup array for delivery charge ledgers by meal_type_id and delivery_date
+     */
+    private function prepareDeliveryLedgerLookup($deliveryChargeLedgers)
+    {
+        $this->deliveryLedgerLookup = [];
+        foreach ($deliveryChargeLedgers as $ledger) {
+            $key = $ledger->meal_type_id . '_' . $ledger->delivery_date;
+            $this->deliveryLedgerLookup[$key] = [
+                'id' => $ledger->id,
+                'delivery_status' => $ledger->delivery_status,
+                'delivery_charge' => $ledger->delivery_charge,
+            ];
         }
     }
 
@@ -170,10 +207,18 @@ class NewMealOrderNotification extends Notification
                 $clientMealOrder = null;
             }
             
+            // Attach delivery ledger info to each item using the lookup
+            $items->each(function($item) {
+                $lookupKey = $item->meal_type_id . '_' . $item->meal_date;
+                $ledgerInfo = $this->deliveryLedgerLookup[$lookupKey] ?? null;
+                $item->delivery_status = $ledgerInfo['delivery_status'] ?? 'pending';
+            });
+            
             return [
                 'mealOrder' => $mealOrder,
                 'clientMealOrder' => $clientMealOrder,
                 'items' => $items,
+                'deliveryLedgerLookup' => $this->deliveryLedgerLookup,
                 'notifiable' => $notifiable
             ];
             
@@ -184,18 +229,26 @@ class NewMealOrderNotification extends Notification
             // For client: show only their items
             $items = $mealOrder->items->where('client_id', $notifiable->id);
             
+            // Attach delivery ledger info to each item using the lookup
+            $items->each(function($item) {
+                $lookupKey = $item->meal_type_id . '_' . $item->meal_date;
+                $ledgerInfo = $this->deliveryLedgerLookup[$lookupKey] ?? null;
+                $item->delivery_status = $ledgerInfo['delivery_status'] ?? 'pending';
+            });
+            
             return [
                 'mealOrder' => $mealOrder,
                 'clientMealOrder' => $clientMealOrder,
                 'items' => $items,
+                'deliveryLedgerLookup' => $this->deliveryLedgerLookup,
                 'notifiable' => $notifiable
             ];
             
         } elseif ($this->type === 'array') {
             $mealOrder = $this->notificationData['meal_order'] ?? null;
             $clientMealOrder = $this->notificationData['client_meal_order'] ?? null;
-            $deliveryLedgers = $this->notificationData['delivery_ledgers'] ?? collect([]);
             
+            // Prepare items based on available data
             if ($clientMealOrder && $clientMealOrder->mealOrder) {
                 $mealOrder = $clientMealOrder->mealOrder;
                 $items = $mealOrder->items->where('client_id', $notifiable->id);
@@ -206,11 +259,18 @@ class NewMealOrderNotification extends Notification
                 $items = collect([]);
             }
             
+            // Attach delivery ledger info to each item using the lookup
+            $items->each(function($item) {
+                $lookupKey = $item->meal_type_id . '_' . $item->meal_date;
+                $ledgerInfo = $this->deliveryLedgerLookup[$lookupKey] ?? null;
+                $item->delivery_status = $ledgerInfo['delivery_status'] ?? 'pending';
+            });
+            
             return [
                 'mealOrder' => $mealOrder,
                 'clientMealOrder' => $clientMealOrder,
-                'deliveryLedgers' => $deliveryLedgers,
                 'items' => $items,
+                'deliveryLedgerLookup' => $this->deliveryLedgerLookup,
                 'notifiable' => $notifiable
             ];
         }

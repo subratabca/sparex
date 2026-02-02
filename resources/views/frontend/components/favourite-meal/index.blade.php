@@ -589,11 +589,9 @@ document.getElementById('confirm-add-meal').addEventListener('click', async () =
 
         if (res.status === 201 && res.data.status === 'success') {
             successToast(res.data.message || 'Meal added successfully!');
-            
-            // Update local meal times data
             customerMealTimes[key] = selectedTime;
-            
             bootstrap.Modal.getInstance(document.getElementById('addMealPlanModal')).hide();
+            await updateMealCartCount();
         } else {
             errorToast(res.data.message || 'Failed to add to meal plan.');
         }
@@ -679,3 +677,6 @@ function handleError(error) {
 </style>
 
 @endsection
+
+
+

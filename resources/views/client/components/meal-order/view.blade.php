@@ -133,8 +133,6 @@
     </div>
 </div>
 
-<!-- Delivery Status Update Modal -->
-<!-- Delivery Status Update Modal -->
 <div class="modal fade" id="deliveryStatusModal" tabindex="-1" aria-labelledby="deliveryStatusModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
@@ -206,28 +204,7 @@
 <script src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 <script>
-// Toast notification functions
-function successToast(message) {
-    Toastify({
-        text: message,
-        duration: 3000,
-        close: true,
-        gravity: "top",
-        position: "right",
-        backgroundColor: "#28a745",
-    }).showToast();
-}
 
-function errorToast(message) {
-    Toastify({
-        text: message,
-        duration: 3000,
-        close: true,
-        gravity: "top",
-        position: "right",
-        backgroundColor: "#dc3545",
-    }).showToast();
-}
 
 function showLoader() {
     document.getElementById('loadingSpinner').style.display = 'block';
@@ -307,7 +284,7 @@ async function loadClientPaymentDetails() {
             // Render order items with delivery status
             renderMealOrderItems(data.items, data.dates, data.items_with_time);
             
-            successToast('Payment details loaded successfully');
+            //successToast('Payment details loaded successfully');
         } else {
             errorToast(response.data.message || 'Failed to load payment details');
         }
@@ -591,7 +568,7 @@ function renderMealOrderItems(items, dates, itemsWithTime = []) {
 function attachDeliveryStatusGroupEventListeners() {
     document.querySelectorAll('.update-delivery-btn-group').forEach(button => {
         button.addEventListener('click', function() {
-            openDeliveryStatusModalForGroup(
+            checkAndOpenDeliveryModal(
                 this.dataset.itemIds,
                 this.dataset.orderId,
                 this.dataset.groupName,
@@ -650,6 +627,77 @@ function populateStatusOptions(currentStatus) {
         select.innerHTML = '<option value="">No further status changes allowed</option>';
     } else {
         select.disabled = false;
+    }
+}
+
+async function checkAndOpenDeliveryModal(itemIds, orderId, groupName, mealDate, mealTypeId, currentStatus, currentStatusLabel) {
+    try {
+        // Check if delivery person has accepted
+        const response = await axios.post(`/client/check/delivery-acceptance/${orderId}`, {
+            meal_date: mealDate,
+            meal_type_id: mealTypeId
+        });
+        
+        if (response.data.status === 'success') {
+            const data = response.data.data;
+            
+            // Check if the desired next status is blocked
+            let nextStatus = '';
+            
+            // Determine what the next status would be based on current status
+            if (currentStatus === 'pending') {
+                nextStatus = 'accept_order';
+            } else if (currentStatus === 'accept_order') {
+                nextStatus = 'preparing';
+            } else if (currentStatus === 'preparing') {
+                nextStatus = 'ready_for_pickup';
+            }
+            
+            // If the next status is in the blocked list, show error
+            if (data.blocked_statuses && data.blocked_statuses.includes(nextStatus)) {
+                let errorMessage = 'Cannot update status. ';
+                
+                if (data.blocked_reason) {
+                    errorMessage += data.blocked_reason;
+                } else {
+                    errorMessage += 'No delivery person has accepted the order yet.';
+                }
+                
+                // Show more detailed message
+                errorToast(errorMessage);
+                
+                // Optionally show delivery person assignment status
+                if (!data.delivery_person_assigned) {
+                    Swal.fire({
+                        title: 'Delivery Person Needed',
+                        text: 'A delivery person must accept this order before you can proceed with preparation.',
+                        icon: 'warning',
+                        showCancelButton: false,
+                        confirmButtonText: 'OK',
+                        confirmButtonColor: '#3085d6'
+                    });
+                }
+                return;
+            }
+            
+            // If delivery person is assigned, show their name
+            if (data.delivery_person_assigned && data.delivery_person_name) {
+                successToast(`Delivery assigned to: ${data.delivery_person_name}`);
+            }
+            
+            // Open modal if allowed
+            openDeliveryStatusModalForGroup(itemIds, orderId, groupName, mealDate, mealTypeId, currentStatus, currentStatusLabel);
+        }
+    } catch (error) {
+        console.error('Error checking delivery acceptance:', error);
+        
+        // If it's a validation error, show the message
+        if (error.response && error.response.data && error.response.data.message) {
+            errorToast(error.response.data.message);
+        } else {
+            // Still open modal but the backend will validate
+            openDeliveryStatusModalForGroup(itemIds, orderId, groupName, mealDate, mealTypeId, currentStatus, currentStatusLabel);
+        }
     }
 }
 
@@ -896,3 +944,4 @@ function formatCurrency(amount) {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 </style>
+

@@ -31,7 +31,6 @@ async function getList() {
     showLoader();
     try {
         let res = await axios.get("/client/get/meal-orders");
-        //console.log('API Response:', res.data);
         
         if (res.status === 200 && res.data.status === 'success') {
             let tableList = $("#tableList");
@@ -64,7 +63,6 @@ async function getList() {
 
             // Render rows with merged cells
             let rowIndex = 0;
-            let previousOrderId = null;
             
             Object.values(orderGroups).forEach(orderItems => {
                 // Sort items by meal_date descending within the order
@@ -85,21 +83,24 @@ async function getList() {
                     let formattedMealTypes = '-';
                     if (item.meal_types && item.meal_types.length > 0) {
                         formattedMealTypes = item.meal_types
-                            .map(t => t.charAt(0).toUpperCase() + t.slice(1))
+                            .map(t => t ? (t.charAt(0).toUpperCase() + t.slice(1)) : '')
+                            .filter(t => t)
                             .join(', ');
                     }
 
                     let row = `
-                        <tr data-order-id="${orderId}" data-row-index="${itemIndex}">
-                            <td class="text-center">${item.sl}</td>`;
+                        <tr data-order-id="${orderId}" data-row-index="${itemIndex}" class="${itemIndex === 0 ? 'first-merged-row' : itemIndex === rowspan-1 ? 'last-merged-row' : 'middle-merged-row'}">`;
+                    
+                    // SL Number
+                    row += `<td class="text-center">${item.sl}</td>`;
                     
                     // Customer Name (merged - only show in first row)
                     if (itemIndex === 0) {
                         row += `
                             <td rowspan="${rowspan}" class="customer-name-cell">
                                 <div class="customer-info">
-                                    <div class="fw-semibold">${item.customer_name}</div>
-                                    <small class="text-muted">${item.customer_email}</small>
+                                    <div class="fw-semibold">${item.customer_name || 'N/A'}</div>
+                                    ${item.customer_email ? `<small class="text-muted">${item.customer_email}</small>` : ''}
                                 </div>
                             </td>`;
                     }
@@ -113,10 +114,10 @@ async function getList() {
                                    title="View Order Details">
                                     ${item.order_number}
                                 </a>
+                                ${item.invoice_no ? `<br><small class="text-muted">${item.invoice_no}</small>` : ''}
                             </td>`;
                     }
 
-                    
                     // Regular columns (not merged)
                     row += `
                             <td>
@@ -202,7 +203,7 @@ function initializeDataTable() {
                 "targets": 2, // Order No (merged)
                 "orderable": true,
                 "className": "text-center",
-                "width": "10%"
+                "width": "12%"
             },
             {
                 "targets": 3, // Meal Date
@@ -266,29 +267,16 @@ function initializeDataTable() {
 }
 
 function addMergedRowStyles() {
-    // Add styling for merged rows
+    // Add styling for merged cells
     $('td[rowspan]').each(function() {
         const $td = $(this);
         const rowspan = parseInt($td.attr('rowspan'));
         
         if (rowspan > 1) {
             $td.addClass('merged-cell');
-            
-            // Find all rows in this merged group
-            const $row = $td.closest('tr');
-            const orderId = $row.data('order-id');
-            const rowIndex = $row.data('row-index');
-            
-            // Add border classes to all rows in the merged group
-            $(`tr[data-order-id="${orderId}"]`).each(function(index) {
-                const $thisRow = $(this);
-                if (index === 0) {
-                    $thisRow.addClass('first-merged-row');
-                } else if (index === rowspan - 1) {
-                    $thisRow.addClass('last-merged-row');
-                } else {
-                    $thisRow.addClass('middle-merged-row');
-                }
+            $td.css({
+                'vertical-align': 'middle',
+                'background-color': '#f8f9fa'
             });
         }
     });
@@ -422,28 +410,37 @@ function handleError(error) {
     margin: 0 2px;
 }
 
+/* Ensure proper vertical alignment in merged cells */
+#mealOrderTable td {
+    vertical-align: middle;
+}
+
 /* Badge styling */
 .badge {
     font-size: 0.75em;
     padding: 0.35em 0.65em;
 }
 
-/* DataTable pagination styling */
-.dataTables_wrapper .dataTables_paginate .paginate_button {
-    padding: 0.375rem 0.75rem;
-    margin-left: 2px;
-    border: 1px solid #dee2e6;
-    border-radius: 0.375rem;
+/* DataTable customization */
+.dataTables_wrapper .dataTables_filter {
+    float: right !important;
 }
 
-.dataTables_wrapper .dataTables_paginate .paginate_button.current {
-    background: #0d6efd;
-    color: white !important;
-    border-color: #0d6efd;
+.dataTables_wrapper .dataTables_length {
+    float: left !important;
 }
 
-/* Ensure proper vertical alignment in merged cells */
-#mealOrderTable td {
-    vertical-align: middle;
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .btn-group {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+    }
+    
+    .btn-group .btn {
+        flex: 1;
+        min-width: 36px;
+    }
 }
 </style>

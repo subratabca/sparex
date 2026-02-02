@@ -218,36 +218,98 @@ function displayNotifications(unreadNotifications, readNotifications) {
     }
 
     function getNotificationLink(notification) {
-        if (notification.data) {
-            let notificationId = notification.data.original_notification_id ?? notification.id; // Get original ID if reminder
-
-            if (notification.data.order_id) {
-                return `/delivery/order/details/${notification.data.order_id}?notification_id=${notificationId}`;
-            } else if (notification.data.complaint_id) {
-                return `/delivery/complaint/details/${notification.data.complaint_id}?notification_id=${notificationId}`;
-            } else if (notification.data.product_id) {
-                return `/delivery/product/details/${notification.data.product_id}?notification_id=${notificationId}`;
-            } else if (notification.data.client_id) {
-                return `/delivery/account/details/${notification.data.client_id}?notification_id=${notificationId}`;
-            } else if (notification.data.customer_complain_id) {
-                return `/delivery/customer-complain/details/${notification.data.customer_complain_id}?notification_id=${notificationId}`;
+        // Parse the notification data
+        let notificationData = notification.data;
+        
+        // If data is a string, parse it as JSON
+        if (typeof notificationData === 'string') {
+            try {
+                notificationData = JSON.parse(notificationData);
+            } catch (e) {
+                console.error('Error parsing notification data:', e);
+                return '#';
             }
         }
+        
+        // Check if we have the nested data structure
+        const nestedData = notificationData.data || {};
+        
+        // For delivery notifications, use the notification ID and delivery_charge_ledger_id
+        if (nestedData.delivery_charge_ledger_id) {
+            return `/delivery/view/notification/${notification.id}`;
+        } else if (notificationData.delivery_charge_ledger_id) {
+            return `/delivery/view/notification/${notification.id}?delivery_charge_ledger_id=${notificationData.delivery_charge_ledger_id}`;
+        }
+        
         return '#';
+    }
+
+    function getNotificationTitle(notification) {
+        // Parse the notification data
+        let notificationData = notification.data;
+        
+        // If data is a string, parse it as JSON
+        if (typeof notificationData === 'string') {
+            try {
+                notificationData = JSON.parse(notificationData);
+            } catch (e) {
+                console.error('Error parsing notification data:', e);
+                return 'Notification';
+            }
+        }
+        
+        // Return the title from notification data
+        // The title is at the top level of the notification.data object
+        return notificationData.title || 'Notification';
+    }
+
+    function formatNotificationTime(createdAt) {
+        try {
+            const date = new Date(createdAt);
+            const now = new Date();
+            const diffMs = now - date;
+            const diffMins = Math.floor(diffMs / 60000);
+            const diffHours = Math.floor(diffMs / 3600000);
+            const diffDays = Math.floor(diffMs / 86400000);
+            
+            if (diffMins < 1) {
+                return 'Just now';
+            } else if (diffMins < 60) {
+                return `${diffMins} min${diffMins === 1 ? '' : 's'} ago`;
+            } else if (diffHours < 24) {
+                return `${diffHours} hour${diffHours === 1 ? '' : 's'} ago`;
+            } else if (diffDays < 7) {
+                return `${diffDays} day${diffDays === 1 ? '' : 's'} ago`;
+            } else {
+                return date.toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                });
+            }
+        } catch (e) {
+            return 'Recently';
+        }
     }
 
     if (unreadNotifications && unreadNotifications.length > 0) {
         unreadNotifications.forEach(notification => {
-            const link = getNotificationLink(notification); 
+            const link = getNotificationLink(notification);
+            const title = getNotificationTitle(notification);
+            const timeAgo = formatNotificationTime(notification.created_at);
+            
             notificationsHTML += `
                 <li class="list-group-item list-group-item-action dropdown-notifications-item">
                     <div class="d-flex gap-2">
-                        <a href="${link}"><div class="d-flex flex-column flex-grow-1 overflow-hidden w-px-200">
-                            <h6 class="mb-1 text-truncate"><strong>${notification.data.data}</strong></h6>
-                            <small class="text-truncate text-body">${new Date(notification.created_at).toLocaleString()}</small>
-                        </div></a>
+                        <a href="${link}" class="d-flex gap-2 w-100 text-decoration-none">
+                            <div class="d-flex flex-column flex-grow-1 overflow-hidden w-px-200">
+                                <h6 class="mb-1 text-truncate"><strong>${title}</strong></h6>
+                                <small class="text-truncate text-muted">${timeAgo}</small>
+                            </div>
+                        </a>
                         <div class="flex-shrink-0 dropdown-notifications-actions">
-                            <small class="text-muted">Unread</small>
+                            <span class="badge bg-danger">New</span>
                         </div>
                     </div>
                     <button class="delete-notification-btn btn btn-danger btn-sm mt-2" onclick="deleteNotification('${notification.id}')">Delete</button>
@@ -257,14 +319,19 @@ function displayNotifications(unreadNotifications, readNotifications) {
 
     if (readNotifications && readNotifications.length > 0) {
         readNotifications.forEach(notification => {
-            const link = getNotificationLink(notification); 
+            const link = getNotificationLink(notification);
+            const title = getNotificationTitle(notification);
+            const timeAgo = formatNotificationTime(notification.created_at);
+            
             notificationsHTML += `
                 <li class="list-group-item list-group-item-action dropdown-notifications-item">
                     <div class="d-flex gap-2">
-                        <a href="${link}"><div class="d-flex flex-column flex-grow-1 overflow-hidden w-px-200">
-                            <h6 class="mb-1 text-truncate">${notification.data.data}</h6>
-                            <small class="text-truncate text-body">${new Date(notification.created_at).toLocaleString()}</small>
-                        </div></a>
+                        <a href="${link}" class="d-flex gap-2 w-100 text-decoration-none">
+                            <div class="d-flex flex-column flex-grow-1 overflow-hidden w-px-200">
+                                <h6 class="mb-1 text-truncate">${title}</h6>
+                                <small class="text-truncate text-muted">${timeAgo}</small>
+                            </div>
+                        </a>
                         <div class="flex-shrink-0 dropdown-notifications-actions">
                             <small class="text-muted">Read</small>
                         </div>

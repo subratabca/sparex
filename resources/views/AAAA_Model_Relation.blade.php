@@ -249,6 +249,7 @@ class Product extends BaseModel
     }
 }
 
+
 <?php
 
 namespace App\Models;
@@ -290,6 +291,38 @@ class MealType extends BaseModel
     }
 
 }
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class MealCart extends Model
+{
+    protected $fillable = ['meal_date','meal_time','client_id','customer_id','meal_type_id','product_id','quantity','unit_price','total_price'];
+
+    public function customer()
+    {
+        return $this->belongsTo(User::class, 'customer_id');
+    }
+
+    public function client()
+    {
+        return $this->belongsTo(User::class, 'client_id');
+    }
+
+    public function mealType()
+    {
+        return $this->belongsTo(MealType::class, 'meal_type_id');
+    }
+
+    public function product()
+    {
+        return $this->belongsTo(Product::class, 'product_id');
+    }
+}
+
 
 <?php
 
@@ -358,30 +391,8 @@ class MealOrderItem extends Model
         return $this->belongsTo(Product::class, 'product_id');
     }
 
-    // Delivery details are now handled through DeliveryChargeLedger
-    public function deliveryChargeLedger()
-    {
-        return $this->belongsTo(DeliveryChargeLedger::class, 'delivery_charge_ledger_id');
-    }
-
-    // Helper method to get delivery status through DeliveryChargeLedger
-    public function getDeliveryStatusAttribute()
-    {
-        return $this->deliveryChargeLedger->delivery_status ?? null;
-    }
-
-    // Helper method to get delivery person through DeliveryChargeLedger
-    public function getDeliveryPersonAttribute()
-    {
-        return $this->deliveryChargeLedger->deliveryPerson ?? null;
-    }
-
-    // Helper method to get tracking number through DeliveryChargeLedger
-    public function getTrackingNumberAttribute()
-    {
-        return $this->deliveryChargeLedger->order_tracking ?? null;
-    }
 }
+
 
 <?php
 
@@ -405,8 +416,8 @@ class ClientMealOrder extends Model
 
     public function mealOrderItems()
     {
-        return $this->hasMany(MealOrderItem::class, 'client_id', 'client_id')
-                    ->where('order_id', $this->order_id);
+        return $this->hasMany(MealOrderItem::class, 'meal_order_id', 'meal_order_id')
+                    ->where('client_id', $this->client_id);
     }
 
     public function deliveryChargeLedgers()
@@ -423,9 +434,45 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+class MealShippingAddress extends Model
+{
+    protected $fillable = ['meal_order_id','name','email','phone','address1','address2','zip_code','country_id','county_id','city_id','latitude','longitude'];
+
+    public function mealOrder()
+    {
+        return $this->belongsTo(MealOrder::class, 'meal_order_id');
+    }
+
+    public function country()
+    {
+        return $this->belongsTo(Country::class);
+    }
+
+    public function county()
+    {
+        return $this->belongsTo(County::class);
+    }
+
+    public function city()
+    {
+        return $this->belongsTo(City::class);
+    }
+}
+
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
 class DeliveryChargeLedger extends Model
 {
-    protected $fillable = ['meal_order_id','customer_id','client_id','delivery_person_id','meal_type_id','delivery_date','order_tracking','delivery_status','delivery_charge','distance_km','distance_category','payment_status','payment_date','payment_notes','is_charge_counted','charge_key'
+    protected $fillable = ['meal_order_id','customer_id','client_id','delivery_person_id','meal_type_id','delivery_date','order_tracking','delivery_status','delivery_charge','distance_km','distance_category','payment_status','is_charge_counted','charge_key'];
+
+    protected $casts = [
+        'delivery_date' => 'date',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     // Delivery Status Constants
@@ -457,7 +504,6 @@ class DeliveryChargeLedger extends Model
         self::STATUS_CANCELLED => 'Cancelled',
     ];
 
-    // Relationships
     public function mealOrder()
     {
         return $this->belongsTo(MealOrder::class, 'meal_order_id');
@@ -483,51 +529,26 @@ class DeliveryChargeLedger extends Model
         return $this->belongsTo(MealType::class, 'meal_type_id');
     }
 
-    public function mealOrderItems()
+    public function paymentHistories()
     {
-        return $this->hasMany(MealOrderItem::class, 'delivery_charge_ledger_id');
+        return $this->hasMany(MealDeliveryPaymentHistory::class, 'delivery_charge_ledger_id');
     }
-
+    
     public function statusHistories()
     {
         return $this->hasMany(MealDeliveryStatusHistory::class, 'delivery_charge_ledger_id');
     }
 
-    // Generate unique charge key
     public static function generateChargeKey($mealOrderId, $clientId, $mealTypeId, $deliveryDate)
     {
         return "MO{$mealOrderId}_C{$clientId}_MT{$mealTypeId}_" . str_replace('-', '', $deliveryDate);
     }
 
-    // Generate unique tracking number
     public static function generateTrackingNumber()
     {
         return 'DL' . strtoupper(\Illuminate\Support\Str::random(8)) . date('Ymd');
     }
 
-    // Status label helper
-    public function getStatusLabelAttribute()
-    {
-        return self::STATUS_LABELS[$this->delivery_status] ?? 'Unknown';
-    }
-
-    // Scope for active deliveries
-    public function scopeActive($query)
-    {
-        return $query->whereNotIn('delivery_status', [self::STATUS_DELIVERED, self::STATUS_CANCELLED]);
-    }
-
-    // Scope for pending deliveries
-    public function scopePending($query)
-    {
-        return $query->where('delivery_status', self::STATUS_PENDING);
-    }
-
-    // Scope for today's deliveries
-    public function scopeForToday($query)
-    {
-        return $query->whereDate('delivery_date', today());
-    }
 }
 
 <?php
@@ -538,13 +559,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class MealDeliveryStatusHistory extends Model
 {
-    protected $fillable = ['delivery_charge_ledger_id','delivery_status','picked_up_at','delivered_at','notes','updated_by_id','updated_by_type'
+    protected $fillable = ['delivery_charge_ledger_id','delivery_status','pick_up_at','notes','updated_by_id','updated_by_type'
     ];
 
     protected $casts = [
+        'pick_up_at' => 'datetime',
         'created_at' => 'datetime',
-        'picked_up_at' => 'datetime',
-        'delivered_at' => 'datetime'
+        'updated_at' => 'datetime',
     ];
 
     // Delivery Status Constants
@@ -621,6 +642,154 @@ class MealDeliveryStatusHistory extends Model
     }
 }
 
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class MealDeliveryPaymentHistory extends Model
+{
+    protected $fillable = ['delivery_charge_ledger_id','type','payment_method','paid_amount','transaction_id','currency','payment_notes'];
+
+    protected $casts = [
+        'amount' => 'decimal:2',
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
+    ];
+
+    public function deliveryChargeLedger()
+    {
+        return $this->belongsTo(DeliveryChargeLedger::class, 'delivery_charge_ledger_id');
+    }
+}
+
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('meal_carts', function (Blueprint $table) {
+            $table->id();
+            $table->date('meal_date');
+            $table->time('meal_time')->nullable();
+            $table->foreignId('client_id')->constrained('users')->onDelete('cascade'); 
+            $table->foreignId('customer_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('meal_type_id')->constrained('meal_types')->onDelete('cascade'); 
+            $table->foreignId('product_id')->constrained('products')->onDelete('cascade');
+            $table->integer('quantity')->unsigned()->default(1);
+            $table->decimal('unit_price', 10, 2);
+            $table->decimal('total_price', 10, 2);
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('meal_carts');
+    }
+};
+
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('delivery_charge_ledgers', function (Blueprint $table) {
+            $table->id();
+            
+            $table->foreignId('meal_order_id')->constrained('meal_orders')->onDelete('cascade');
+            $table->foreignId('customer_id')->constrained('users')->onDelete('cascade');
+            
+            $table->foreignId('client_id')->constrained('users')->onDelete('cascade');
+            
+            $table->foreignId('delivery_person_id')->nullable()->constrained('users')->onDelete('set null');
+            
+            $table->foreignId('meal_type_id')->constrained('meal_types')->onDelete('cascade');
+            $table->date('delivery_date');
+
+            $table->string('order_tracking')->unique()->nullable();
+
+            $table->enum('delivery_status', ['pending','accept_order','preparing','ready_for_pickup','picked_up','on_the_way','arrived','delivered','cancelled'])->default('pending');
+            
+            $table->decimal('delivery_charge', 10, 2)->default(0);
+            $table->decimal('distance_km', 8, 2)->nullable(); 
+            $table->string('distance_category')->nullable(); 
+            
+            $table->enum('payment_status', ['due', 'paid', 'cancelled'])->default('due');
+            $table->timestamp('payment_date')->nullable();
+            $table->text('payment_notes')->nullable();
+            
+            $table->boolean('is_charge_counted')->default(true);
+            $table->string('charge_key')->unique(); 
+            
+            $table->timestamps();
+            
+            // Indexes for performance with shorter names
+            $table->index(['client_id', 'delivery_date', 'meal_type_id'], 'idx_dcl_client_date_type');
+            $table->index(['delivery_person_id', 'payment_status'], 'idx_dcl_delivery_payment');
+            $table->index('charge_key', 'idx_dcl_charge_key');
+            $table->index('meal_order_id', 'idx_dcl_meal_order');
+            $table->index('customer_id', 'idx_dcl_customer');
+            
+            // indexes for tracking
+            $table->index('order_tracking', 'idx_dcl_order_tracking');
+            $table->index(['customer_id', 'delivery_status'], 'idx_dcl_customer_status');
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('delivery_charge_ledgers');
+    }
+};
+
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('meal_delivery_status_histories', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('delivery_charge_ledger_id')->nullable()->constrained('delivery_charge_ledgers')->onDelete('cascade');
+            $table->enum('delivery_status', ['pending','accept_order','preparing','ready_for_pickup','picked_up','on_the_way','arrived','delivered','cancelled'
+            ]);
+            $table->timestamp('pick_up_at')->nullable();
+            $table->text('notes')->nullable();
+            $table->unsignedBigInteger('updated_by_id')->nullable();
+            $table->string('updated_by_type')->nullable(); // 'client', 'delivery_person', 'system', 'customer'
+            $table->timestamps();
+
+            $table->index(['updated_by_id', 'updated_by_type'], 'idx_mdsh_updated_by');
+            $table->index('delivery_status', 'idx_mdsh_status');
+            $table->index('created_at', 'idx_mdsh_created_at');
+            $table->index('delivery_charge_ledger_id', 'idx_mdsh_delivery_charge_ledger');
+            $table->index(['delivery_status', 'pick_up_at'], 'idx_mdsh_status_pickup_at');
+        });
+    }
+
+    public function down(): void 
+    {
+        Schema::dropIfExists('meal_delivery_status_histories');
+    }
+};
 
 Remember above model relation.Nothing to do anything now or explain.
 

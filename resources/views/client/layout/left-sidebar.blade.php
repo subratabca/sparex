@@ -80,11 +80,24 @@
       </a>
     </li>
 
-    <li class="menu-item {{ request()->routeIs('client.meal.orders*') ? 'active' : '' }}">
-      <a href="{{ route('client.meal.orders') }}" class="menu-link">
+    <li class="menu-item {{ request()->routeIs(['client.meal.orders*', 'client.delivery.paypents*']) ? 'active open' : '' }}">
+      <a href="javascript:void(0);" class="menu-link menu-toggle">
         <i class="menu-icon tf-icons mdi mdi-food-fork-drink"></i>
         <div data-i18n="Meal Orders">Meal Orders</div>
+        <div class="badge bg-primary rounded-pill ms-auto">2</div>
       </a>
+      <ul class="menu-sub">
+        <li class="menu-item {{ request()->routeIs('client.meal.orders*') ? 'active' : '' }}">
+          <a href="{{ route('client.meal.orders') }}" class="menu-link">
+            <div data-i18n="Meal Orders">Meal Orders</div>
+          </a>
+        </li>
+        <li class="menu-item {{ request()->routeIs('client.delivery.paypents*') ? 'active' : '' }}">
+          <a href="{{ route('client.delivery.paypents') }}" class="menu-link">
+            <div data-i18n="Delivery Payments">Delivery Payments</div>
+          </a>
+        </li>
+      </ul>
     </li>
 
     <li class="menu-item {{ request()->routeIs(['client.customers', 'client.banned.customers']) ? 'active open' : '' }}">
