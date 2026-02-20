@@ -62,7 +62,7 @@ async function getList() {
         await getAllMealTypes();
 
         let res = await axios.get("/user/get/meal-order");
-        console.log('API Response:', res.data); // Debug log
+        //console.log('API Response:', res.data); 
         
         if (res.status === 200 && res.data.status === 'success') {
             let tableList = $("#tableList");

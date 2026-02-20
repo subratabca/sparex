@@ -1,4 +1,3 @@
-<!--Add Credit Limit Modal -->
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content border-0 shadow-lg">
@@ -15,33 +14,25 @@
                 <!-- Payment Method -->
                 <div class="mb-3">
                     <label class="form-label fw-semibold">Select Payment Method:</label>
-
                     <div class="d-flex gap-4 mt-2">
-
-                        <!-- Cash -->
                         <label class="form-check">
                             <input class="form-check-input" type="radio" name="credit_payment" value="cash" id="creditCash" checked>
                             Cash
                         </label>
-
-                        <!-- Stripe -->
                         <label class="form-check">
                             <input class="form-check-input" type="radio" name="credit_payment" value="stripe" id="creditStripe">
                             Stripe
                         </label>
-
-                        <!-- PayPal -->
                         <label class="form-check">
                             <input class="form-check-input" type="radio" name="credit_payment" value="paypal" id="creditPaypal">
                             PayPal
                         </label>
-
                     </div>
                 </div>
 
                 <!-- 💰 Cash Amount Input -->
                 <div id="cashAmountField" class="mb-3">
-                    <label class="form-label fw-semibold">Enter Credit Amount:</label>
+                    <label class="form-label fw-semibold">Enter Amount:</label>
                     <input type="number" id="creditAmount" class="form-control" placeholder="Enter amount (e.g. 100, 200)" min="1" step="0.01">
                     <small id="amountError" class="text-danger" style="display:none;"></small>
                 </div>
@@ -52,16 +43,13 @@
                     <div class="row g-4">
                         <div class="form-row">
                             <label for="credit-card-element"></label>
-                            <div id="credit-card-element">
-                                <!-- Stripe Element will be inserted here -->
-                            </div>
+                            <div id="credit-card-element"></div>
                             <div id="credit-card-errors" role="alert"></div>
                         </div>
-                        
                         <div class="col-md-6">
                             <div class="form-floating form-floating-outline">
                                 <input type="number" class="form-control" id="stripeCreditAmount" placeholder="Enter amount" min="1" step="0.01">
-                                <label for="stripeCreditAmount">Amount to Add ($)<span class="text-danger">*</span></label>
+                                <label for="stripeCreditAmount">Amount to Pay ($)<span class="text-danger">*</span></label>
                             </div>
                             <small id="stripeAmountError" class="text-danger" style="display:none;"></small>
                         </div>
@@ -155,7 +143,6 @@
                     <button class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button class="btn btn-info" onclick="submitCredit()" id="submitCreditBtn">Submit</button>
                 </div>
-
             </div>
         </div>
     </div>
@@ -168,87 +155,31 @@ let creditElements = null;
 let creditCountryCodeMap = {};
 let userProfileData = null;
 
-// IMPORTANT: Copy the getCountryCode function from checkout.blade.php
-function getCountryCode(countryName) {
-    const countryCodes = {
-        'United States': 'US',
-        'United Kingdom': 'GB',
-        'Canada': 'CA',
-        'Australia': 'AU',
-        'Germany': 'DE',
-        'France': 'FR',
-        'Spain': 'ES',
-        'Italy': 'IT',
-        'Japan': 'JP',
-        'China': 'CN',
-        'India': 'IN',
-        'Brazil': 'BR',
-        'Mexico': 'MX',
-        'Russia': 'RU',
-        'South Korea': 'KR',
-        'Netherlands': 'NL',
-        'Switzerland': 'CH',
-        'Sweden': 'SE',
-        'Norway': 'NO',
-        'Denmark': 'DK',
-        'Finland': 'FI',
-        'Ireland': 'IE',
-        'Poland': 'PL',
-        'Portugal': 'PT',
-        'Austria': 'AT',
-        'Belgium': 'BE',
-        'Greece': 'GR',
-        'Turkey': 'TR',
-        'Saudi Arabia': 'SA',
-        'United Arab Emirates': 'AE',
-        'South Africa': 'ZA',
-        'Egypt': 'EG',
-        'Nigeria': 'NG',
-        'Kenya': 'KE',
-        'Argentina': 'AR',
-        'Chile': 'CL',
-        'Colombia': 'CO',
-        'Peru': 'PE',
-        'Venezuela': 'VE',
-        'New Zealand': 'NZ',
-        'Singapore': 'SG',
-        'Malaysia': 'MY',
-        'Thailand': 'TH',
-        'Vietnam': 'VN',
-        'Philippines': 'PH',
-        'Indonesia': 'ID',
-        'Pakistan': 'PK',
-        'Bangladesh': 'BD',
-        'Sri Lanka': 'LK',
-        'Israel': 'IL',
-        'Iran': 'IR',
-        'Iraq': 'IQ',
-        'Afghanistan': 'AF',
-        'England': 'GB', // England is part of United Kingdom
-        'Scotland': 'GB', // Scotland is part of United Kingdom
-        'Wales': 'GB', // Wales is part of United Kingdom
-        'Northern Ireland': 'GB' // Northern Ireland is part of United Kingdom
-    };
-    
-    return countryCodes[countryName] || '';
+// Helper to get delivery charge from hidden field
+function getDeliveryCharge() {
+    return document.getElementById('deiveryChargeID').value || '';
+}
+
+// Helper to get ledger ID
+function getLedgerId() {
+    return document.getElementById('ledgerID').value || '';
 }
 
 // Initialize Stripe for credit modal when modal is shown
 document.getElementById('paymentModal').addEventListener('shown.bs.modal', function () {
-    // Set default cash payment
+    // Set default cash payment and pre‑fill amount
     document.getElementById('creditCash').checked = true;
     document.getElementById('cashAmountField').style.display = "block";
     document.getElementById('stripePaymentField').style.display = "none";
     document.getElementById('paypalPaymentField').style.display = "none";
 
-    // Pre-fill cash amount from hidden delivery charge
-    const deliveryCharge = document.getElementById('deiveryChargeID').value || '';
+    const deliveryCharge = getDeliveryCharge();
     document.getElementById('creditAmount').value = deliveryCharge;
-    // Initialize Stripe for credit modal
+
+    // Initialize Stripe only once
     if (!creditStripe) {
         creditStripe = Stripe('pk_test_51JHjNRSDYO1wlylS2t9Mdffvf6gXo7BhEkupXMj17tAoMteZHKKlP1ZooX6eaEZjOf6SHp8rJ2141rsuapAFLB3i00vysBKwyd');
         
-        // Create Stripe Elements for credit modal
         creditElements = creditStripe.elements();
         const style = {
             base: {
@@ -265,10 +196,8 @@ document.getElementById('paymentModal').addEventListener('shown.bs.modal', funct
             style: style,
             hidePostalCode: true
         });
-        
         creditCardElement.mount('#credit-card-element');
 
-        // Handle real-time validation errors for credit modal
         creditCardElement.on('change', (event) => {
             const displayError = document.getElementById('credit-card-errors');
             if (event.error) {
@@ -282,7 +211,7 @@ document.getElementById('paymentModal').addEventListener('shown.bs.modal', funct
         });
     }
     
-    // Pre-load countries for credit modal
+    // Pre-load countries
     loadCreditCountries();
 });
 
@@ -292,10 +221,11 @@ document.querySelectorAll('input[name="credit_payment"]').forEach(radio => {
         const cashAmountField = document.getElementById('cashAmountField');
         const stripePaymentField = document.getElementById('stripePaymentField');
         const paypalPaymentField = document.getElementById('paypalPaymentField');
+        const deliveryCharge = getDeliveryCharge();
         
         // Reset all fields
-        document.getElementById('creditAmount').value = '';
-        document.getElementById('stripeCreditAmount').value = '';
+        document.getElementById('creditAmount').value = deliveryCharge;   // pre‑fill cash field
+        document.getElementById('stripeCreditAmount').value = '';        // will be set if stripe selected
         document.getElementById('amountError').style.display = 'none';
         document.getElementById('stripeAmountError').style.display = 'none';
         document.getElementById('credit-card-errors').textContent = '';
@@ -314,7 +244,14 @@ document.querySelectorAll('input[name="credit_payment"]').forEach(radio => {
             stripePaymentField.style.display = "block";
             paypalPaymentField.style.display = "none";
             
-            // Load user profile and populate form
+            // Pre‑fill the Stripe amount field with the delivery charge
+            document.getElementById('stripeCreditAmount').value = deliveryCharge;
+            
+            // Force Stripe element to resize after container becomes visible
+            if (creditCardElement) {
+                setTimeout(() => creditCardElement.update({}), 100);
+            }
+            
             loadUserProfileForCredit();
         } else if (this.value === "paypal") {
             cashAmountField.style.display = "none";
@@ -355,12 +292,8 @@ async function initializeCreditAddressForm(userData) {
     // Load and set country
     if (userData.country_id) {
         await loadCreditCountries(userData.country_id);
-        
-        // After countries are loaded, load counties
         if (userData.county_id) {
             await loadCreditCounties(userData.country_id, userData.county_id);
-            
-            // After counties are loaded, load cities
             if (userData.city_id) {
                 await loadCreditCities(userData.county_id, userData.city_id);
             }
@@ -377,13 +310,12 @@ async function loadCreditCountries(selectedId = '') {
         
         response.data.data.forEach(country => {
             const option = new Option(country.name, country.id);
-            option.selected = country.id == selectedId; // Use == for string/number comparison
+            option.selected = country.id == selectedId;
             option.dataset.countryCode = country.country_code || getCountryCode(country.name);
             dropdown.add(option);
             creditCountryCodeMap[country.id] = country.country_code || getCountryCode(country.name);
         });
         
-        // Add event listener for country change
         dropdown.addEventListener('change', async function() {
             await loadCreditCounties(this.value);
             document.getElementById('credit-city').innerHTML = '<option value="">Select City</option>';
@@ -403,11 +335,10 @@ async function loadCreditCounties(countryId, selectedId = '') {
             const response = await axios.get(`/counties/${countryId}`);
             response.data.data.forEach(county => {
                 const option = new Option(county.name, county.id);
-                option.selected = county.id == selectedId; // Use == for string/number comparison
+                option.selected = county.id == selectedId;
                 dropdown.add(option);
             });
             
-            // Add event listener for county change
             dropdown.addEventListener('change', async function() {
                 await loadCreditCities(this.value);
             });
@@ -427,7 +358,7 @@ async function loadCreditCities(countyId, selectedId = '') {
             const response = await axios.get(`/cities/${countyId}`);
             response.data.data.forEach(city => {
                 const option = new Option(city.name, city.id);
-                option.selected = city.id == selectedId; // Use == for string/number comparison
+                option.selected = city.id == selectedId;
                 dropdown.add(option);
             });
         } catch (error) {
@@ -444,34 +375,26 @@ function populateCreditFormFromCheckout() {
     checkoutFields.forEach(fieldId => {
         const checkoutField = document.getElementById(fieldId);
         const creditField = document.getElementById('credit-' + fieldId);
-        
         if (checkoutField && checkoutField.value && creditField) {
             creditField.value = checkoutField.value;
         }
     });
     
-    // Copy country selection if available
     const checkoutCountry = document.getElementById('country');
     const creditCountry = document.getElementById('credit-country');
     if (checkoutCountry && checkoutCountry.value && creditCountry) {
         creditCountry.value = checkoutCountry.value;
-        
-        // Trigger change to load counties
         const event = new Event('change');
         creditCountry.dispatchEvent(event);
         
-        // After a delay, try to copy county and city
         setTimeout(async () => {
             const checkoutCounty = document.getElementById('county');
             const creditCounty = document.getElementById('credit-county');
             if (checkoutCounty && checkoutCounty.value && creditCounty) {
                 creditCounty.value = checkoutCounty.value;
-                
-                // Trigger change to load cities
                 const countyEvent = new Event('change');
                 creditCounty.dispatchEvent(countyEvent);
                 
-                // After another delay, copy city
                 setTimeout(() => {
                     const checkoutCity = document.getElementById('city');
                     const creditCity = document.getElementById('credit-city');
@@ -489,7 +412,6 @@ async function submitCredit() {
     const submitBtn = document.getElementById('submitCreditBtn');
     const originalBtnText = submitBtn.innerHTML;
     
-    // Validation
     if (!method) {
         errorToast("Please select a payment method");
         return;
@@ -505,7 +427,6 @@ async function submitCredit() {
         } else if (method.value === "stripe") {
             await processStripePayment();
         } else if (method.value === "paypal") {
-            // For now, redirect to PayPal or show message
             infoToast("PayPal payment will be implemented soon. Please use Cash or Stripe.");
         }
     } catch (error) {
@@ -542,15 +463,12 @@ function getCreditBillingData() {
 // Validate credit billing form
 function validateCreditBillingForm(billingData) {
     let isValid = true;
-    
-    // Clear previous errors
     document.querySelectorAll('#creditBillingSection .error-message').forEach(span => span.textContent = '');
     
     if (!billingData.name) { 
         document.getElementById('credit-name-error').textContent = 'Name is required'; 
         isValid = false; 
     }
-    
     if (!billingData.email) { 
         document.getElementById('credit-email-error').textContent = 'Email is required'; 
         isValid = false; 
@@ -558,27 +476,22 @@ function validateCreditBillingForm(billingData) {
         document.getElementById('credit-email-error').textContent = 'Please enter a valid email address'; 
         isValid = false;
     }
-    
     if (!billingData.phone) { 
         document.getElementById('credit-phone-error').textContent = 'Phone number is required'; 
         isValid = false; 
     }
-    
     if (!billingData.address1) { 
         document.getElementById('credit-address1-error').textContent = 'Address is required'; 
         isValid = false; 
     }
-    
     if (!billingData.zip_code) { 
         document.getElementById('credit-zip_code-error').textContent = 'Zip/Postal code is required'; 
         isValid = false; 
     }
-    
     if (!billingData.country) { 
         document.getElementById('credit-country-error').textContent = 'Please select a country'; 
         isValid = false; 
     }
-    
     return isValid;
 }
 
@@ -589,23 +502,20 @@ function isValidEmail(email) {
 }
 
 async function processCashPayment() {
-    const ledgerID = document.getElementById('ledgerID').value;
+    const ledgerID = getLedgerId();
     const amount = document.getElementById('creditAmount').value.trim();
     const errorText = document.getElementById('amountError');
 
-    // Validation
     if (amount === "" || amount <= 0 || isNaN(amount)) {
         errorText.style.display = "block";
         errorText.textContent = "Please enter a valid amount.";
         throw new Error("Invalid amount");
     }
-
     if (parseFloat(amount) < 1) {
         errorText.style.display = "block";
         errorText.textContent = "Minimum amount is $1.00";
         throw new Error("Amount too low");
     }
-
     errorText.style.display = "none";
 
     const response = await axios.post("/client/store/meal-delivery/payment/by/cash", {
@@ -622,42 +532,33 @@ async function processCashPayment() {
 }
 
 async function processStripePayment() {
+    const ledgerID = getLedgerId();                     // <-- get ledger ID
     const amount = document.getElementById('stripeCreditAmount').value.trim();
     const errorText = document.getElementById('stripeAmountError');
 
-    // Validation
     if (amount === "" || amount <= 0 || isNaN(amount)) {
         errorText.style.display = "block";
         errorText.textContent = "Please enter a valid amount.";
         throw new Error("Invalid amount");
     }
-
     if (parseFloat(amount) < 1) {
         errorText.style.display = "block";
         errorText.textContent = "Minimum amount is $1.00";
         throw new Error("Amount too low");
     }
-
     errorText.style.display = "none";
 
-    // Get billing data from credit modal form
     const billingData = getCreditBillingData();
-    
-    // Validate billing form
     if (!validateCreditBillingForm(billingData)) {
         throw new Error("Please fill in all required billing information");
     }
-    
-    // Check if we have minimal billing data for Indian regulations
     const hasMinimalBillingData = billingData.name && billingData.email && billingData.address1 && billingData.country_code;
-    
     if (!hasMinimalBillingData) {
         throw new Error("Complete billing information is required for Stripe payments");
     }
 
-    // Validate Stripe card with billing details
     const cardErrors = document.getElementById('credit-card-errors');
-    const { error: cardError, paymentMethod } = await creditStripe.createPaymentMethod({
+    const { error: cardError } = await creditStripe.createPaymentMethod({
         type: 'card',
         card: creditCardElement,
         billing_details: {
@@ -685,10 +586,8 @@ async function processStripePayment() {
     cardErrors.textContent = '';
     cardErrors.style.display = 'none';
 
-    // Create payment intent for credit top-up
-    const paymentAmount = Math.round(parseFloat(amount) * 100); // Convert to cents
-
-    // Prepare metadata for payment intent
+    // Create payment intent
+    const paymentAmount = Math.round(parseFloat(amount) * 100);
     const metadata = {
         payment_type: 'credit_topup',
         customer_name: billingData.name,
@@ -699,7 +598,7 @@ async function processStripePayment() {
     const paymentIntentResponse = await axios.post('/client/meal-delivery/create-payment-intent', {
         amount: paymentAmount,
         currency: 'usd',
-        description: `Credit Top-up - $${parseFloat(amount).toFixed(2)}`,
+        description: `Payment - $${parseFloat(amount).toFixed(2)}`,
         metadata: metadata
     });
 
@@ -714,7 +613,6 @@ async function processStripePayment() {
         throw new Error('Payment server error: Missing client secret');
     }
 
-    // Prepare confirmation options with billing details
     const confirmOptions = {
         payment_method: {
             card: creditCardElement,
@@ -734,7 +632,6 @@ async function processStripePayment() {
         }
     };
 
-    // Confirm the card payment
     const { error: confirmError, paymentIntent } = await creditStripe.confirmCardPayment(clientSecret, confirmOptions);
 
     if (confirmError) {
@@ -748,7 +645,6 @@ async function processStripePayment() {
         } else if (confirmError.message.includes('Indian regulations')) {
             errorMessage = 'Indian regulations require complete billing information.';
         }
-        
         cardErrors.textContent = errorMessage;
         cardErrors.style.color = '#dc3545';
         cardErrors.style.display = 'block';
@@ -756,20 +652,20 @@ async function processStripePayment() {
     }
 
     if (paymentIntent && paymentIntent.status === 'succeeded') {
-        // Store the credit with Stripe payment details
-        const response = await axios.post("/user/store/credit/by/stripe", {
+        // Store the payment – include ledger_id now
+        const response = await axios.post("/client/store/meal-delivery/payment/by/stripe", {
             payment_method: 'stripe',
             amount: parseFloat(amount).toFixed(2),
             stripe_payment_id: paymentIntent.id,
             stripe_payment_method: paymentIntent.payment_method,
             payment_intent_id: paymentIntentId,
             billing_name: billingData.name,
-            billing_email: billingData.email
+            billing_email: billingData.email,
+            ledger_id: ledgerID   // <-- send ledger_id
         });
 
         if (response.status === 200) {
-            successToast(`$${parseFloat(amount).toFixed(2)} credit added successfully!`);
-            // Close modal
+            successToast(`$${parseFloat(amount).toFixed(2)} payment successful!`);
             document.getElementById('paymentModal').querySelector(".btn-close").click();
             window.location.reload();
         }
@@ -777,7 +673,6 @@ async function processStripePayment() {
         throw new Error('Payment not completed successfully');
     }
 }
-
 
 // Function to show info toast (add this if not exists)
 function infoToast(message) {

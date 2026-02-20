@@ -4,14 +4,17 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
-use Exception;
-use Carbon\Carbon;
 use App\Models\MealDeliveryPaymentHistory;
 use App\Models\DeliveryChargeLedger;
-use App\Models\MealDeliveryStatusHistory;
+use Stripe\Stripe;
+use Stripe\PaymentIntent;
+use Stripe\Exception\ApiErrorException;
+use Exception;
+use App\Models\MealShippingAddress;
 use App\Models\User;
-
+use App\Models\MealOrder;
+use App\Models\MealOrderItem;
+use App\Models\MealType;
 
 class ClientDeliveryPaymentController extends Controller
 {
@@ -87,537 +90,161 @@ class ClientDeliveryPaymentController extends Controller
         }
     }
 
-    public function createPaymentIntent(Request $request)
+    public function view()
     {
-        try {
-            $request->validate([
-                'amount' => 'required|numeric|min:1',
-                'currency' => 'nullable|string|size:3',
-                'description' => 'nullable|string',
-                'metadata' => 'nullable|array'
-            ]);
-
-            // Get the secret key from config
-            $stripeSecretKey = config('services.stripe.secret');
-            
-            if (empty($stripeSecretKey)) {
-                throw new Exception('Stripe secret key is not configured. Check your .env file.');
-            }
-
-            // Check if it's a publishable key (shouldn't be)
-            if (strpos($stripeSecretKey, 'pk_') === 0) {
-                throw new Exception('Invalid Stripe secret key. You are using a publishable key (pk_) for server-side operations. Need secret key (sk_).');
-            }
-
-            \Stripe\Stripe::setApiKey($stripeSecretKey);
-
-            $paymentIntent = \Stripe\PaymentIntent::create([
-                'amount' => intval($request->amount), // Amount in cents
-                'currency' => $request->currency ?? 'usd',
-                'description' => $request->description ?? 'Meal Order Payment',
-                'metadata' => $request->metadata ?? [],
-                'automatic_payment_methods' => [
-                    'enabled' => true,
-                ],
-            ]);
-
-            \Log::info('Payment Intent Created Successfully', [
-                'payment_intent_id' => $paymentIntent->id,
-                'amount' => $paymentIntent->amount,
-                'currency' => $paymentIntent->currency,
-                'status' => $paymentIntent->status
-            ]);
-
-            return response()->json([
-                'status' => 'success',
-                'message' => 'Payment intent created successfully',
-                'data' => [
-                    'client_secret' => $paymentIntent->client_secret,
-                    'payment_intent_id' => $paymentIntent->id,
-                    'amount' => $paymentIntent->amount / 100, // Convert back to dollars
-                    'currency' => $paymentIntent->currency
-                ]
-            ], 200);
-
-        } catch (\Stripe\Exception\AuthenticationException $e) {
-            \Log::error('Stripe Authentication Error: ' . $e->getMessage());
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Stripe authentication failed. Please check your API keys.',
-                'error' => 'Authentication Error'
-            ], 401);
-        } catch (\Stripe\Exception\InvalidRequestException $e) {
-            \Log::error('Stripe Invalid Request: ' . $e->getMessage());
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Invalid request to Stripe: ' . $e->getMessage(),
-                'error' => 'Invalid Request'
-            ], 400);
-        } catch (Exception $e) {
-            \Log::error('Payment Intent Error: ' . $e->getMessage());
-            \Log::error('Stack Trace: ' . $e->getTraceAsString());
-            
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Payment Intent creation failed: ' . $e->getMessage(),
-                'error' => $e->getMessage()
-            ], 500);
-        }
+        return view('client.pages.meal-delivery-payment.view');
     }
 
-    public function storeByStripe(Request $request)
+    public function getMealOrderPaymentDetails($delivery_charge_ledger_id)
     {
-        $request->validate([
-            'meal_orders' => 'required|array|min:1',
-            'meal_orders.*.meal_date' => 'required|date',
-            'meal_orders.*.meal_time' => 'nullable|string',
-            'meal_orders.*.meal_type_id' => 'required|integer|exists:meal_types,id',
-            'meal_orders.*.product_id' => 'required|integer|exists:products,id',
-            'meal_orders.*.quantity' => 'required|integer|min:1',
-            'meal_orders.*.unit_price' => 'required|numeric|min:0',
-            'meal_orders.*.total_price' => 'required|numeric|min:0',
-            'name' => 'required|string|max:255',
-            'email' => 'required|email',
-            'phone' => 'required|string|max:20',
-            'address1' => 'required|string|max:255',
-            'address2' => 'nullable|string|max:255',
-            'zip_code' => 'required|string|max:20',
-            'country_id' => 'required|integer|exists:countries,id',
-            'county_id' => 'required|integer|exists:counties,id',
-            'city_id' => 'required|integer|exists:cities,id',
-            'delivery_option' => 'required|in:self_pickup,courier',
-            'subtotal' => 'required|numeric|min:0',
-            'tax' => 'required|numeric|min:0',
-            'delivery_charge' => 'required|numeric|min:0',
-            'total_amount' => 'required|numeric|min:0',
-            'payment_intent_id' => 'required|string',
-            'stripe_payment_id' => 'required|string',
-        ]);
-
-        DB::beginTransaction();
-
         try {
-            $customerId = $request->header('id');
-            $mealOrders = $request->meal_orders;
-            
-            \Log::info('Stripe Order Processing Started', [
-                'customer_id' => $customerId,
-                'payment_intent_id' => $request->payment_intent_id,
-                'total_amount' => $request->total_amount,
-                'stripe_payment_id' => $request->stripe_payment_id
-            ]);
+            $deliveryLedger = DeliveryChargeLedger::with([
+                'mealOrder.customer',
+                'client',
+                'deliveryPerson',
+                'mealType',
+                'statusHistories' => function($query) {
+                    $query->orderBy('created_at', 'desc');
+                }
+            ])->find($delivery_charge_ledger_id);
 
-            // Verify the payment intent
-            $stripeSecretKey = config('services.stripe.secret');
-            
-            if (empty($stripeSecretKey)) {
-                throw new Exception('Stripe secret key not configured');
-            }
-            
-            \Stripe\Stripe::setApiKey($stripeSecretKey);
-            
-            $paymentIntent = \Stripe\PaymentIntent::retrieve($request->payment_intent_id);
-
-            // Verify payment was successful
-            if ($paymentIntent->status !== 'succeeded') {
-                throw new Exception('Payment not completed successfully. Status: ' . $paymentIntent->status);
+            if (!$deliveryLedger) {
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'Delivery record not found.'
+                ], 404);
             }
 
-            // Verify amount matches
-            $expectedAmount = intval($request->total_amount * 100); // Convert to cents
-            if ($paymentIntent->amount !== $expectedAmount) {
-                throw new Exception('Payment amount mismatch. Expected: ' . $expectedAmount . ', Got: ' . $paymentIntent->amount);
+            $mealOrder = MealOrder::find($deliveryLedger->meal_order_id);
+            
+            if (!$mealOrder) {
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'Meal order not found.'
+                ], 404);
             }
 
-            // Get TAX_RATE from config
+            $shippingAddress = MealShippingAddress::where('meal_order_id', $deliveryLedger->meal_order_id)->first();
+
+            $orderItems = MealOrderItem::with(['product', 'mealType'])
+                ->where('meal_order_id', $deliveryLedger->meal_order_id)
+                ->where('client_id', $deliveryLedger->client_id)
+                ->where('meal_type_id', $deliveryLedger->meal_type_id)
+                ->whereDate('meal_date', $deliveryLedger->delivery_date)
+                ->get();
+
+            $subtotal = $orderItems->sum('total_price');
             $taxRate = (float) config('services.tax_rate', 0.10);
+            $tax = $subtotal * $taxRate;
+            $deliveryFee = $deliveryLedger->delivery_charge;
+            $total = $subtotal + $tax + $deliveryFee;
 
-            // Calculate overall totals
-            $overallSubtotal = 0;
-            foreach ($mealOrders as $item) {
-                $overallSubtotal += $item['total_price'];
-            }
-            $overallTax = $overallSubtotal * $taxRate;
+            $client = User::find($deliveryLedger->client_id);
+            $customer = User::find($mealOrder->customer_id);
+            $mealType = MealType::find($deliveryLedger->meal_type_id);
 
-            // Generate order numbers
-            $orderNumber = 'MO-' . Str::upper(Str::random(8)) . '-' . time();
-            $invoiceNo = 'INV-' . Str::upper(Str::random(6)) . '-' . time();
+            $deliveryStatuses = DeliveryChargeLedger::STATUS_LABELS;
 
-            // ✅ Prepare customer shipping address for distance calculation
-            $customerShippingAddress = [
-                'city_id'  => $request->city_id,
-                'address1' => $request->address1,
-                'zip_code' => $request->zip_code,
+            $data = [
+                'delivery_info' => [
+                    'id' => $deliveryLedger->id,
+                    'tracking_number' => $deliveryLedger->order_tracking,
+                    'delivery_date' => $deliveryLedger->delivery_date,
+                    'delivery_status' => $deliveryLedger->delivery_status,
+                    'delivery_status_label' => $deliveryStatuses[$deliveryLedger->delivery_status] ?? 'Unknown',
+                    'delivery_charge' => number_format($deliveryLedger->delivery_charge, 2),
+                    'distance_km' => $deliveryLedger->distance_km,
+                    'distance_category' => $deliveryLedger->distance_category,
+                    'payment_status' => $deliveryLedger->payment_status,
+                    'payment_date' => $deliveryLedger->payment_date,
+                    'payment_notes' => $deliveryLedger->payment_notes,
+                    'charge_key' => $deliveryLedger->charge_key,
+                    'created_at' => $deliveryLedger->created_at->format('Y-m-d H:i:s'),
+                    'updated_at' => $deliveryLedger->updated_at->format('Y-m-d H:i:s'),
+                ],
+                'restaurant_details' => $client ? [
+                    'id' => $client->id,
+                    'name' => $client->firstName . ' ' . $client->lastName,
+                    'email' => $client->email,
+                    'mobile' => $client->mobile,
+                    'address1' => $client->address1,
+                    'address2' => $client->address2,
+                    'zip_code' => $client->zip_code,
+                    'city_id' => $client->city_id,
+                    'image' => $client->image,
+                ] : null,
+                'customer_details' => $customer ? [
+                    'id' => $customer->id,
+                    'name' => $customer->firstName . ' ' . $customer->lastName,
+                    'email' => $customer->email,
+                    'mobile' => $customer->mobile,
+                    'image' => $customer->image,
+                    'address1' => $shippingAddress->address1 ?? null,
+                    'address2' => $shippingAddress->address2 ?? null,
+                    'zip_code' => $shippingAddress->zip_code ?? null,
+                    'city_id' => $shippingAddress->city_id ?? null,
+                    'shipping_name' => $shippingAddress->name ?? null,
+                    'shipping_phone' => $shippingAddress->phone ?? null,
+                    'shipping_email' => $shippingAddress->email ?? null,
+                ] : null,
+                'order_summary' => [
+                    'order_number' => $mealOrder->order_number,
+                    'invoice_no' => $mealOrder->invoice_no,
+                    'subtotal' => number_format($subtotal, 2),
+                    'tax' => number_format($tax, 2),
+                    'delivery_fee' => number_format($deliveryFee, 2),
+                    'total' => number_format($total, 2),
+                    'meal_type' => $mealType->name ?? 'N/A',
+                    'order_date' => $mealOrder->created_at->format('Y-m-d H:i:s'),
+                    'delivery_type' => $mealOrder->delivery_type,
+                ],
+                'order_items' => $orderItems->map(function($item) {
+                    return [
+                        'id' => $item->id,
+                        'product_name' => $item->product->name ?? 'Unknown Product',
+                        'product_image' => $item->product->image ?? null,
+                        'quantity' => $item->quantity,
+                        'unit_price' => number_format($item->unit_price, 2),
+                        'total_price' => number_format($item->total_price, 2),
+                        'meal_date' => $item->meal_date,
+                        'meal_time' => $item->meal_time,
+                        'meal_type' => $item->mealType->name ?? 'N/A',
+                    ];
+                }),
+                'status_history' => $deliveryLedger->statusHistories->map(function($history) use ($deliveryStatuses) {
+                    return [
+                        'id' => $history->id,
+                        'delivery_status' => $history->delivery_status,
+                        'status_label' => $deliveryStatuses[$history->delivery_status] ?? 'Unknown',
+                        'notes' => $history->notes,
+                        'updated_by_type' => $history->updated_by_type,
+                        'updated_by_label' => $history->updated_by_label,
+                        'pick_up_at' => $history->pick_up_at ? $history->pick_up_at->format('Y-m-d H:i:s') : null,
+                        'created_at' => $history->created_at->format('Y-m-d H:i:s'),
+                    ];
+                }),
+                'delivery_person' => $deliveryLedger->deliveryPerson ? [
+                    'id' => $deliveryLedger->deliveryPerson->id,
+                    'name' => $deliveryLedger->deliveryPerson->firstName . ' ' . $deliveryLedger->deliveryPerson->lastName,
+                    'email' => $deliveryLedger->deliveryPerson->email,
+                    'mobile' => $deliveryLedger->deliveryPerson->mobile,
+                    'address1' => $deliveryLedger->deliveryPerson->address1,
+                    'address2' => $deliveryLedger->deliveryPerson->address2,
+                    'zip_code' => $deliveryLedger->deliveryPerson->zip_code,
+                    'city_id' => $deliveryLedger->deliveryPerson->city_id,
+                    'image' => $deliveryLedger->deliveryPerson->image,
+                ] : null,
             ];
-
-            // ✅ Group by meal_date
-            $mealOrdersByDate = [];
-            foreach ($mealOrders as $item) {
-                $date = $item['meal_date'];
-                if (!isset($mealOrdersByDate[$date])) {
-                    $mealOrdersByDate[$date] = [];
-                }
-                $mealOrdersByDate[$date][] = $item;
-            }
-
-            $totalCalculatedDeliveryCharge = 0;
-            $chargesPerDate = [];
-            $deliveryLedgerData = [];
-
-            // Calculate delivery charges per date
-            foreach ($mealOrdersByDate as $date => $itemsForDate) {
-                $chargesPerClientMealType = [];
-                $dateCharge = 0;
-
-                foreach ($itemsForDate as $item) {
-                    $product = Product::find($item['product_id']);
-                    if (!$product) continue;
-
-                    $client = User::find($product->client_id);
-                    $mealType = MealType::find($item['meal_type_id']);
-                    
-                    if (!$client || !$mealType) continue;
-
-                    // Key: client_id + meal_type_id to avoid double counting
-                    $key = $client->id . '_' . $mealType->id;
-
-                    if (isset($chargesPerClientMealType[$key])) {
-                        // Already counted this client + meal type for this date
-                        continue;
-                    }
-
-                    // Ensure client has valid address
-                    if (!$client->city_id || !$client->address1 || !$client->zip_code) continue;
-
-                    $clientAddress = [
-                        'city_id'  => $client->city_id,
-                        'address1' => $client->address1,
-                        'zip_code' => $client->zip_code,
-                    ];
-
-                    // Calculate distance
-                    $distance = $this->getDistanceBetweenLocations($clientAddress, $customerShippingAddress);
-                    if ($distance === null) continue;
-
-                    // Get delivery charge for this client + meal type
-                    $deliveryCharge = MealDeliveryCharge::where('client_id', $client->id)
-                        ->where('meal_type_id', $mealType->id)
-                        ->first();
-
-                    if (!$deliveryCharge) continue;
-
-                    // Determine charge based on distance
-                    if ($distance <= 2) {
-                        $charge = $deliveryCharge->inside_city_2km;
-                        $category = 'inside_city_2km';
-                    } elseif ($distance <= 5) {
-                        $charge = $deliveryCharge->inside_city_5km;
-                        $category = 'inside_city_5km';
-                    } elseif ($distance <= 10) {
-                        $charge = $deliveryCharge->inside_city_10km;
-                        $category = 'inside_city_10km';
-                    } else {
-                        $charge = $deliveryCharge->inside_city_above_10km;
-                        $category = 'inside_city_above_10km';
-                    }
-
-                    // Store charge for this client + meal type (counted once)
-                    $chargesPerClientMealType[$key] = $charge;
-                    $dateCharge += $charge;
-
-                    // Store delivery ledger data
-                    $deliveryLedgerData[] = [
-                        'client_id' => $client->id,
-                        'meal_type_id' => $mealType->id,
-                        'delivery_date' => $date,
-                        'delivery_charge' => $charge,
-                        'distance_km' => $distance,
-                        'distance_category' => $category,
-                    ];
-                }
-
-                $chargesPerDate[$date] = $dateCharge;
-                $totalCalculatedDeliveryCharge += $dateCharge;
-            }
-
-            // ✅ Use the CALCULATED delivery charge instead of frontend provided charge
-            $calculatedDeliveryCharge = $totalCalculatedDeliveryCharge;
-            $overallTotal = $overallSubtotal + $overallTax + $calculatedDeliveryCharge;
-
-            // Create main meal order with CALCULATED delivery charge
-            $mealOrder = MealOrder::create([
-                'customer_id' => $customerId,
-                'order_number' => $orderNumber,
-                'invoice_no' => $invoiceNo,
-                'status' => 'pending',
-                'delivery_type' => $request->delivery_option,
-                'delivery_fee' => $calculatedDeliveryCharge,
-                'subtotal' => $overallSubtotal,
-                'tax' => $overallTax,
-                'payable_amount' => $overallTotal,
-                'paid_amount' => $overallTotal, // Full amount paid
-                'payment_type' => 'stripe',
-                'payment_method' => 'stripe',
-                'payment_status' => 'paid',
-                'currency' => 'USD',
-                'transaction_id' => $request->stripe_payment_id,
-            ]);
-
-            // Create shipping address
-            MealShippingAddress::create([
-                'meal_order_id' => $mealOrder->id,
-                'name' => $request->name,
-                'email' => $request->email,
-                'phone' => $request->phone,
-                'address1' => $request->address1,
-                'address2' => $request->address2,
-                'zip_code' => $request->zip_code,
-                'country_id' => $request->country_id,
-                'county_id' => $request->county_id,
-                'city_id' => $request->city_id,
-                'latitude' => null,
-                'longitude' => null,
-            ]);
-
-            $allOrderItems = [];
-
-            // Calculate client delivery fees
-            $clientDeliveryFees = [];
-            $clientSubtotals = [];
-            $clientTaxes = [];
-
-            // Re-calculate delivery fees per client
-            foreach ($mealOrdersByDate as $date => $itemsForDate) {
-                $calculatedClientsForDate = [];
-                
-                foreach ($itemsForDate as $item) {
-                    $product = Product::find($item['product_id']);
-                    if (!$product) continue;
-
-                    $clientId = $product->client_id;
-                    $mealTypeId = $item['meal_type_id'];
-                    
-                    $key = $clientId . '_' . $mealTypeId;
-
-                    // Skip if already calculated this client+meal_type for this date
-                    if (isset($calculatedClientsForDate[$key])) {
-                        continue;
-                    }
-
-                    $client = User::find($clientId);
-                    $mealType = MealType::find($mealTypeId);
-                    
-                    if (!$client || !$mealType) continue;
-
-                    // Ensure client has valid address
-                    if (!$client->city_id || !$client->address1 || !$client->zip_code) continue;
-
-                    $clientAddress = [
-                        'city_id'  => $client->city_id,
-                        'address1' => $client->address1,
-                        'zip_code' => $client->zip_code,
-                    ];
-
-                    // Calculate distance
-                    $distance = $this->getDistanceBetweenLocations($clientAddress, $customerShippingAddress);
-                    if ($distance === null) continue;
-
-                    // Get delivery charge
-                    $deliveryCharge = MealDeliveryCharge::where('client_id', $clientId)
-                        ->where('meal_type_id', $mealTypeId)
-                        ->first();
-
-                    if (!$deliveryCharge) continue;
-
-                    // Determine charge based on distance
-                    if ($distance <= 2) {
-                        $charge = $deliveryCharge->inside_city_2km;
-                    } elseif ($distance <= 5) {
-                        $charge = $deliveryCharge->inside_city_5km;
-                    } elseif ($distance <= 10) {
-                        $charge = $deliveryCharge->inside_city_10km;
-                    } else {
-                        $charge = $deliveryCharge->inside_city_above_10km;
-                    }
-
-                    // Add to client delivery fees
-                    if (!isset($clientDeliveryFees[$clientId])) {
-                        $clientDeliveryFees[$clientId] = 0;
-                    }
-                    $clientDeliveryFees[$clientId] += $charge;
-                    
-                    $calculatedClientsForDate[$key] = true;
-                }
-            }
-
-            // Process meal items and calculate subtotals/taxes per client
-            foreach ($mealOrders as $item) {
-                $product = Product::find($item['product_id']);
-                if (!$product) continue;
-
-                $clientId = $product->client_id;
-                $mealTypeId = $item['meal_type_id'];
-                $mealDate = $item['meal_date'];
-                $mealTime = $item['meal_time'] ?? null;
-
-                // Initialize client data if not exists
-                if (!isset($clientSubtotals[$clientId])) {
-                    $clientSubtotals[$clientId] = 0;
-                    $clientTaxes[$clientId] = 0;
-                }
-
-                // Add to subtotal and tax
-                $clientSubtotals[$clientId] += $item['total_price'];
-                $clientTaxes[$clientId] += $item['total_price'] * $taxRate;
-
-                // Create order item
-                $orderItem = MealOrderItem::create([
-                    'meal_order_id' => $mealOrder->id,
-                    'client_id' => $clientId,
-                    'meal_type_id' => $item['meal_type_id'],
-                    'product_id' => $item['product_id'],
-                    'meal_date' => $item['meal_date'],
-                    'meal_time' => $mealTime,
-                    'quantity' => $item['quantity'],
-                    'unit_price' => $item['unit_price'],
-                    'total_price' => $item['total_price'],
-                ]);
-
-                $allOrderItems[] = $orderItem;
-            }
-
-            // ✅ NOW Create ClientMealOrder records with PROPER delivery fees (after calculating subtotals/taxes)
-            $clientMealOrders = [];
-            foreach ($clientSubtotals as $clientId => $subtotal) {
-                $deliveryFee = $clientDeliveryFees[$clientId] ?? 0;
-                $tax = $clientTaxes[$clientId] ?? 0;
-                $total = $subtotal + $tax + $deliveryFee;
-
-                $clientMealOrder = ClientMealOrder::create([
-                    'meal_order_id' => $mealOrder->id,
-                    'client_id' => $clientId,
-                    'subtotal' => $subtotal,
-                    'tax' => $tax,
-                    'delivery_fee' => $deliveryFee,
-                    'payable_amount' => $total,
-                    'paid_amount' => $total, // Full amount paid for this client
-                    'payment_status' => 'paid',
-                ]);
-
-                $clientMealOrders[] = $clientMealOrder;
-            }
-
-            // Create DeliveryChargeLedger records for each unique client+meal_type+date combination
-            $deliveryLedgers = [];
-            foreach ($deliveryLedgerData as $ledgerItem) {
-                $chargeKey = DeliveryChargeLedger::generateChargeKey(
-                    $mealOrder->id,
-                    $ledgerItem['client_id'],
-                    $ledgerItem['meal_type_id'],
-                    $ledgerItem['delivery_date']
-                );
-
-                // Generate tracking number
-                $trackingNumber = DeliveryChargeLedger::generateTrackingNumber();
-
-                // Create delivery charge ledger record
-                $deliveryLedger = DeliveryChargeLedger::create([
-                    'meal_order_id' => $mealOrder->id,
-                    'customer_id' => $customerId,
-                    'client_id' => $ledgerItem['client_id'],
-                    'delivery_person_id' => null,
-                    'meal_type_id' => $ledgerItem['meal_type_id'],
-                    'delivery_date' => $ledgerItem['delivery_date'],
-                    'order_tracking' => $trackingNumber,
-                    'delivery_charge' => $ledgerItem['delivery_charge'],
-                    'distance_km' => $ledgerItem['distance_km'],
-                    'distance_category' => $ledgerItem['distance_category'],
-                    'payment_status' => 'due',
-                    'is_charge_counted' => true,
-                    'charge_key' => $chargeKey,
-                ]);
-
-                // Create initial status history
-                MealDeliveryStatusHistory::create([
-                    'delivery_charge_ledger_id' => $deliveryLedger->id,
-                    'delivery_status' => 'pending',
-                    'notes' => 'Order placed',
-                    'updated_by_id' => $customerId,
-                    'updated_by_type' => 'customer',
-                ]);
-
-                $deliveryLedgers[] = $deliveryLedger;
-            }
-
-            DB::commit();
-
-            // Notifications
-            $admin = User::where('role', 'admin')->first();
-            if ($admin) {
-                $admin->notify(new NewMealOrderNotification($mealOrder));
-            }
-
-            // Notify customer
-            $customer = User::find($customerId);
-            if ($customer) {
-                $customer->notify(new NewMealOrderNotification($mealOrder));
-            }
-
-            // Notify each client using the created ClientMealOrder objects
-            foreach ($clientMealOrders as $clientMealOrder) {
-                $client = User::find($clientMealOrder->client_id);
-                if ($client) {
-                    // Pass the ClientMealOrder object directly
-                    $client->notify(new NewMealOrderNotification($clientMealOrder));
-                }
-            }
-
-            // Load relationships for the response
-            $mealOrder->load(['items', 'clientMealOrders', 'mealShippingAddress']);
 
             return response()->json([
                 'status' => 'success',
-                'message' => 'Stripe payment completed successfully!',
-                'data' => [
-                    'meal_order' => $mealOrder,
-                    'order_items' => $allOrderItems,
-                    'total_items' => count($allOrderItems),
-                    'total_clients' => count($clientSubtotals),
-                    'delivery_ledgers' => collect($deliveryLedgers)->map(function($ledger) {
-                        return [
-                            'id' => $ledger->id,
-                            'tracking_number' => $ledger->order_tracking,
-                            'client_id' => $ledger->client_id,
-                            'meal_type_id' => $ledger->meal_type_id,
-                            'delivery_date' => $ledger->delivery_date,
-                            'delivery_status' => $ledger->delivery_status,
-                            'delivery_charge' => $ledger->delivery_charge,
-                        ];
-                    }),
-                    'tax_rate_used' => $taxRate,
-                    'delivery_calculation' => [
-                        'calculated_total' => $calculatedDeliveryCharge,
-                        'frontend_provided' => $request->delivery_charge,
-                        'details_per_date' => $chargesPerDate,
-                    ],
-                    'stripe_details' => [
-                        'payment_intent_id' => $paymentIntent->id,
-                        'amount_paid' => $paymentIntent->amount / 100,
-                        'currency' => $paymentIntent->currency,
-                        'payment_method' => $paymentIntent->payment_method,
-                    ]
-                ],
-                'redirect_url' => '/user/meal-order'
-            ], 201);
+                'data' => $data
+            ], 200);
 
         } catch (Exception $e) {
-            DB::rollBack();
-            \Log::error('Stripe meal order creation error: ' . $e->getMessage());
-            \Log::error($e->getTraceAsString());
             return response()->json([
-                'status' => 'failed',
-                'message' => 'Unable to process Stripe payment: ' . $e->getMessage(),
-                'error' => $e->getMessage(),
+                'status' => 'error',
+                'message' => 'An error occurred while fetching order details.'
             ], 500);
         }
     }
@@ -638,7 +265,7 @@ class ClientDeliveryPaymentController extends Controller
 
             MealDeliveryPaymentHistory::create([
                 'delivery_charge_ledger_id' => $ledger->id,
-                'type' => 'credit', 
+                'type' => 'debit', 
                 'payment_method' => 'cash',
                 'paid_amount' => $request->amount,
                 'transaction_id' => $transactionId,
@@ -647,14 +274,121 @@ class ClientDeliveryPaymentController extends Controller
             ]);
 
             return response()->json([
-                'status' => true,
+                'status' => 'success',
                 'message' => 'Payment recorded successfully.'
             ]);
 
-        } catch (\Exception $e) {
+        } catch (Exception $e) {
             return response()->json([
-                'status' => false,
+                'status' => 'error',
                 'message' => 'Failed to process payment: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function createPaymentIntent(Request $request)
+    {
+        $request->validate([
+            'amount'      => 'required|numeric|min:1',    
+            'currency'    => 'nullable|string|size:3',
+            'description' => 'nullable|string',
+            'metadata'    => 'nullable|array'
+        ]);
+
+        try {
+            $stripeSecretKey = config('services.stripe.secret');
+            if (empty($stripeSecretKey)) {
+                throw new Exception('Stripe secret key is not configured.');
+            }
+
+            Stripe::setApiKey($stripeSecretKey);
+
+            $paymentIntent = PaymentIntent::create([
+                'amount'                    => intval($request->amount),
+                'currency'                  => $request->currency ?? 'usd',
+                'description'               => $request->description ?? 'Client Payment',
+                'metadata'                   => $request->metadata ?? [],
+                'automatic_payment_methods' => ['enabled' => true],
+            ]);
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Payment intent created successfully.',
+                'data'    => [
+                    'client_secret'     => $paymentIntent->client_secret,
+                    'payment_intent_id' => $paymentIntent->id,
+                    'amount'            => $paymentIntent->amount / 100,
+                    'currency'          => $paymentIntent->currency,
+                ]
+            ], 200);
+
+        } catch (ApiErrorException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Stripe error: ' . $e->getMessage()
+            ], 500);
+        } catch (Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Could not create payment intent.'
+            ], 500);
+        }
+    }
+
+    public function storeByStripe(Request $request)
+    {
+        $request->validate([
+            'amount'                => 'required|numeric|min:1',
+            'stripe_payment_id'     => 'required|string',
+            'stripe_payment_method' => 'required|string',
+            'payment_intent_id'     => 'required|string',
+            'billing_name'          => 'required|string',
+            'billing_email'         => 'required|email',
+            'ledger_id'             => 'required|exists:delivery_charge_ledgers,id', 
+        ]);
+
+        try {
+            $stripeSecretKey = config('services.stripe.secret');
+            Stripe::setApiKey($stripeSecretKey);
+            $paymentIntent = PaymentIntent::retrieve($request->payment_intent_id);
+
+            if ($paymentIntent->status !== 'succeeded') {
+                throw new Exception('Payment not succeeded, status: ' . $paymentIntent->status);
+            }
+
+            $paymentHistory = MealDeliveryPaymentHistory::create([
+                'delivery_charge_ledger_id' => $request->ledger_id,
+                'type'                       => 'credit',
+                'payment_method'             => 'stripe',
+                'paid_amount'                => $request->amount,
+                'transaction_id'              => $request->stripe_payment_id, 
+                'currency'                    => 'USD',
+                'payment_notes'                => 'Stripe payment. ID: ' . $request->stripe_payment_id,
+            ]);
+
+            $ledger = DeliveryChargeLedger::find($request->ledger_id);
+            if ($ledger) {
+                $ledger->payment_status = 'paid';
+                $ledger->save();
+            }
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Payment recorded successfully.',
+                'data'    => [
+                    'payment_id' => $paymentHistory->id,
+                ]
+            ], 200);
+
+        } catch (ApiErrorException $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Stripe verification failed: ' . $e->getMessage()
+            ], 500);
+        } catch (Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Failed to record payment: ' . $e->getMessage()
             ], 500);
         }
     }

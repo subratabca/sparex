@@ -10,10 +10,10 @@ use Exception;
 
 class DeliveryNotificationController extends Controller
 {
-  public function index()
-  {
-     return view('delivery.pages.notification.index');
-  }
+    public function index()
+    {
+        return view('delivery.pages.notification.index');
+    }
 
     public function limitedNotificationList(Request $request) 
     {
@@ -31,28 +31,28 @@ class DeliveryNotificationController extends Controller
 
             if ($user) {
                 $unreadNotifications = $user->unreadNotifications()
-                    ->latest()
-                    ->take(4)
-                    ->get()
-                    ->map(function ($notification) {
-                        if (is_string($notification->data)) {
-                            $notification->data = json_decode($notification->data, true);
-                        }
-                        return $notification;
-                    });
-                
+                ->latest()
+                ->take(4)
+                ->get()
+                ->map(function ($notification) {
+                    if (is_string($notification->data)) {
+                        $notification->data = json_decode($notification->data, true);
+                    }
+                    return $notification;
+                });
+
                 $unreadCount = $unreadNotifications->count();
-                
+
                 $readNotifications = $user->readNotifications()
-                    ->latest()
-                    ->take(4 - $unreadCount)
-                    ->get()
-                    ->map(function ($notification) {
-                        if (is_string($notification->data)) {
-                            $notification->data = json_decode($notification->data, true);
-                        }
-                        return $notification;
-                    });
+                ->latest()
+                ->take(4 - $unreadCount)
+                ->get()
+                ->map(function ($notification) {
+                    if (is_string($notification->data)) {
+                        $notification->data = json_decode($notification->data, true);
+                    }
+                    return $notification;
+                });
 
                 return response()->json([
                     'status' => 'success',
@@ -73,50 +73,50 @@ class DeliveryNotificationController extends Controller
 
     public function getNotificationList(Request $request) 
     {
-      try {
-          $email = $request->header('email');
+        try {
+            $email = $request->header('email');
 
-          if (!$email) {
-              return response()->json([
-                  'status' => 'failed',
-                  'message' => 'Unauthorized! Need to login.'
-              ], 400);
-          }
+            if (!$email) {
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'Unauthorized! Need to login.'
+                ], 400);
+            }
 
-          $user = User::where('email', $email)->first();
+            $user = User::where('email', $email)->first();
 
-          if ($user) {
-              $unreadNotifications = $user->unreadNotifications()->latest()->get();
-              $unreadCount = $unreadNotifications->count();
-              $readNotifications = $user->readNotifications()->latest()->get();
+            if ($user) {
+                $unreadNotifications = $user->unreadNotifications()->latest()->get();
+                $unreadCount = $unreadNotifications->count();
+                $readNotifications = $user->readNotifications()->latest()->get();
 
-              return response()->json([
-                  'status' => 'success',
-                  'message' => 'Request Successful',
-                  'data' => $user,
-                  'unreadNotifications' => $unreadNotifications,
-                  'readNotifications' => $readNotifications,
-              ], 200);
-          } 
-          
-      } catch (Exception $e) {
-          return response()->json([
-              'status' => 'failed',
-              'message' => $e->getMessage()
-          ], 500);
-      }
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Request Successful',
+                    'data' => $user,
+                    'unreadNotifications' => $unreadNotifications,
+                    'readNotifications' => $readNotifications,
+                ], 200);
+            } 
+
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'failed',
+                'message' => $e->getMessage()
+            ], 500);
+        }
     }
 
     public function view()
     {
-      return view('delivery.pages.notification.view');
+        return view('delivery.pages.notification.view');
     }
 
-    public function showNotificationDetails(Request $request, $notificationId)
+    public function getNotificationDetails(Request $request, $notificationId)
     {
         try {
             $email = $request->header('email');
-            
+
             if (!$email) {
                 return response()->json([
                     'status' => 'error',
@@ -125,7 +125,6 @@ class DeliveryNotificationController extends Controller
             }
 
             $user = User::where('email', $email)->first();
-            
             if (!$user) {
                 return response()->json([
                     'status' => 'error',
@@ -133,9 +132,8 @@ class DeliveryNotificationController extends Controller
                 ], 404);
             }
 
-            // Get the notification
             $notification = $user->notifications()->where('id', $notificationId)->first();
-            
+
             if (!$notification) {
                 return response()->json([
                     'status' => 'error',
@@ -143,37 +141,28 @@ class DeliveryNotificationController extends Controller
                 ], 404);
             }
 
-            // Mark notification as read
             $notification->markAsRead();
-
-            // Get the notification data
             $notificationData = $notification->data;
-            
-            // Extract inner data from notification
             $innerData = $notificationData['data'] ?? [];
-            
-            // If there's a delivery_charge_ledger_id, get current status from database
+
             if (isset($innerData['delivery_charge_ledger_id'])) {
                 $deliveryChargeLedger = DeliveryChargeLedger::find($innerData['delivery_charge_ledger_id']);
                 if ($deliveryChargeLedger) {
-                    // Update the inner data with current status from database
                     $innerData['delivery_person_id'] = $deliveryChargeLedger->delivery_person_id;
                     $innerData['delivery_status'] = $deliveryChargeLedger->delivery_status;
                     $innerData['payment_status'] = $deliveryChargeLedger->payment_status;
                     $innerData['order_tracking'] = $deliveryChargeLedger->order_tracking;
-                    
-                    // Add delivery person info if assigned
+
                     if ($deliveryChargeLedger->delivery_person_id) {
                         $innerData['delivery_person'] = [
                             'id' => $deliveryChargeLedger->delivery_person_id,
                             'name' => $deliveryChargeLedger->deliveryPerson ? 
-                                $deliveryChargeLedger->deliveryPerson->firstName . ' ' . $deliveryChargeLedger->deliveryPerson->lastName : null
+                            $deliveryChargeLedger->deliveryPerson->firstName . ' ' . $deliveryChargeLedger->deliveryPerson->lastName : null
                         ];
                     }
                 }
             }
 
-            // Prepare response data
             $responseData = [
                 'title' => $notificationData['title'] ?? null,
                 'message' => $notificationData['message'] ?? null,
@@ -200,12 +189,12 @@ class DeliveryNotificationController extends Controller
             ], 500);
         }
     }
-    
+
     public function acceptNotification(Request $request, $notificationId)
     {
         try {
             $email = $request->header('email');
-            
+
             if (!$email) {
                 return response()->json([
                     'status' => 'error',
@@ -214,7 +203,7 @@ class DeliveryNotificationController extends Controller
             }
 
             $user = User::where('email', $email)->first();
-            
+
             if (!$user || !$user->isDelivery()) {
                 return response()->json([
                     'status' => 'error',
@@ -222,9 +211,7 @@ class DeliveryNotificationController extends Controller
                 ], 403);
             }
 
-            // Get the notification
             $notification = $user->notifications()->where('id', $notificationId)->first();
-            
             if (!$notification) {
                 return response()->json([
                     'status' => 'error',
@@ -234,7 +221,7 @@ class DeliveryNotificationController extends Controller
 
             $notificationData = $notification->data;
             $innerData = $notificationData['data'] ?? [];
-            
+
             if (!isset($innerData['delivery_charge_ledger_id'])) {
                 return response()->json([
                     'status' => 'error',
@@ -243,10 +230,7 @@ class DeliveryNotificationController extends Controller
             }
 
             $deliveryChargeLedgerId = $innerData['delivery_charge_ledger_id'];
-            
-            // Update delivery charge ledger
             $deliveryChargeLedger = DeliveryChargeLedger::find($deliveryChargeLedgerId);
-            
             if (!$deliveryChargeLedger) {
                 return response()->json([
                     'status' => 'error',
@@ -254,7 +238,6 @@ class DeliveryNotificationController extends Controller
                 ], 404);
             }
 
-            // Check if already accepted by someone else
             if ($deliveryChargeLedger->delivery_person_id && $deliveryChargeLedger->delivery_person_id != $user->id) {
                 return response()->json([
                     'status' => 'error',
@@ -262,12 +245,10 @@ class DeliveryNotificationController extends Controller
                 ], 400);
             }
 
-            // Update delivery charge ledger
             $deliveryChargeLedger->delivery_person_id = $user->id;
             $deliveryChargeLedger->delivery_status = 'accept_order';
             $deliveryChargeLedger->save();
 
-            // Create status history
             MealDeliveryStatusHistory::create([
                 'delivery_charge_ledger_id' => $deliveryChargeLedgerId,
                 'delivery_status' => 'accept_order',
@@ -295,78 +276,77 @@ class DeliveryNotificationController extends Controller
         }
     }
 
-  public function markAsRead(Request $request)
-  {
-      try {
-          $email = $request->header('email');
-          if (!$email) {
-              return response()->json([
-                  'status' => 'error',
-                  'message' => 'Email header is missing.'
-              ], 400);
-          }
+    public function markAsRead(Request $request)
+    {
+        try {
+            $email = $request->header('email');
+            if (!$email) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Email header is missing.'
+                ], 400);
+            }
 
-          $user = User::where('email', $email)->first();
-          if (!$user) {
-              return response()->json([
-                  'status' => 'error',
-                  'message' => 'User not found.'
-              ], 404);
-          }
+            $user = User::where('email', $email)->first();
+            if (!$user) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'User not found.'
+                ], 404);
+            }
 
-          $user->unreadNotifications->markAsRead();
-          $unreadCount = $user->unreadNotifications->count();
+            $user->unreadNotifications->markAsRead();
+            $unreadCount = $user->unreadNotifications->count();
 
-          return response()->json([
-              'status' => 'success',
-              'message' => 'All notifications marked as read.',
-              'unreadCount' => $unreadCount,
-          ], 200);
+            return response()->json([
+                'status' => 'success',
+                'message' => 'All notifications marked as read.',
+                'unreadCount' => $unreadCount,
+            ], 200);
 
-      } catch (\Exception $e) {
-          return response()->json([
-              'status' => 'error',
-              'message' => 'An error occurred while marking notifications as read.',
-              'error' => $e->getMessage(),
-          ], 500);
-      }
-  }
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'An error occurred while marking notifications as read.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
 
+    public function deleteNotification(Request $request, $notificationId)
+    {
+        try {
+            $email = $request->header('email');
+            $user = User::where('email', $email)->first();
 
-  public function deleteNotification(Request $request, $notificationId)
-  {
-      try {
-          $email = $request->header('email');
-          $user = User::where('email', $email)->first();
+            if (!$user) {
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'User not found.',
+                ], 404);
+            }
 
-          if (!$user) {
-              return response()->json([
-                  'status' => 'failed',
-                  'message' => 'User not found.',
-              ], 404);
-          }
+            $notification = $user->notifications()->find($notificationId);
 
-          $notification = $user->notifications()->find($notificationId);
+            if ($notification) {
+                $notification->delete();
 
-          if ($notification) {
-              $notification->delete();
-
-              return response()->json([
-                  'status' => 'success',
-                  'message' => 'Notification deleted successfully.',
-              ], 200);
-          } else {
-              return response()->json([
-                  'status' => 'failed',
-                  'message' => 'Notification not found.',
-              ], 404);
-          }
-      } catch (Exception $e) {
-          return response()->json([
-              'status' => 'failed',
-              'message' => 'An error occurred while deleting the notification: ' . $e->getMessage(),
-          ], 500);
-      }
-  }
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Notification deleted successfully.',
+                ], 200);
+            } else {
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'Notification not found.',
+                ], 404);
+            }
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'failed',
+                'message' => 'An error occurred while deleting the notification: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 
 }

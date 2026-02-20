@@ -253,7 +253,7 @@ class ClientMealOrderController extends Controller
             // Create a lookup array for delivery charge ledgers by meal_type_id and delivery_date
             $deliveryLedgerLookup = [];
             foreach ($deliveryChargeLedgers as $ledger) {
-                $key = $ledger->meal_type_id . '_' . $ledger->delivery_date;
+                $key = $ledger->meal_type_id . '_' . $ledger->delivery_date->format('Y-m-d');
                 $deliveryLedgerLookup[$key] = $ledger;
             }
 
@@ -302,7 +302,7 @@ class ClientMealOrderController extends Controller
                 
                 if (!isset($groupedItems[$mealDate][$mealTypeName])) {
                     // Find delivery charge ledger for this meal type and date using lookup
-                    $lookupKey = $mealTypeId . '_' . $mealDate;
+                    $lookupKey = $mealTypeId . '_' . Carbon::parse($mealDate)->format('Y-m-d');
                     $deliveryChargeLedger = $deliveryLedgerLookup[$lookupKey] ?? null;
                     
                     $deliveryStatus = $deliveryChargeLedger ? $deliveryChargeLedger->delivery_status : 'pending';
@@ -324,7 +324,7 @@ class ClientMealOrderController extends Controller
                 }
                 
                 // Get delivery status for this individual item from delivery charge ledger lookup
-                $lookupKey = $item->meal_type_id . '_' . $item->meal_date;
+                $lookupKey = $item->meal_type_id . '_' . Carbon::parse($item->meal_date)->format('Y-m-d');
                 $itemDeliveryChargeLedger = $deliveryLedgerLookup[$lookupKey] ?? null;
                 $deliveryStatus = $itemDeliveryChargeLedger ? $itemDeliveryChargeLedger->delivery_status : 'pending';
                 $deliveryStatusLabel = $deliveryStatuses[$deliveryStatus] ?? ucfirst($deliveryStatus);
@@ -444,7 +444,7 @@ class ClientMealOrderController extends Controller
                 'meal_types' => $mealTypes,
                 'dates' => array_keys($groupedItems),
                 'items_with_time' => $mealOrderItems->map(function($item) use ($deliveryLedgerLookup) {
-                    $lookupKey = $item->meal_type_id . '_' . $item->meal_date;
+                    $lookupKey = $item->meal_type_id . '_' . Carbon::parse($item->meal_date)->format('Y-m-d');
                     $deliveryChargeLedger = $deliveryLedgerLookup[$lookupKey] ?? null;
                     
                     return [

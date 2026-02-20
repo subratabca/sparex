@@ -54,7 +54,7 @@ async function loadDeliveryList() {
                 </span>`;
 
             const viewButton = `
-                <a href="/client/meal-order/payment-details/${item.delivery_charge_ledger_id}"
+                <a href="/client/meal-order/payment/details/${item.delivery_charge_ledger_id}"
                    class="btn btn-sm btn-info">
                     <i class="bx bx-show"></i> View
                 </a>`;

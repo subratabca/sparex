@@ -18,7 +18,6 @@ use Exception;
 
 class DeliveryMealOrderController extends Controller
 {
-
     public function index()
     {
         return view('delivery.pages.meal-order.index');
@@ -71,7 +70,6 @@ class DeliveryMealOrderController extends Controller
             ], 500);
         }
     }
-
 
     public function view(Request $request)
     {
@@ -129,7 +127,9 @@ class DeliveryMealOrderController extends Controller
                 ->get();
 
             $subtotal = $orderItems->sum('total_price');
-            $tax = $mealOrder->tax;
+            $taxRate = (float) config('services.tax_rate', 0.10);
+            $tax = $subtotal * $taxRate;
+
             $deliveryFee = $deliveryLedger->delivery_charge;
             $total = $subtotal + $tax + $deliveryFee;
 
@@ -172,6 +172,7 @@ class DeliveryMealOrderController extends Controller
                     'name' => $customer->firstName . ' ' . $customer->lastName,
                     'email' => $customer->email,
                     'mobile' => $customer->mobile,
+                    'image' => $customer->image,
                     'address1' => $shippingAddress->address1 ?? null,
                     'address2' => $shippingAddress->address2 ?? null,
                     'zip_code' => $shippingAddress->zip_code ?? null,

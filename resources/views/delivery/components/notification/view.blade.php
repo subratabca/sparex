@@ -743,45 +743,55 @@ async function handleUpdateDeliveryStatus() {
         // First check the current delivery status using deliveryChargeLedgerId
         const checkResponse = await axios.post(`/delivery/check/delivery-status/${deliveryChargeLedgerId}`);
         
-        if (checkResponse.data.status === 'success') {
-            const currentStatus = checkResponse.data.data.delivery_status;
-            const nextStatus = getNextDeliveryStatus(currentStatus);
-            
-            if (!nextStatus) {
-                errorToast('No further status updates allowed.');
-                return;
-            }
-            
-            // Ask for confirmation
-            const confirmMessage = `Are you sure you want to update delivery status to "${getStatusButtonLabel(currentStatus)}"?`;
-            
-            if (!confirm(confirmMessage)) {
-                return;
-            }
-            
-            showLoader();
-            
-            // Update the delivery status using deliveryChargeLedgerId
-            const updateResponse = await axios.post(`/delivery/update/delivery-status/${deliveryChargeLedgerId}`, {
-                delivery_status: nextStatus,
-                notes: ''
-            });
-            
-            if (updateResponse.data.status === 'success') {
-                successToast(updateResponse.data.message);
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500);
-            } else {
-                errorToast(updateResponse.data.message || 'Failed to update delivery status.');
-                hideLoader();
-            }
-        } else {
+        if (checkResponse.data.status !== 'success') {
             errorToast(checkResponse.data.message || 'Failed to check delivery status.');
+            return;
+        }
+
+        const currentStatus = checkResponse.data.data.delivery_status;
+        const nextStatus = getNextDeliveryStatus(currentStatus);
+
+        if (!nextStatus) {
+            errorToast('No further status updates allowed.');
+            return;
+        }
+
+        // Show confirmation dialog with SweetAlert2
+        const result = await Swal.fire({
+            title: 'Are you sure?',
+            text: `You are about to update delivery status to "${getStatusButtonLabel(currentStatus)}".`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#3085d6',
+            cancelButtonColor: '#d33',
+            confirmButtonText: 'Yes, proceed!',
+            cancelButtonText: 'Cancel'
+        });
+
+        if (!result.isConfirmed) {
+            return; // User cancelled
+        }
+
+        showLoader(); // Show loader only after user confirms
+
+        // Update the delivery status using deliveryChargeLedgerId
+        const updateResponse = await axios.post(`/delivery/update/delivery-status/${deliveryChargeLedgerId}`, {
+            delivery_status: nextStatus,
+            notes: ''
+        });
+
+        if (updateResponse.data.status === 'success') {
+            successToast(updateResponse.data.message);
+            setTimeout(() => {
+                window.location.reload();
+            }, 1500);
+        } else {
+            errorToast(updateResponse.data.message || 'Failed to update delivery status.');
         }
     } catch (error) {
         handleError(error);
-        hideLoader();
+    } finally {
+        hideLoader(); // Always hide the loader when done (unless page reloads, which is fine)
     }
 }
 
@@ -866,3 +876,4 @@ function handleError(error) {
     margin-top: 1.5rem;
 }
 </style>
+

@@ -1,176 +1,3 @@
-<?php
-namespace App\Http\Controllers\Delivery;
-
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Notifications\Delivery\NewDeliveryAvailableNotification;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
-use App\Models\DeliveryChargeLedger;
-use App\Models\MealDeliveryStatusHistory;
-use App\Models\MealShippingAddress;
-use App\Models\User;
-use App\Models\MealOrder;
-use App\Models\MealOrderItem;
-use App\Models\MealType;
-use Carbon\Carbon;
-use Exception;
-
-class DeliveryMealOrderController extends Controller
-{
-    public function getMealOrderDetails($delivery_charge_ledger_id)
-    {
-        try {
-            $deliveryLedger = DeliveryChargeLedger::with([
-                'mealOrder.customer',
-                'client',
-                'deliveryPerson',
-                'mealType',
-                'statusHistories' => function($query) {
-                    $query->orderBy('created_at', 'desc');
-                }
-            ])->find($delivery_charge_ledger_id);
-
-            if (!$deliveryLedger) {
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'Delivery record not found.'
-                ], 404);
-            }
-
-            $mealOrder = MealOrder::find($deliveryLedger->meal_order_id);
-            
-            if (!$mealOrder) {
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'Meal order not found.'
-                ], 404);
-            }
-
-            $shippingAddress = MealShippingAddress::where('meal_order_id', $deliveryLedger->meal_order_id)->first();
-
-            $orderItems = MealOrderItem::with(['product', 'mealType'])
-                ->where('meal_order_id', $deliveryLedger->meal_order_id)
-                ->where('client_id', $deliveryLedger->client_id)
-                ->where('meal_type_id', $deliveryLedger->meal_type_id)
-                ->whereDate('meal_date', $deliveryLedger->delivery_date)
-                ->get();
-
-            $subtotal = $orderItems->sum('total_price');
-            $taxRate = (float) config('services.tax_rate', 0.10);
-            $tax = $subtotal * $taxRate;
-
-            $deliveryFee = $deliveryLedger->delivery_charge;
-            $total = $subtotal + $tax + $deliveryFee;
-
-            $client = User::find($deliveryLedger->client_id);
-            $customer = User::find($mealOrder->customer_id);
-            $mealType = MealType::find($deliveryLedger->meal_type_id);
-
-            $deliveryStatuses = DeliveryChargeLedger::STATUS_LABELS;
-
-            $data = [
-                'delivery_info' => [
-                    'id' => $deliveryLedger->id,
-                    'tracking_number' => $deliveryLedger->order_tracking,
-                    'delivery_date' => $deliveryLedger->delivery_date,
-                    'delivery_status' => $deliveryLedger->delivery_status,
-                    'delivery_status_label' => $deliveryStatuses[$deliveryLedger->delivery_status] ?? 'Unknown',
-                    'delivery_charge' => number_format($deliveryLedger->delivery_charge, 2),
-                    'distance_km' => $deliveryLedger->distance_km,
-                    'distance_category' => $deliveryLedger->distance_category,
-                    'payment_status' => $deliveryLedger->payment_status,
-                    'payment_date' => $deliveryLedger->payment_date,
-                    'payment_notes' => $deliveryLedger->payment_notes,
-                    'charge_key' => $deliveryLedger->charge_key,
-                    'created_at' => $deliveryLedger->created_at->format('Y-m-d H:i:s'),
-                    'updated_at' => $deliveryLedger->updated_at->format('Y-m-d H:i:s'),
-                ],
-                'restaurant_details' => $client ? [
-                    'id' => $client->id,
-                    'name' => $client->firstName . ' ' . $client->lastName,
-                    'email' => $client->email,
-                    'mobile' => $client->mobile,
-                    'address1' => $client->address1,
-                    'address2' => $client->address2,
-                    'zip_code' => $client->zip_code,
-                    'city_id' => $client->city_id,
-                    'image' => $client->image,
-                ] : null,
-                'customer_details' => $customer ? [
-                    'id' => $customer->id,
-                    'name' => $customer->firstName . ' ' . $customer->lastName,
-                    'email' => $customer->email,
-                    'mobile' => $customer->mobile,
-                    'image' => $customer->image,
-                    'address1' => $shippingAddress->address1 ?? null,
-                    'address2' => $shippingAddress->address2 ?? null,
-                    'zip_code' => $shippingAddress->zip_code ?? null,
-                    'city_id' => $shippingAddress->city_id ?? null,
-                    'shipping_name' => $shippingAddress->name ?? null,
-                    'shipping_phone' => $shippingAddress->phone ?? null,
-                    'shipping_email' => $shippingAddress->email ?? null,
-                ] : null,
-                'order_summary' => [
-                    'order_number' => $mealOrder->order_number,
-                    'invoice_no' => $mealOrder->invoice_no,
-                    'subtotal' => number_format($subtotal, 2),
-                    'tax' => number_format($tax, 2),
-                    'delivery_fee' => number_format($deliveryFee, 2),
-                    'total' => number_format($total, 2),
-                    'meal_type' => $mealType->name ?? 'N/A',
-                    'order_date' => $mealOrder->created_at->format('Y-m-d H:i:s'),
-                    'delivery_type' => $mealOrder->delivery_type,
-                ],
-                'order_items' => $orderItems->map(function($item) {
-                    return [
-                        'id' => $item->id,
-                        'product_name' => $item->product->name ?? 'Unknown Product',
-                        'product_image' => $item->product->image ?? null,
-                        'quantity' => $item->quantity,
-                        'unit_price' => number_format($item->unit_price, 2),
-                        'total_price' => number_format($item->total_price, 2),
-                        'meal_date' => $item->meal_date,
-                        'meal_time' => $item->meal_time,
-                        'meal_type' => $item->mealType->name ?? 'N/A',
-                    ];
-                }),
-                'status_history' => $deliveryLedger->statusHistories->map(function($history) use ($deliveryStatuses) {
-                    return [
-                        'id' => $history->id,
-                        'delivery_status' => $history->delivery_status,
-                        'status_label' => $deliveryStatuses[$history->delivery_status] ?? 'Unknown',
-                        'notes' => $history->notes,
-                        'updated_by_type' => $history->updated_by_type,
-                        'updated_by_label' => $history->updated_by_label,
-                        'pick_up_at' => $history->pick_up_at ? $history->pick_up_at->format('Y-m-d H:i:s') : null,
-                        'created_at' => $history->created_at->format('Y-m-d H:i:s'),
-                    ];
-                }),
-                'delivery_person' => $deliveryLedger->deliveryPerson ? [
-                    'id' => $deliveryLedger->deliveryPerson->id,
-                    'name' => $deliveryLedger->deliveryPerson->firstName . ' ' . $deliveryLedger->deliveryPerson->lastName,
-                    'email' => $deliveryLedger->deliveryPerson->email,
-                    'mobile' => $deliveryLedger->deliveryPerson->mobile,
-                ] : null,
-            ];
-
-            return response()->json([
-                'status' => 'success',
-                'data' => $data
-            ], 200);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'An error occurred while fetching order details.'
-            ], 500);
-        }
-    }
-}
-
-From above method response below code is working fine.Want to add Delivery Actions portion in below code.From this action button delivery man can update delivery_status of DeliveryChargeLedger model from ready_for_pickup->picked_up->on_the_way->arrived->delivered.This button only show when delivery_person_id of DeliveryChargeLedger model is not null.Give me full updated above method and below code so i can copy paste.
-
 <div class="container-xxl flex-grow-1 container-p-y">
     <div class="row">
         <div class="col-12">
@@ -230,31 +57,31 @@ From above method response below code is working fine.Want to add Delivery Actio
             </div>
         </div>
 
-        <!-- Restaurant Details -->
+        <!-- Delivery Person Details -->
         <div class="col-lg-4 mb-4">
             <div class="card h-100">
                 <div class="card-header bg-warning text-dark">
-                    <h5 class="card-title mb-0"><i class="bx bx-store me-2"></i>Restaurant Details</h5>
+                    <h5 class="card-title mb-0"><i class="bx bx-store me-2"></i>Delivery Person Details</h5>
                 </div>
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
-                        <img id="restaurant-image" src="" class="rounded-circle me-2" style="width: 50px; height: 50px; object-fit: cover;">
+                        <img id="delivery-person-image" src="" class="rounded-circle me-2" style="width: 50px; height: 50px; object-fit: cover;">
                         <div>
-                            <small class="text-muted">Restaurant Name</small>
-                            <h6 class="mb-0" id="restaurant-name">-</h6>
+                            <small class="text-muted">Name</small>
+                            <h6 class="mb-0" id="delivery-person-name">-</h6>
                         </div>
                     </div>
                     <div class="mb-3">
                         <small class="text-muted">Email</small>
-                        <h6 class="mb-0" id="restaurant-email">-</h6>
+                        <h6 class="mb-0" id="delivery-person-email">-</h6>
                     </div>
                     <div class="mb-3">
                         <small class="text-muted">Phone</small>
-                        <h6 class="mb-0" id="restaurant-phone">-</h6>
+                        <h6 class="mb-0" id="delivery-person-phone">-</h6>
                     </div>
                     <div class="mb-3">
                         <small class="text-muted">Address</small>
-                        <h6 class="mb-0 small" id="restaurant-address">-</h6>
+                        <h6 class="mb-0 small" id="delivery-person-address">-</h6>
                     </div>
                 </div>
             </div>
@@ -400,7 +227,7 @@ function toTitleCase(str) {
 function getImageUrl(type, filename) {
     if (!filename) return '/upload/no_image.jpg';
     const basePaths = {
-        restaurant: '/upload/client-profile/medium/',
+        delivery: '/upload/delivery-profile/medium/',
         customer: '/upload/customer-profile/medium/',
         product: '/upload/product/small/'
     };
@@ -411,16 +238,15 @@ async function loadDeliveryOrderDetails() {
     try {
         showLoader();
         
-        // Get the delivery_charge_ledger_id from URL
         const pathSegments = window.location.pathname.split('/');
         const ledgerId = pathSegments[pathSegments.length - 1];
         
-        const response = await axios.get(`/delivery/get/meal-order/details/${ledgerId}`);
+        const response = await axios.get(`/client/get/meal-order/payment/details/${ledgerId}`);
         
         if (response.status === 200 && response.data.status === 'success') {
             const data = response.data.data;
-            
-            // Update Delivery Information
+
+            // Delivery Information
             document.getElementById('tracking-number').textContent = data.delivery_info.tracking_number || '-';
             document.getElementById('delivery-date').textContent = data.delivery_info.delivery_date || '-';
             
@@ -441,24 +267,24 @@ async function loadDeliveryOrderDetails() {
             
             document.getElementById('charge-key').textContent = data.delivery_info.charge_key || '-';
             
-            // Update Restaurant Details
-            if (data.restaurant_details) {
-                document.getElementById('restaurant-image').src = getImageUrl('restaurant', data.restaurant_details.image);
-                document.getElementById('restaurant-name').textContent = data.restaurant_details.name ? toTitleCase(data.restaurant_details.name) : '-';
-                document.getElementById('restaurant-email').textContent = data.restaurant_details.email || '-';
-                document.getElementById('restaurant-phone').textContent = data.restaurant_details.mobile || '-';
+            // Delivery Person Details
+            if (data.delivery_person) {
+                document.getElementById('delivery-person-image').src = getImageUrl('delivery', data.delivery_person.image);
+                document.getElementById('delivery-person-name').textContent = data.delivery_person.name ? toTitleCase(data.delivery_person.name) : '-';
+                document.getElementById('delivery-person-email').textContent = data.delivery_person.email || '-';
+                document.getElementById('delivery-person-phone').textContent = data.delivery_person.mobile || '-';
                 
-                const restaurantAddress = [
-                    data.restaurant_details.address1,
-                    data.restaurant_details.address2,
-                    data.restaurant_details.zip_code
+                const personAddress = [
+                    data.delivery_person.address1,
+                    data.delivery_person.address2,
+                    data.delivery_person.zip_code
                 ].filter(Boolean).join(', ') || '-';
-                document.getElementById('restaurant-address').textContent = restaurantAddress;
+                document.getElementById('delivery-person-address').textContent = personAddress;
             } else {
-                document.getElementById('restaurant-image').src = '/upload/no_image.jpg';
+                document.getElementById('delivery-person-image').src = '/upload/no_image.jpg';
             }
             
-            // Update Customer Details
+            // Customer Details
             if (data.customer_details) {
                 document.getElementById('customer-image').src = getImageUrl('customer', data.customer_details.image);
                 document.getElementById('customer-name').textContent = data.customer_details.name ? toTitleCase(data.customer_details.name) : '-';
@@ -476,7 +302,7 @@ async function loadDeliveryOrderDetails() {
                 document.getElementById('customer-image').src = '/upload/no_image.jpg';
             }
             
-            // Update Order Summary
+            // Order Summary
             document.getElementById('order-number').textContent = data.order_summary.order_number || '-';
             document.getElementById('invoice-no').textContent = data.order_summary.invoice_no || '-';
             document.getElementById('meal-type').textContent = data.order_summary.meal_type ? toTitleCase(data.order_summary.meal_type) : '-';
@@ -487,7 +313,7 @@ async function loadDeliveryOrderDetails() {
             document.getElementById('delivery-fee').textContent = '$' + data.order_summary.delivery_fee;
             document.getElementById('total').textContent = '$' + data.order_summary.total;
             
-            // Update Order Items
+            // Order Items
             const orderItemsTable = document.getElementById('order-items-table');
             orderItemsTable.innerHTML = '';
             
@@ -521,7 +347,7 @@ async function loadDeliveryOrderDetails() {
                 `;
             }
             
-            // Update Status History
+            // Status History
             const statusHistory = document.getElementById('status-history');
             statusHistory.innerHTML = '';
             
@@ -640,3 +466,5 @@ function getDeliveryBadgeClass(status) {
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 </style>
+
+

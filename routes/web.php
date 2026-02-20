@@ -922,10 +922,11 @@ Route::prefix('client')->middleware([ClientTokenVerificationMiddleware::class])-
         Route::get('/payments','index')->name('client.delivery.paypents');
         Route::get('/get/meal-order/payments','getMealOrderPayments');
 
-
-        Route::post('/store/meal-delivery/payment/by/stripe','storeByStripe');
+        Route::get('/meal-order/payment/details/{delivery_charge_ledger_id}','view');
+        Route::get('/get/meal-order/payment/details/{delivery_charge_ledger_id}','getMealOrderPaymentDetails');
 
         Route::post('/meal-delivery/create-payment-intent', 'createPaymentIntent');
+        Route::post('/store/meal-delivery/payment/by/stripe','storeByStripe');
         Route::post('/store/meal-delivery/payment/by/cash','storeByCash');
     });
 });
@@ -987,7 +988,7 @@ Route::prefix('delivery')->middleware([DeliveryTokenVerificationMiddleware::clas
         Route::get('/limited/notification/list', 'limitedNotificationList');
 
         Route::get('/view/notification/{notificationId}', 'view');
-        Route::get('/get/notification/details/{notificationId}', 'showNotificationDetails')->name('delivery.notification.details');
+        Route::get('/get/notification/details/{notificationId}', 'getNotificationDetails')->name('delivery.notification.details');
 
         Route::get('/markAsRead', 'markAsRead')->name('delivery.markRead');
         Route::delete('/delete/notification/{notificationId}', 'deleteNotification');

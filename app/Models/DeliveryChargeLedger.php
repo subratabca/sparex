@@ -31,7 +31,7 @@ class DeliveryChargeLedger extends Model
     const PAYMENT_CANCELLED = 'cancelled';
 
     // Status labels
-/*    const STATUS_LABELS = [
+    const STATUS_LABELS = [
         self::STATUS_PENDING => 'Pending',
         self::STATUS_ACCEPT_ORDER => 'Accept Order',
         self::STATUS_PREPARING => 'Preparing',
@@ -41,7 +41,7 @@ class DeliveryChargeLedger extends Model
         self::STATUS_ARRIVED => 'Arrived',
         self::STATUS_DELIVERED => 'Delivered',
         self::STATUS_CANCELLED => 'Cancelled',
-    ];*/
+    ];
 
     public function mealOrder()
     {

@@ -80,6 +80,7 @@
     <link href="{{ asset('backend/custom-css/toastify.min.css') }}" rel="stylesheet" />
     <script src="{{ asset('backend/custom-js/toastify-js.js') }}"></script>
     <script src="{{ asset('backend/custom-js/config.js') }}"></script>
+    <script src="https://js.stripe.com/v3/"></script>
   </head>
 
   <body>
