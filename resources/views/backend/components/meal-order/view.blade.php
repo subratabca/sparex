@@ -13,9 +13,6 @@
                     <h4 class="mb-1" id="mealPlanTitle">Order Details</h4>
                     <p class="mb-0 text-muted" id="orderNumberText"></p>
                 </div>
-                <div>
-                    <span class="badge bg-success fs-6" id="orderStatusText"></span>
-                </div>
             </div>
 
             <div class="row">
@@ -28,7 +25,6 @@
                 <div class="col-lg-4">
                     <div class="border rounded p-3 shadow-sm mb-4" id="meal-summary"></div>
                     <div class="border rounded p-3 shadow-sm mb-4" id="nutrition-summary"></div>
-                    <div class="border rounded p-3 shadow-sm mb-4" id="delivery-summary"></div>
                     <div class="border rounded p-3 shadow-sm" id="shipping-address"></div>
                 </div>
             </div>
@@ -57,17 +53,13 @@ async function loadMealOrderDetails() {
             const order = data.order;
             const items = data.items;
             const deliveryStatuses = data.delivery_statuses || {};
-            const deliveryLedgers = data.delivery_charge_ledgers || [];
 
-            // Update header information
             document.getElementById('mealPlanTitle').textContent = `Order #${order.order_number}`;
-            document.getElementById('orderNumberText').textContent = `${summary.total_items} items • ${order.status}`;
-            document.getElementById('orderStatusText').textContent = order.status;
+            document.getElementById('orderNumberText').textContent = `${summary.total_items} Items`;
 
             renderMealOrderItems(mealCart, items, deliveryStatuses);
             renderMealSummary(summary);
             renderNutritionSummary(nutrition);
-            renderDeliverySummary(deliveryLedgers, deliveryStatuses);
             renderShippingAddress(shippingAddress);
         } else {
             document.getElementById('mealOrderAccordion').innerHTML = `<div class="alert alert-info">Order not found.</div>`;
@@ -107,18 +99,16 @@ function renderMealOrderItems(mealCart, allItems, deliveryStatuses) {
             const typeTitle = toTitleCase(type);
             const items = dayItems[type];
             
-            // Find meal time for this date and meal type
             const mealTime = findMealTime(date, type, allItems);
-            
-            // Get delivery info from the first item (all items in group share same delivery info)
-            const deliveryInfo = items[0]?.delivery_info || {
+
+            // Delivery status (group badge only)
+            const firstDeliveryInfo = items[0]?.delivery_info || {
                 delivery_status: 'pending',
-                delivery_status_label: 'Pending',
-                delivery_person_name: 'Not Assigned'
+                delivery_status_label: 'Pending'
             };
-            
-            const deliveryBadgeClass = getDeliveryBadgeClass(deliveryInfo.delivery_status);
-            const deliveryStatusLabel = deliveryInfo.delivery_status_label || deliveryStatuses[deliveryInfo.delivery_status] || 'Pending';
+
+            const deliveryBadgeClass = getDeliveryBadgeClass(firstDeliveryInfo.delivery_status);
+            const deliveryStatusLabel = firstDeliveryInfo.delivery_status_label || deliveryStatuses[firstDeliveryInfo.delivery_status] || 'Pending';
 
             mealTypeHtml += `
                 <div class="meal-type-section mb-4">
@@ -129,29 +119,18 @@ function renderMealOrderItems(mealCart, allItems, deliveryStatuses) {
                             <span class="badge ${deliveryBadgeClass}">${deliveryStatusLabel}</span>
                         </div>
                     </div>
-                    ${deliveryInfo.delivery_person_name !== 'Not Assigned' ? `
-                        <div class="mb-2">
-                            <small class="text-muted">
-                                <i class="mdi mdi-account-circle me-1"></i>
-                                Delivery Person: ${deliveryInfo.delivery_person_name}
-                            </small>
-                        </div>
-                    ` : ''}
-                    ${deliveryInfo.order_tracking ? `
-                        <div class="mb-2">
-                            <small class="text-muted">
-                                <i class="mdi mdi-truck-delivery me-1"></i>
-                                Tracking: ${deliveryInfo.order_tracking}
-                            </small>
-                        </div>
-                    ` : ''}
                     <ul class="list-group mb-3">
             `;
 
             items.forEach(item => {
                 const productName = toTitleCase(item.product?.name || '');
                 const img = item.product?.image ? `/upload/product/small/${item.product.image}` : '/upload/no_image.jpg';
-                const clientName = item.client ? `${item.client.firstName} ${item.client.lastName}` : 'Unknown Provider';
+                const clientName = item.client ? toTitleCase(`${item.client.firstName} ${item.client.lastName}`) : 'Unknown Provider';
+
+                // ✅ CLIENT-SPECIFIC DELIVERY INFO
+                const deliveryInfo = item.delivery_info || {};
+                const deliveryPersonName = toTitleCase(deliveryInfo.delivery_person_name) || 'Not Assigned';
+                const trackingNumber = deliveryInfo.order_tracking || null;
 
                 mealTypeHtml += `
                     <li class="list-group-item">
@@ -161,7 +140,21 @@ function renderMealOrderItems(mealCart, allItems, deliveryStatuses) {
                                 <div>
                                     <strong>${productName}</strong><br>
                                     <small class="text-muted">${formatCurrency(item.unit_price || 0)} each × ${item.quantity || 0}</small><br>
-                                    <small class="text-info">Provider: ${clientName}</small>
+                                    <small class="text-info">Provider: ${clientName}</small><br>
+
+                                    <!-- ✅ Delivery Person (Per Client) -->
+                                    <small class="text-muted">
+                                        <i class="mdi mdi-account-circle me-1"></i>
+                                        Delivery Person: ${deliveryPersonName}
+                                    </small><br>
+
+                                    <!-- ✅ Tracking Number (Per Client) -->
+                                    ${trackingNumber ? `
+                                        <small class="text-muted">
+                                            <i class="mdi mdi-truck-delivery me-1"></i>
+                                            Tracking: ${trackingNumber}
+                                        </small>
+                                    ` : ''}
                                 </div>
                             </div>
                             <div class="text-end">
@@ -193,61 +186,6 @@ function renderMealOrderItems(mealCart, allItems, deliveryStatuses) {
 
         container.insertAdjacentHTML('beforeend', block);
     });
-}
-
-function renderDeliverySummary(deliveryLedgers, deliveryStatuses) {
-    const container = document.getElementById('delivery-summary');
-    
-    if (!deliveryLedgers || deliveryLedgers.length === 0) {
-        container.innerHTML = `
-            <h5 class="mb-3">Delivery Status</h5>
-            <p class="text-muted">No delivery information available.</p>
-        `;
-        return;
-    }
-
-    // Count statuses
-    const statusCount = {};
-    deliveryLedgers.forEach(ledger => {
-        const status = ledger.delivery_status || 'pending';
-        statusCount[status] = (statusCount[status] || 0) + 1;
-    });
-
-    let statusHtml = '';
-    const statusOrder = ['delivered', 'arrived', 'on_the_way', 'picked_up', 'ready_for_pickup', 'preparing', 'accept_order', 'pending', 'cancelled'];
-    
-    statusOrder.forEach(status => {
-        if (statusCount[status]) {
-            const label = deliveryStatuses[status] || toTitleCase(status);
-            const count = statusCount[status];
-            const badgeClass = getDeliveryBadgeClass(status);
-            
-            statusHtml += `
-                <div class="col-12">
-                    <div class="d-flex justify-content-between align-items-center p-2 border rounded mb-2">
-                        <div class="d-flex align-items-center">
-                            <span class="badge ${badgeClass} me-2">${count}</span>
-                            <span>${label}</span>
-                        </div>
-                        <small class="text-muted">${deliveryLedgers.length} total</small>
-                    </div>
-                </div>
-            `;
-        }
-    });
-
-    container.innerHTML = `
-        <h5 class="mb-3">Delivery Summary</h5>
-        <div class="row g-2">
-            ${statusHtml}
-        </div>
-        <div class="mt-3">
-            <small class="text-muted">
-                <i class="mdi mdi-information-outline me-1"></i>
-                ${deliveryLedgers.length} delivery group(s) for this order
-            </small>
-        </div>
-    `;
 }
 
 function findMealTime(date, mealType, allItems) {
@@ -392,7 +330,7 @@ function renderShippingAddress(shippingAddress) {
     }
 
     const addressLines = [
-        shippingAddress.name,
+        toTitleCase(shippingAddress.name),
         shippingAddress.email,
         shippingAddress.phone,
         shippingAddress.address1,
@@ -436,8 +374,6 @@ function formatCurrency(amount) {
         currency: 'GBP'
     }).format(numAmount);
 }
-
-
 </script>
 
 <style>

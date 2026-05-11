@@ -335,7 +335,8 @@ async function loadMealCart() {
         if (response.status === 200 && response.data.status === 'success') {
 
             const mealCart = response.data.data.meal_cart;
-            const summary = response.data.data.summary;
+            //const summary = response.data.data.summary;
+            summary = response.data.data.summary;
 
             document.getElementById('mealPlanTitle').textContent =
                 `My Weekly Meal Plan (${summary.total_items} items)`;
@@ -1473,21 +1474,49 @@ function extractMealOrdersFromCheckout() {
     return mealOrders;
 }
 
-// Helper function to parse date from accordion header
+
 function parseDateFromHeader(dateText) {
     try {
         const currentYear = new Date().getFullYear();
         const dateParts = dateText.split(', ');
+
         if (dateParts.length === 2) {
+
             const monthDay = dateParts[1];
+
+            // Create local date safely
             const date = new Date(`${monthDay}, ${currentYear}`);
-            return date.toISOString().split('T')[0];
+
+            // Format without UTC conversion
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+
+            return `${year}-${month}-${day}`;
         }
+
     } catch (error) {
         console.error('Error parsing date:', error);
     }
+
     return null;
 }
+
+// Helper function to parse date from accordion header
+// function parseDateFromHeader(dateText) {
+//     try {
+//         const currentYear = new Date().getFullYear();
+//         const dateParts = dateText.split(', ');
+//         if (dateParts.length === 2) {
+//             const monthDay = dateParts[1];
+//             const date = new Date(`${monthDay}, ${currentYear}`);
+//             return date.toISOString().split('T')[0];
+//         }
+//     } catch (error) {
+//         console.error('Error parsing date:', error);
+//     }
+//     return null;
+// }
 
 // Helper function to check if email is valid
 function isValidEmail(email) {

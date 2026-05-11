@@ -91,19 +91,14 @@
             <li>
               <a class="dropdown-item {{ Route::is('favourite.meals') ? 'active' : '' }}" href="{{ route('favourite.meals') }}">
                 <i class="mdi mdi-food-fork-drink me-2"></i>
-                <span>Choose Meals</span>
+                <span>Set Meals</span>
               </a>
             </li>
-<!--             <li>
-              <a class="dropdown-item {{ Route::is('meals') ? 'active' : '' }}" href="{{ route('meals') }}">
-                <i class="mdi mdi-account-outline me-2"></i>
-                <span>Set Meal</span>
-              </a>
-            </li> -->
+
             <li>
               <a class="dropdown-item {{ Route::is('meal.order') ? 'active' : '' }}" href="{{ route('meal.order') }}">
                 <i class="mdi mdi-food-takeout-box me-2"></i>
-                <span>Meal Plan</span>
+                <span>Meal Orders</span>
               </a>
             </li>
           </ul>

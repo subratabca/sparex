@@ -54,7 +54,38 @@
           document.getElementById('firstName').value = data['firstName'];
           document.getElementById('lastName').value = data['lastName'];
           document.getElementById('mobile').value = data['mobile'];
+
+          document.getElementById('address1').value = data['address1'];
+          document.getElementById('address2').value = data['address2'];
+          document.getElementById('zip-code').value = data['zip_code'];
+
           document.getElementById('mainImg').src = data['image'] ? "/upload/admin-profile/small/" + data['image'] : "/upload/no_image.jpg";
+
+          const countriesResponse = await axios.get('/countries');
+          const countrySelect = document.getElementById('countrySelect');
+          countrySelect.innerHTML = '<option value="">Select Country</option>';
+          countriesResponse.data.data.forEach(country => {
+              const option = document.createElement('option');
+              option.value = country.id;
+              option.textContent = country.name;
+              if (data.country_id === country.id) {
+                  option.selected = true;
+              }
+              countrySelect.appendChild(option);
+          });
+
+
+          await loadCounties(data.country_id || '', data.county_id || '');
+          countrySelect.addEventListener('change', async function () {
+              await loadCounties(this.value);
+          });
+
+
+          await loadCities(data.county_id || '', data.city_id || '');
+          const countySelect = document.getElementById('countySelect');
+          countySelect.addEventListener('change', async function () {
+              await loadCities(this.value);
+          });
         }
       
       }
@@ -76,5 +107,40 @@
       }
     }
   }
+
+
+  async function loadCounties(countryId, selectedCountyId = '') {
+  const countySelect = document.getElementById('countySelect');
+  countySelect.innerHTML = '<option value="">Select County</option>';
+  if (countryId) {
+    const countiesResponse = await axios.get(`/counties/${countryId}`);
+    countiesResponse.data.data.forEach(county => {
+      const option = document.createElement('option');
+      option.value = county.id;
+      option.textContent = county.name;
+      if (selectedCountyId === county.id) {
+        option.selected = true;
+      }
+      countySelect.appendChild(option);
+    });
+  }
+}
+
+async function loadCities(countyId, selectedCityId = '') {
+  const citySelect = document.getElementById('citySelect');
+  citySelect.innerHTML = '<option value="">Select City</option>';
+  if (countyId) {
+    const citiesResponse = await axios.get(`/cities/${countyId}`);
+    citiesResponse.data.data.forEach(city => {
+      const option = document.createElement('option');
+      option.value = city.id;
+      option.textContent = city.name;
+      if (selectedCityId === city.id) {
+        option.selected = true;
+      }
+      citySelect.appendChild(option);
+    });
+  }
+}
 </script>
 

@@ -43,6 +43,16 @@ class DeliveryChargeLedger extends Model
         self::STATUS_CANCELLED => 'Cancelled',
     ];
 
+public const STATUS_PROGRESS = [
+    'pending' => 10,
+    'accept_order' => 20,
+    'preparing' => 40,
+    'ready_for_pickup' => 60,
+    'out_for_delivery' => 80,
+    'delivered' => 100,
+    'cancelled' => 0,
+];
+
     public function mealOrder()
     {
         return $this->belongsTo(MealOrder::class, 'meal_order_id');

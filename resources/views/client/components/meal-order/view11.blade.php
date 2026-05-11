@@ -7,6 +7,14 @@
             </a>
         </div>
         <div class="card-body">
+            <!-- Loading Spinner -->
+            <div id="loadingSpinner" class="text-center py-5" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="mt-2 text-muted">Loading payment details...</p>
+            </div>
+
             <!-- Main Content -->
             <div id="mainContent">
                 <!-- Order Header -->
@@ -14,6 +22,9 @@
                     <div>
                         <h4 class="mb-1" id="mealPlanTitle">Client Payment Details</h4>
                         <p class="mb-0 text-muted" id="orderNumberText"></p>
+                    </div>
+                    <div>
+                        <span class="badge bg-success fs-6" id="orderStatusText"></span>
                     </div>
                 </div>
 
@@ -194,6 +205,18 @@
 <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
 <script>
 
+
+function showLoader() {
+    document.getElementById('loadingSpinner').style.display = 'block';
+    document.getElementById('mainContent').style.display = 'none';
+    document.getElementById('errorMessage').style.display = 'none';
+}
+
+function hideLoader() {
+    document.getElementById('loadingSpinner').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+}
+
 function handleError(error) {
     let message = "An unexpected error occurred.";
     if (error.response) {
@@ -245,6 +268,7 @@ async function loadClientPaymentDetails() {
             // Update header information
             document.getElementById('mealPlanTitle').textContent = `Client Payment - Order #${data.order.order_number}`;
             document.getElementById('orderNumberText').textContent = `Invoice: ${data.order.invoice_no} • ${data.summary.total_items} items`;
+            document.getElementById('orderStatusText').textContent = data.order.status ? toTitleCase(data.order.status) : 'Unknown';
 
             updateCustomerInfo(data.customer);
             

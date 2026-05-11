@@ -4,28 +4,9 @@
             <div class="card mb-4">
                 <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="card-title mb-0">Delivery Order Details</h5>
-                    <a href="{{ route('delivery.meal.orders') }}" class="btn btn-secondary">
-                        <i class="bx bx-arrow-back me-1"></i> Back to Orders
+                    <a href="{{ route('admin.delivery.paypents') }}" class="btn btn-secondary">
+                        <i class="bx bx-arrow-back me-1"></i> Back to Delivery Payments
                     </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Delivery Actions - Prominent Top Banner -->
-    <div class="row mb-4" id="delivery-actions-row" style="display: none;">
-        <div class="col-12">
-            <div class="card border border-success shadow-sm">
-                <div class="card-body d-flex align-items-center justify-content-between">
-                    <div>
-                        <h5 class="mb-1 text-success">
-                            <i class="bx bx-play-circle me-2"></i>Delivery Action Required
-                        </h5>
-                        <p class="mb-0 text-muted" id="delivery-action-hint"></p>
-                    </div>
-                    <button type="button" class="btn btn-lg btn-success" id="update-delivery-status-btn" onclick="handleUpdateDeliveryStatus()">
-                        <i class="bx bx-refresh me-1"></i> Update Status
-                    </button>
                 </div>
             </div>
         </div>
@@ -76,31 +57,31 @@
             </div>
         </div>
 
-        <!-- Restaurant Details -->
+        <!-- Delivery Person Details -->
         <div class="col-lg-4 mb-4">
             <div class="card h-100">
                 <div class="card-header bg-warning text-dark">
-                    <h5 class="card-title mb-0"><i class="bx bx-store me-2"></i>Restaurant Details</h5>
+                    <h5 class="card-title mb-0"><i class="bx bx-store me-2"></i>Delivery Person Details</h5>
                 </div>
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
-                        <img id="restaurant-image" src="" class="rounded-circle me-2" style="width: 50px; height: 50px; object-fit: cover;">
+                        <img id="delivery-person-image" src="" class="rounded-circle me-2" style="width: 50px; height: 50px; object-fit: cover;">
                         <div>
-                            <small class="text-muted">Restaurant Name</small>
-                            <h6 class="mb-0" id="restaurant-name">-</h6>
+                            <small class="text-muted">Name</small>
+                            <h6 class="mb-0" id="delivery-person-name">-</h6>
                         </div>
                     </div>
                     <div class="mb-3">
                         <small class="text-muted">Email</small>
-                        <h6 class="mb-0" id="restaurant-email">-</h6>
+                        <h6 class="mb-0" id="delivery-person-email">-</h6>
                     </div>
                     <div class="mb-3">
                         <small class="text-muted">Phone</small>
-                        <h6 class="mb-0" id="restaurant-phone">-</h6>
+                        <h6 class="mb-0" id="delivery-person-phone">-</h6>
                     </div>
                     <div class="mb-3">
                         <small class="text-muted">Address</small>
-                        <h6 class="mb-0 small" id="restaurant-address">-</h6>
+                        <h6 class="mb-0 small" id="delivery-person-address">-</h6>
                     </div>
                 </div>
             </div>
@@ -233,13 +214,10 @@
     </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     loadDeliveryOrderDetails();
 });
-
-let deliveryData = null; 
 
 function toTitleCase(str) {
     if (!str) return "";
@@ -249,7 +227,7 @@ function toTitleCase(str) {
 function getImageUrl(type, filename) {
     if (!filename) return '/upload/no_image.jpg';
     const basePaths = {
-        restaurant: '/upload/client-profile/medium/',
+        delivery: '/upload/delivery-profile/medium/',
         customer: '/upload/customer-profile/medium/',
         product: '/upload/product/small/'
     };
@@ -260,88 +238,87 @@ async function loadDeliveryOrderDetails() {
     try {
         showLoader();
         
-        // Get the delivery_charge_ledger_id from URL
         const pathSegments = window.location.pathname.split('/');
         const ledgerId = pathSegments[pathSegments.length - 1];
         
-        const response = await axios.get(`/delivery/get/meal-order/details/${ledgerId}`);
+        const response = await axios.get(`/admin/get/meal-delivery/payment/details/${ledgerId}`);
         
         if (response.status === 200 && response.data.status === 'success') {
-            deliveryData = response.data.data; // store globally
-            
-            // Update Delivery Information
-            document.getElementById('tracking-number').textContent = deliveryData.delivery_info.tracking_number || '-';
-            document.getElementById('delivery-date').textContent = deliveryData.delivery_info.delivery_date || '-';
+            const data = response.data.data;
+
+            // Delivery Information
+            document.getElementById('tracking-number').textContent = data.delivery_info.tracking_number || '-';
+            document.getElementById('delivery-date').textContent = data.delivery_info.delivery_date || '-';
             
             const deliveryStatusBadge = document.getElementById('delivery-status-badge');
-            deliveryStatusBadge.textContent = deliveryData.delivery_info.delivery_status_label || '-';
-            deliveryStatusBadge.className = 'badge ' + getDeliveryBadgeClass(deliveryData.delivery_info.delivery_status);
+            deliveryStatusBadge.textContent = data.delivery_info.delivery_status_label || '-';
+            deliveryStatusBadge.className = 'badge ' + getDeliveryBadgeClass(data.delivery_info.delivery_status);
             
-            document.getElementById('delivery-status-label').textContent = deliveryData.delivery_info.delivery_status_label || '-';
-            document.getElementById('delivery-charge').textContent = '$' + (deliveryData.delivery_info.delivery_charge || '0.00');
+            document.getElementById('delivery-status-label').textContent = data.delivery_info.delivery_status_label || '-';
+            document.getElementById('delivery-charge').textContent = '$' + (data.delivery_info.delivery_charge || '0.00');
             
-            const distance = deliveryData.delivery_info.distance_km ? 
-                `${deliveryData.delivery_info.distance_km} km (${deliveryData.delivery_info.distance_category})` : '-';
+            const distance = data.delivery_info.distance_km ? 
+                `${data.delivery_info.distance_km} km (${data.delivery_info.distance_category})` : '-';
             document.getElementById('distance').textContent = distance;
             
             const paymentStatusBadge = document.getElementById('payment-status');
-            paymentStatusBadge.textContent = deliveryData.delivery_info.payment_status || '-';
-            paymentStatusBadge.className = 'badge ' + (deliveryData.delivery_info.payment_status === 'paid' ? 'bg-success' : 'bg-warning');
+            paymentStatusBadge.textContent = data.delivery_info.payment_status || '-';
+            paymentStatusBadge.className = 'badge ' + (data.delivery_info.payment_status === 'paid' ? 'bg-success' : 'bg-warning');
             
-            document.getElementById('charge-key').textContent = deliveryData.delivery_info.charge_key || '-';
+            document.getElementById('charge-key').textContent = data.delivery_info.charge_key || '-';
             
-            // Update Restaurant Details
-            if (deliveryData.restaurant_details) {
-                document.getElementById('restaurant-image').src = getImageUrl('restaurant', deliveryData.restaurant_details.image);
-                document.getElementById('restaurant-name').textContent = deliveryData.restaurant_details.name ? toTitleCase(deliveryData.restaurant_details.name) : '-';
-                document.getElementById('restaurant-email').textContent = deliveryData.restaurant_details.email || '-';
-                document.getElementById('restaurant-phone').textContent = deliveryData.restaurant_details.mobile || '-';
+            // Delivery Person Details
+            if (data.delivery_person) {
+                document.getElementById('delivery-person-image').src = getImageUrl('delivery', data.delivery_person.image);
+                document.getElementById('delivery-person-name').textContent = data.delivery_person.name ? toTitleCase(data.delivery_person.name) : '-';
+                document.getElementById('delivery-person-email').textContent = data.delivery_person.email || '-';
+                document.getElementById('delivery-person-phone').textContent = data.delivery_person.mobile || '-';
                 
-                const restaurantAddress = [
-                    deliveryData.restaurant_details.address1,
-                    deliveryData.restaurant_details.address2,
-                    deliveryData.restaurant_details.zip_code
+                const personAddress = [
+                    data.delivery_person.address1,
+                    data.delivery_person.address2,
+                    data.delivery_person.zip_code
                 ].filter(Boolean).join(', ') || '-';
-                document.getElementById('restaurant-address').textContent = restaurantAddress;
+                document.getElementById('delivery-person-address').textContent = personAddress;
             } else {
-                document.getElementById('restaurant-image').src = '/upload/no_image.jpg';
+                document.getElementById('delivery-person-image').src = '/upload/no_image.jpg';
             }
             
-            // Update Customer Details
-            if (deliveryData.customer_details) {
-                document.getElementById('customer-image').src = getImageUrl('customer', deliveryData.customer_details.image);
-                document.getElementById('customer-name').textContent = deliveryData.customer_details.name ? toTitleCase(deliveryData.customer_details.name) : '-';
-                document.getElementById('customer-email').textContent = deliveryData.customer_details.email || '-';
-                document.getElementById('customer-phone').textContent = deliveryData.customer_details.mobile || '-';
-                document.getElementById('shipping-name').textContent = deliveryData.customer_details.shipping_name ? toTitleCase(deliveryData.customer_details.shipping_name) : '-';
+            // Customer Details
+            if (data.customer_details) {
+                document.getElementById('customer-image').src = getImageUrl('customer', data.customer_details.image);
+                document.getElementById('customer-name').textContent = data.customer_details.name ? toTitleCase(data.customer_details.name) : '-';
+                document.getElementById('customer-email').textContent = data.customer_details.email || '-';
+                document.getElementById('customer-phone').textContent = data.customer_details.mobile || '-';
+                document.getElementById('shipping-name').textContent = data.customer_details.shipping_name ? toTitleCase(data.customer_details.shipping_name) : '-';
                 
                 const shippingAddress = [
-                    deliveryData.customer_details.address1,
-                    deliveryData.customer_details.address2,
-                    deliveryData.customer_details.zip_code
+                    data.customer_details.address1,
+                    data.customer_details.address2,
+                    data.customer_details.zip_code
                 ].filter(Boolean).join(', ') || '-';
                 document.getElementById('shipping-address').textContent = shippingAddress;
             } else {
                 document.getElementById('customer-image').src = '/upload/no_image.jpg';
             }
             
-            // Update Order Summary
-            document.getElementById('order-number').textContent = deliveryData.order_summary.order_number || '-';
-            document.getElementById('invoice-no').textContent = deliveryData.order_summary.invoice_no || '-';
-            document.getElementById('meal-type').textContent = deliveryData.order_summary.meal_type ? toTitleCase(deliveryData.order_summary.meal_type) : '-';
-            document.getElementById('delivery-type').textContent = deliveryData.order_summary.delivery_type ? toTitleCase(deliveryData.order_summary.delivery_type) : '-';
-            document.getElementById('order-date').textContent = deliveryData.order_summary.order_date || '-';
-            document.getElementById('subtotal').textContent = '$' + deliveryData.order_summary.subtotal;
-            document.getElementById('tax').textContent = '$' + deliveryData.order_summary.tax;
-            document.getElementById('delivery-fee').textContent = '$' + deliveryData.order_summary.delivery_fee;
-            document.getElementById('total').textContent = '$' + deliveryData.order_summary.total;
+            // Order Summary
+            document.getElementById('order-number').textContent = data.order_summary.order_number || '-';
+            document.getElementById('invoice-no').textContent = data.order_summary.invoice_no || '-';
+            document.getElementById('meal-type').textContent = data.order_summary.meal_type ? toTitleCase(data.order_summary.meal_type) : '-';
+            document.getElementById('delivery-type').textContent = data.order_summary.delivery_type ? toTitleCase(data.order_summary.delivery_type) : '-';
+            document.getElementById('order-date').textContent = data.order_summary.order_date || '-';
+            document.getElementById('subtotal').textContent = '$' + data.order_summary.subtotal;
+            document.getElementById('tax').textContent = '$' + data.order_summary.tax;
+            document.getElementById('delivery-fee').textContent = '$' + data.order_summary.delivery_fee;
+            document.getElementById('total').textContent = '$' + data.order_summary.total;
             
-            // Update Order Items
+            // Order Items
             const orderItemsTable = document.getElementById('order-items-table');
             orderItemsTable.innerHTML = '';
             
-            if (deliveryData.order_items && deliveryData.order_items.length > 0) {
-                deliveryData.order_items.forEach(item => {
+            if (data.order_items && data.order_items.length > 0) {
+                data.order_items.forEach(item => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>
@@ -370,12 +347,12 @@ async function loadDeliveryOrderDetails() {
                 `;
             }
             
-            // Update Status History
+            // Status History
             const statusHistory = document.getElementById('status-history');
             statusHistory.innerHTML = '';
             
-            if (deliveryData.status_history && deliveryData.status_history.length > 0) {
-                deliveryData.status_history.forEach(history => {
+            if (data.status_history && data.status_history.length > 0) {
+                data.status_history.forEach(history => {
                     const historyItem = document.createElement('div');
                     historyItem.className = 'timeline-item mb-3';
                     historyItem.innerHTML = `
@@ -400,9 +377,6 @@ async function loadDeliveryOrderDetails() {
                 statusHistory.innerHTML = '<div class="text-center text-muted py-3">No status history available</div>';
             }
             
-            // Setup Delivery Actions card visibility and button (now targeting top banner)
-            setupDeliveryActionsCard(deliveryData);
-            
         } else {
             errorToast('Failed to load order details');
         }
@@ -410,120 +384,6 @@ async function loadDeliveryOrderDetails() {
         handleError(error);
     } finally {
         hideLoader();
-    }
-}
-
-function setupDeliveryActionsCard(data) {
-    const actionsRow = document.getElementById('delivery-actions-row');
-    const actionBtn = document.getElementById('update-delivery-status-btn');
-    const hintEl = document.getElementById('delivery-action-hint');
-
-    // Check if delivery person is assigned (not null) and status is in allowed progression list
-    const deliveryPerson = data.delivery_person;
-    const currentStatus = data.delivery_info.delivery_status;
-    const allowedStatuses = ['ready_for_pickup', 'picked_up', 'on_the_way', 'arrived'];
-
-    if (deliveryPerson && deliveryPerson.id && allowedStatuses.includes(currentStatus)) {
-        // Determine next status and button label
-        const nextStatus = getNextDeliveryStatus(currentStatus);
-        const buttonLabel = getStatusButtonLabel(currentStatus);
-
-        actionBtn.innerHTML = `<i class="bx bx-edit me-1"></i> ${buttonLabel}`;
-        actionBtn.dataset.nextStatus = nextStatus;
-        actionBtn.dataset.ledgerId = data.delivery_info.id;
-
-        hintEl.textContent = `Current: ${data.delivery_info.delivery_status_label} → Next: ${getStatusLabel(nextStatus)}`;
-        actionsRow.style.display = 'block';
-    } else {
-        actionsRow.style.display = 'none';
-    }
-}
-
-function getNextDeliveryStatus(currentStatus) {
-    const flow = {
-        'ready_for_pickup': 'picked_up',
-        'picked_up': 'on_the_way',
-        'on_the_way': 'arrived',
-        'arrived': 'delivered'
-    };
-    return flow[currentStatus] || null;
-}
-
-function getStatusLabel(status) {
-    const labels = {
-        'pending': 'Pending',
-        'accept_order': 'Order Accepted',
-        'preparing': 'Preparing',
-        'ready_for_pickup': 'Ready for Pickup',
-        'picked_up': 'Picked Up',
-        'on_the_way': 'On the Way',
-        'arrived': 'Arrived',
-        'delivered': 'Delivered',
-        'cancelled': 'Cancelled'
-    };
-    return labels[status] || status;
-}
-
-function getStatusButtonLabel(currentStatus) {
-    const labels = {
-        'ready_for_pickup': 'Mark as Picked Up',
-        'picked_up': 'Mark as On the Way',
-        'on_the_way': 'Mark as Arrived',
-        'arrived': 'Mark as Delivered'
-    };
-    return labels[currentStatus] || 'Update Status';
-}
-
-async function handleUpdateDeliveryStatus() {
-    const btn = document.getElementById('update-delivery-status-btn');
-    const ledgerId = btn.dataset.ledgerId;
-    const nextStatus = btn.dataset.nextStatus;
-
-    if (!ledgerId || !nextStatus) {
-        errorToast('Cannot determine next status.');
-        return;
-    }
-
-    const result = await Swal.fire({
-        title: 'Are you sure?',
-        text: `You are about to mark this delivery as "${getStatusLabel(nextStatus)}".`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'Yes, proceed!',
-        cancelButtonText: 'Cancel'
-    });
-
-    if (!result.isConfirmed) {
-        return; 
-    }
-
-    showLoader();
-    try {
-        const response = await axios.post(`/delivery/update/delivery-status/${ledgerId}`, {
-            delivery_status: nextStatus,
-            notes: '' // optional notes
-        });
-
-        if (response.data.status === 'success') {
-            Swal.fire({
-                title: 'Updated!',
-                text: 'Delivery status updated successfully.',
-                icon: 'success',
-                timer: 1500,
-                showConfirmButton: false
-            });
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
-        } else {
-            errorToast(response.data.message || 'Failed to update status.');
-        }
-    } catch (error) {
-        handleError(error);
-    } finally {
-        hideLoader(); 
     }
 }
 
@@ -606,3 +466,5 @@ function getDeliveryBadgeClass(status) {
     box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 </style>
+
+

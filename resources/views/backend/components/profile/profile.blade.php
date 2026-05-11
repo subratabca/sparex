@@ -30,32 +30,76 @@
         <div class="card-body pt-2 mt-1">
           <form id="formAccountSettings">
             <div class="row mt-2 gy-4">
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <div class="form-floating form-floating-outline">
                   <input type="text" disabled class="form-control" id="email" autofocus />
                   <label for="firstName">Email</label>
                 </div>
               </div>
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <div class="form-floating form-floating-outline">
                   <input type="text" class="form-control" id="firstName" autofocus />
                   <label for="firstName">First Name</label>
                   <span class="error-message text-danger" id="firstName-error"></span>
                 </div>
               </div>
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <div class="form-floating form-floating-outline">
                   <input type="text" class="form-control" id="lastName" />
                   <label for="lastName">Last Name</label>
                   <span class="error-message text-danger" id="lastName-error"></span>
                 </div>
               </div>
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <div class="form-floating form-floating-outline">
                   <input type="text" class="form-control"  id="mobile" />
                   <label for="phoneNumber">Phone Number</label>
                   <span class="error-message text-danger" id="mobile-error"></span>
                 </div>
+              </div>
+              <div class="col-md-4">
+                  <div class="form-floating form-floating-outline">
+                      <input type="text" class="form-control" id="address1" placeholder="Enter house and street number" />
+                      <label for="address1">Address1<span class="text-danger">*</span></label>
+                      <span class="error-message text-danger" id="address1-error"></span>
+                  </div>
+              </div>
+              <div class="col-md-4">
+                  <div class="form-floating form-floating-outline mb-4">
+                      <input type="text" class="form-control" id="address2" placeholder="Enter address2" />
+                      <label for="exampleFormControlInput1">Address2</label>
+                      <span class="error-message text-danger" id="address2-error"></span>
+                  </div>
+              </div>
+              <div class="col-md-4">
+                  <div class="form-floating form-floating-outline mb-4">
+                      <input type="text" class="form-control" id="zip-code" placeholder="Enter zip code" />
+                      <label for="zip-code">Postcode(Example: EC1A 1BB)<span class="text-danger">*</span></label>
+                      <span class="error-message text-danger" id="zip_code-error"></span>
+                  </div>
+              </div>
+              <div class="col-md-4">
+                  <div class="form-floating form-floating-outline">
+                      <select id="countrySelect" class="form-select w-100" aria-label="Select Country"></select>
+                      <label for="countrySelect">Select Country<span class="text-danger">*</span></label>
+                  </div>
+                  <span class="error-message text-danger" id="country-error"></span>
+              </div>
+
+              <div class="col-md-4">
+                  <div class="form-floating form-floating-outline">
+                      <select id="countySelect" class="form-select w-100" aria-label="Select County"></select>
+                      <label for="countySelect">Select County<span class="text-danger">*</span></label>
+                  </div>
+                  <span class="error-message text-danger" id="county-error"></span>
+              </div>
+
+              <div class="col-md-4">
+                  <div class="form-floating form-floating-outline">
+                      <select id="citySelect" class="form-select w-100" aria-label="Select City"></select>
+                      <label for="citySelect">Select City<span class="text-danger">*</span></label>
+                  </div>
+                  <span class="error-message text-danger" id="city-error"></span>
               </div>
             </div>
             <div class="mt-4">

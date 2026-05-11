@@ -796,3 +796,6 @@ Remember above model relation.Nothing to do anything now or explain.
 
 
 There is 4 type user in User model with role admin,client,customer,delivery. In this project customer can order multiple meal from multiple clients(client means who will provide meal) for future booking.Meal type include breakfast,lunch,snacks,dinner. each meal type may have multiple items like breakfast have 3 items from 3 different clients. For meal delivery to customer there is a delivery charge which will calculate on distance wise from client location to customer meal shipping address.suppose customer-A order for breakfast for 3 items.1 item will come from client-1 and 2 items will come from client-2 then it will count 2 delivery charge one for clent-1 and 2nd for client-2 for same meal type for same day.if same customer may have order for dinner then delivery charge will be calculate same as breakfast this way.
+
+
+when customer place an order online by paying bill through his stripe payment.this amont will go to admin account.then admin will pay to client through card/stripe that will go to client account. and client will pay delivery man payment.How to handle this payment system when using stripe payment. First give me idea aboy stripe payment.

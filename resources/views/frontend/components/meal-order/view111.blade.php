@@ -66,37 +66,22 @@
 </div>
 
 <!-- Delivery Status Modal -->
-<!-- Modern Delivery Status Modal -->
 <div class="modal fade" id="deliveryStatusModal" tabindex="-1">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content border-0 shadow">
-            <div class="modal-header bg-gradient bg-primary text-white">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title">
                     <i class="mdi mdi-truck-delivery me-2"></i>
                     Delivery Tracking
                 </h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
-
             <div class="modal-body">
-
-                <!-- Progress Section -->
-                <div class="mb-4">
-                    <div class="d-flex justify-content-between mb-1">
-                        <strong>Delivery Progress</strong>
-                        <span id="progressPercent" class="fw-bold text-primary">0%</span>
-                    </div>
-                    <div class="progress" style="height:10px;">
-                        <div id="progressBar"
-                             class="progress-bar progress-bar-striped progress-bar-animated"
-                             style="width:0%">
-                        </div>
+                <div id="delivery-status-history">
+                    <div class="text-center text-muted py-3">
+                        No status history available
                     </div>
                 </div>
-
-                <!-- Timeline -->
-                <div id="delivery-status-history" class="modern-timeline"></div>
-
             </div>
         </div>
     </div>
@@ -629,77 +614,6 @@ function formatCurrency(amount) {
 function openTrackingModal(statusHistory) {
 
     const container = document.getElementById('delivery-status-history');
-    const progressBar = document.getElementById('progressBar');
-    const progressPercent = document.getElementById('progressPercent');
-
-    container.innerHTML = '';
-    progressBar.style.width = "0%";
-    progressPercent.innerText = "0%";
-
-    if (!Array.isArray(statusHistory) || statusHistory.length === 0) {
-        container.innerHTML =
-            '<div class="text-center text-muted py-3">No status history available</div>';
-        new bootstrap.Modal(document.getElementById('deliveryStatusModal')).show();
-        return;
-    }
-
-    // Reverse so oldest at top, latest at bottom
-    const ordered = [...statusHistory].reverse();
-
-    // Calculate progress %
-    const totalSteps = ordered.length;
-    const completedSteps = ordered.length;
-    const percentage = Math.round((completedSteps / totalSteps) * 100);
-
-    // Animate progress bar
-    setTimeout(() => {
-        progressBar.style.width = percentage + "%";
-        progressPercent.innerText = percentage + "%";
-    }, 200);
-
-    ordered.forEach((history, index) => {
-
-        const isLatest = index === ordered.length - 1;
-
-        const item = document.createElement('div');
-        item.className = `timeline-item ${isLatest ? 'latest-status' : ''}`;
-
-        item.innerHTML = `
-            <div class="timeline-marker ${isLatest ? 'active-marker' : ''}"></div>
-            <div class="timeline-content">
-                <div class="d-flex justify-content-between align-items-center">
-                    <span class="badge ${getDeliveryBadgeClass(history.delivery_status)}">
-                        ${history.status_label}
-                    </span>
-                    <small class="text-muted">${history.created_at}</small>
-                </div>
-
-                <small class="text-muted d-block mt-1">
-                    Updated by: ${history.updated_by_label}
-                </small>
-
-                ${history.notes ? `
-                    <div class="mt-1 text-secondary">
-                        ${history.notes}
-                    </div>
-                ` : ''}
-
-                ${history.pick_up_at ? `
-                    <div class="mt-1 text-info">
-                        Pickup: ${history.pick_up_at}
-                    </div>
-                ` : ''}
-            </div>
-        `;
-
-        container.appendChild(item);
-    });
-
-    new bootstrap.Modal(document.getElementById('deliveryStatusModal')).show();
-}
-function openTrackingModal222(statusHistory) {
-
-    const container = document.getElementById('delivery-status-history');
     container.innerHTML = '';
 
     if (!statusHistory || statusHistory.length === 0) {
@@ -780,67 +694,6 @@ function openTrackingModal222(statusHistory) {
     z-index: 9999;
 }
 
-
-
-
-.modern-timeline {
-    position: relative;
-    padding-left: 30px;
-}
-
-.timeline-item {
-    position: relative;
-    margin-bottom: 25px;
-}
-
-.timeline-marker {
-    position: absolute;
-    left: -18px;
-    top: 5px;
-    width: 14px;
-    height: 14px;
-    background: #dee2e6;
-    border-radius: 50%;
-    border: 3px solid white;
-    box-shadow: 0 0 0 2px #dee2e6;
-}
-
-.timeline-item::before {
-    content: "";
-    position: absolute;
-    left: -12px;
-    top: 20px;
-    width: 2px;
-    height: calc(100% + 5px);
-    background: #dee2e6;
-}
-
-.timeline-item:last-child::before {
-    display: none;
-}
-
-.active-marker {
-    background: #0d6efd;
-    box-shadow: 0 0 0 2px #0d6efd;
-    animation: pulse 1.5s infinite;
-}
-
-.latest-status .timeline-content {
-    background: #f8f9fa;
-    padding: 12px;
-    border-radius: 8px;
-    border-left: 4px solid #0d6efd;
-}
-
-.timeline-content {
-    margin-left: 10px;
-}
-
-@keyframes pulse {
-    0% { box-shadow: 0 0 0 0 rgba(13,110,253,0.7); }
-    70% { box-shadow: 0 0 0 8px rgba(13,110,253,0); }
-    100% { box-shadow: 0 0 0 0 rgba(13,110,253,0); }
-}
 </style>
 
 @endsection

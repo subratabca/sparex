@@ -238,65 +238,6 @@ class DeliveryMealOrderController extends Controller
         }
     }
 
-    public function getMealOrderDetails111($ledgerId)
-    {
-        try {
-            $ledger = DeliveryChargeLedger::with([
-                'mealType',
-                'mealOrder.items.product',
-                'mealOrder.customer',
-                'client'
-            ])->findOrFail($ledgerId);
-
-            // Filter items ONLY by ledger meal_type_id
-            $items = $ledger->mealOrder->items
-                ->where('meal_type_id', $ledger->meal_type_id)
-                ->map(function ($item) {
-                    return [
-                        'product_name' => $item->product->name ?? 'N/A',
-                        'quantity' => $item->quantity,
-                    ];
-                })
-                ->values();
-
-            return response()->json([
-                'status' => 'success',
-                'data' => [
-                    'ledger_id'        => $ledger->id,
-                    'order_tracking'   => $ledger->order_tracking,
-                    'delivery_date'    => $ledger->delivery_date,
-                    'meal_type'        => $ledger->mealType->name ?? 'N/A',
-
-                    'delivery_status'  => DeliveryChargeLedger::STATUS_LABELS[$ledger->delivery_status] ?? 'Unknown',
-                    'payment_status'   => ucfirst($ledger->payment_status),
-                    'delivery_charge'  => $ledger->delivery_charge,
-                    'distance_km'      => $ledger->distance_km,
-                    'distance_category'=> $ledger->distance_category,
-
-                    'restaurant' => [
-                        'name'   => trim(($ledger->client->firstName ?? '') . ' ' . ($ledger->client->lastName ?? '')),
-                        'mobile' => $ledger->client->mobile ?? '',
-                        'address'=> $ledger->client->address1 ?? '',
-                    ],
-
-                    'customer' => [
-                        'name'   => trim(($ledger->mealOrder->customer->firstName ?? '') . ' ' . ($ledger->mealOrder->customer->lastName ?? '')),
-                        'mobile' => $ledger->mealOrder->customer->mobile ?? '',
-                        'address'=> $ledger->mealOrder->customer->address1 ?? '',
-                    ],
-
-                    'items' => $items
-                ]
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'status'  => 'error',
-                'message' => $e->getMessage()
-            ], 500);
-        }
-    }
-
     public function checkDeliveryAvailability(Request $request)
     {
         try {

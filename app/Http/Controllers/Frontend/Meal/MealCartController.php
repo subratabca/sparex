@@ -123,7 +123,8 @@ class MealCartController extends Controller
                                 'unit_price' => $item->unit_price,
                                 'total_price' => $item->total_price,
                                 'meal_type' => $item->mealType,
-                                'meal_time' => $item->meal_time, // Add meal_time here
+                                'meal_date' => $item->meal_date, 
+                                'meal_time' => $item->meal_time,
                                 'product' => $item->product,
                                 'client' => $item->client ? [
                                     'firstName' => $item->client->firstName,
