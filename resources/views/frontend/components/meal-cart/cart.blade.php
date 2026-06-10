@@ -55,9 +55,8 @@ async function loadMealCart() {
 
         if (response.status === 200 && response.data.status === 'success') {
             const mealCart = response.data.data.meal_cart;
-            const summary = response.data.data.summary;
+            const summary  = response.data.data.summary;
 
-            // Update title with total items
             const title = document.getElementById('mealPlanTitle');
             title.textContent = `My Weekly Meal Plan (${summary.total_items} items)`;
 
@@ -69,8 +68,7 @@ async function loadMealCart() {
             document.getElementById('mealPlanTitle').textContent = 'My Weekly Meal Plan (0 items)';
         }
     } catch (error) {
-        console.error(error);
-        errorToast('Failed to load meal cart');
+        handleError(error);
     } finally {
         hideLoader();
     }
@@ -87,56 +85,41 @@ function renderMealCart(mealCart) {
     }
 
     dates.forEach((date, index) => {
-        const dayItems = mealCart[date];
-        const collapseId = `mealDay${index}`;
+        const mealTypeGroups = mealCart[date];
+        const collapseId     = `mealDay${index}`;
 
-        const formattedDate = new Date(date).toLocaleDateString('en-US', {
+        const formattedDate = new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
             weekday: 'long',
             month: 'short',
             day: 'numeric'
         });
 
-        // Group items by meal type
-        const mealTypeGroups = {};
-        dayItems.forEach(item => {
-            const mealTypeName = item.meal_type?.name || 'Unknown';
-            if (!mealTypeGroups[mealTypeName]) {
-                mealTypeGroups[mealTypeName] = [];
-            }
-            mealTypeGroups[mealTypeName].push(item);
+        // Count total items for this date
+        let totalItemsForDate = 0;
+        Object.values(mealTypeGroups).forEach(typeItems => {
+            totalItemsForDate += Object.values(typeItems).length;
         });
 
         let mealTypeHtml = '';
-        Object.keys(mealTypeGroups).forEach(type => {
-            const typeTitle = toTitleCase(type);
-            const items = mealTypeGroups[type];
-            
-            // Get the common meal time for this meal type (all items should have same time)
-            const mealTime = items[0]?.meal_time;
-            const formattedTime = formatTime(mealTime);
-            
-            // Show meal type with count and delivery time
-            mealTypeHtml += `
-                <div class="mb-4">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="mb-0 fw-bold">${typeTitle} (${items.length} items)</h6>
-                        <div class="text-primary">
-                            <i class="fas fa-clock me-1"></i>
-                            <strong>Delivery Time:</strong> ${formattedTime}
-                        </div>
-                    </div>
-                    <div class="border rounded p-3 bg-light">
-                        <ul class="list-group">
-            `;
 
+        Object.keys(mealTypeGroups).forEach(mealTypeId => {
+            const items         = Object.values(mealTypeGroups[mealTypeId]);
+            const typeTitle     = toTitleCase(items[0]?.meal_type?.name || 'Unknown');
+            const mealTime      = items[0]?.meal_time;
+            const formattedTime = formatTime(mealTime);
+
+            let itemsHtml = '';
             items.forEach(item => {
                 const productName = toTitleCase(item.product?.name || '');
-                const img = item.product?.image ? `/upload/product/small/${item.product.image}` : '/upload/no_image.jpg';
+                const img = item.product?.image
+                    ? `/upload/product/small/${item.product.image}`
+                    : '/upload/no_image.jpg';
 
-                mealTypeHtml += `
+                itemsHtml += `
                     <li class="list-group-item d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center gap-3">
-                            <img src="${img}" alt="${productName}" class="rounded" style="width:60px;height:60px;object-fit:cover;">
+                            <img src="${img}" alt="${productName}" class="rounded" 
+                                 style="width:60px;height:60px;object-fit:cover;">
                             <div>
                                 <strong>${productName}</strong><br>
                                 <small class="text-muted">$${parseFloat(item.unit_price).toFixed(2)} each</small>
@@ -145,19 +128,39 @@ function renderMealCart(mealCart) {
                         <div class="d-flex align-items-center gap-2">
                             <div class="me-3">
                                 <small>Qty:</small>
-                                <input type="number" class="form-control form-control-sm d-inline-block" style="width: 70px;" value="${item.quantity}" min="1" onchange="updateMealItem(${item.id}, this.value)">
+                                <input type="number" 
+                                       class="form-control form-control-sm d-inline-block" 
+                                       style="width: 70px;" 
+                                       value="${item.quantity}" 
+                                       min="1" 
+                                       onchange="handleQtyChange(this, ${item.id})">
                             </div>
-
-                            <button class="btn btn-sm btn-outline-danger" onclick="removeMealItem(${item.id})">&times;</button>
+                            <button class="btn btn-sm btn-outline-danger" 
+                                    onclick="removeMealItem(${item.id})">&times;</button>
                         </div>
                     </li>
                 `;
             });
 
+            const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+
             mealTypeHtml += `
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="mb-0 fw-bold">${typeTitle} (${items.length} items)</h6>
+                        <div class="text-primary">
+                            <i class="mdi mdi-clock-outline me-1"></i>
+                            <strong>Delivery Time:</strong> ${formattedTime}
+                        </div>
+                    </div>
+                    <div class="border rounded p-3 bg-light">
+                        <ul class="list-group">
+                            ${itemsHtml}
                         </ul>
                         <div class="mt-2 text-end">
-                            <small class="text-muted">Subtotal for ${typeTitle}: $${items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0).toFixed(2)}</small>
+                            <small class="text-muted">
+                                Subtotal for ${typeTitle}: $${subtotal.toFixed(2)}
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -167,14 +170,19 @@ function renderMealCart(mealCart) {
         const block = `
             <div class="accordion-item shadow-sm mb-3">
                 <h2 class="accordion-header">
-                    <button class="accordion-button ${index !== 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                    <button class="accordion-button ${index !== 0 ? 'collapsed' : ''}" 
+                            type="button" 
+                            data-bs-toggle="collapse" 
+                            data-bs-target="#${collapseId}">
                         <div class="d-flex justify-content-between w-100">
                             <span>${formattedDate}</span>
-                            <span class="badge bg-primary">${dayItems.length} items</span>
+                            <span class="badge bg-primary">${totalItemsForDate} items</span>
                         </div>
                     </button>
                 </h2>
-                <div id="${collapseId}" class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" data-bs-parent="#mealCartAccordion">
+                <div id="${collapseId}" 
+                     class="accordion-collapse collapse ${index === 0 ? 'show' : ''}" 
+                     data-bs-parent="#mealCartAccordion">
                     <div class="accordion-body">${mealTypeHtml}</div>
                 </div>
             </div>
@@ -190,13 +198,17 @@ function renderMealSummary(summary) {
         <h5 class="mb-3">Price Summary</h5>
         <ul class="list-group list-group-flush">
             <li class="list-group-item d-flex justify-content-between">
-                Subtotal: <span>$${summary.subtotal.toFixed(2)}</span>
+                Subtotal: <span>$${parseFloat(summary.subtotal).toFixed(2)}</span>
             </li>
             <li class="list-group-item d-flex justify-content-between">
-                Tax: <span>$${summary.tax.toFixed(2)}</span>
+                Tax: <span>$${parseFloat(summary.tax).toFixed(2)}</span>
+            </li>
+            <li class="list-group-item d-flex justify-content-between text-info">
+                Service Fee (${(summary.service_fee_rate * 100).toFixed(0)}%):
+                <span>$${parseFloat(summary.service_fee).toFixed(2)}</span>
             </li>
             <li class="list-group-item d-flex justify-content-between fw-bold">
-                Total: <span>$${summary.total.toFixed(2)}</span>
+                Total: <span>$${parseFloat(summary.total).toFixed(2)}</span>
             </li>
         </ul>
         <div class="mt-3 text-center">
@@ -205,38 +217,58 @@ function renderMealSummary(summary) {
     `;
 }
 
+// Debounce qty change — handles both typing and arrow clicks
+let qtyTimeout = null;
+function handleQtyChange(input, itemId) {
+    clearTimeout(qtyTimeout);
+    qtyTimeout = setTimeout(() => {
+        updateMealItem(itemId, input.value);
+    }, 500);
+}
+
 async function updateMealItem(id, quantity) {
     if (quantity < 1) {
         errorToast('Quantity must be at least 1');
-        await loadMealCart(); // Reload to reset the input value
+        await loadMealCart();
         return;
     }
     try {
-        const response = await axios.post('/user/meal-cart/update', { meal_item_id: id, quantity });
+        showLoader();
+        const response = await axios.post('/user/meal-cart/update', { 
+            meal_item_id: id, 
+            quantity 
+        });
         if (response.data.status === 'success') {
             await loadMealCart();
+            await updateMealCartCount();
             successToast('Quantity updated successfully');
         } else {
             errorToast('Failed to update item');
         }
     } catch (error) {
-        errorToast('Failed to update item');
+        handleError(error);
+    } finally {
+        hideLoader();
     }
 }
 
 async function removeMealItem(id) {
-    //if (!confirm('Are you sure you want to remove this item from your meal plan?')) return;
-    
+    if (!confirm('Are you sure you want to remove this item from your meal plan?')) return;
+
     try {
+        showLoader();
         const response = await axios.post('/user/meal-cart/remove', { meal_item_id: id });
         if (response.data.status === 'success') {
             await loadMealCart();
+            await updateMealCartCount();
             successToast('Item removed successfully');
         } else {
             errorToast('Failed to remove item');
         }
     } catch (error) {
-        errorToast('Failed to remove item');
+        handleError(error);
+    } finally {
+        hideLoader();
     }
 }
 </script>

@@ -16,10 +16,10 @@ return new class extends Migration
             $table->foreignId('meal_order_id')->constrained('meal_orders')->onDelete('cascade');
             $table->foreignId('client_id')->constrained('users')->onDelete('cascade');
             $table->decimal('subtotal', 10, 2);
-            $table->decimal('tax', 10, 2); 
+            $table->decimal('tax', 10, 2);
+            $table->decimal('platform_fee', 10, 2)->default(0);
             $table->decimal('delivery_fee', 10, 2)->default(0); 
             $table->decimal('payable_amount', 10, 2);
-            $table->decimal('paid_amount', 10, 2);
             $table->enum('payment_status', ['due', 'paid'])->default('due');
             $table->timestamps();
         });

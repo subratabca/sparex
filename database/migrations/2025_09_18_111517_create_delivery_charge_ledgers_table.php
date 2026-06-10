@@ -29,6 +29,8 @@ return new class extends Migration
             $table->enum('delivery_status', ['pending','accept_order','preparing','ready_for_pickup','picked_up','on_the_way','arrived','delivered','cancelled'])->default('pending');
             
             $table->decimal('delivery_charge', 10, 2)->default(0);
+            $table->decimal('rider_platform_fee', 10, 2)->default(0);
+            $table->decimal('payable_amount', 10, 2)->default(0);
             $table->decimal('distance_km', 8, 2)->nullable(); 
             $table->string('distance_category')->nullable(); 
             

@@ -65,6 +65,7 @@
             
             // Generate image URL - check if image exists
             $imagePath = $product->image ? 'upload/product/small/' . $product->image : 'upload/no_image.jpg';
+            //$imagePath = $product->image ? asset('upload/product/small/' . $product->image) : asset('upload/no_image.jpg');
             // For email, we need full URL
             $imageUrl = asset($imagePath);
         @endphp

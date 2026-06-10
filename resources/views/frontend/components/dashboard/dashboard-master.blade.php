@@ -81,7 +81,7 @@
                         </ul>
                       </li>
         <li class="nav-item mb-1">
-          <a class="nav-link dropdown-toggle {{ Route::is(['meals','meal.order','favourite.meals']) ? 'active' : '' }}" 
+          <a class="nav-link dropdown-toggle {{ Route::is(['meal.plan','meal.order','user.meal.reports']) ? 'active' : '' }}" 
              href="#" id="menuTypesDropdown" role="button" data-bs-toggle="dropdown" 
              aria-expanded="false">
             <i class="mdi mdi-food me-2"></i>
@@ -89,9 +89,9 @@
           </a>
           <ul class="dropdown-menu" aria-labelledby="productComplaintsDropdown">
             <li>
-              <a class="dropdown-item {{ Route::is('favourite.meals') ? 'active' : '' }}" href="{{ route('favourite.meals') }}">
+              <a class="dropdown-item {{ Route::is('meal.plan') ? 'active' : '' }}" href="{{ route('meal.plan') }}">
                 <i class="mdi mdi-food-fork-drink me-2"></i>
-                <span>Set Meals</span>
+                <span>Meal Plan</span>
               </a>
             </li>
 
@@ -99,6 +99,13 @@
               <a class="dropdown-item {{ Route::is('meal.order') ? 'active' : '' }}" href="{{ route('meal.order') }}">
                 <i class="mdi mdi-food-takeout-box me-2"></i>
                 <span>Meal Orders</span>
+              </a>
+            </li>
+
+            <li>
+              <a class="dropdown-item {{ Route::is('user.meal.reports') ? 'active' : '' }}" href="{{ route('user.meal.reports') }}">
+                <i class="mdi mdi-food-takeout-box me-2"></i>
+                <span>Meal Reports</span>
               </a>
             </li>
           </ul>

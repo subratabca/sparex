@@ -53,7 +53,10 @@ return [
         'redirect' => env('TWITTER_REDIRECT_URI'),
     ],
 
-    'tax_rate' => env('TAX_RATE'),
+    'tax_rate'            => env('TAX_RATE',            0.20),
+    'service_fee'         => env('SERVICE_FEE',         0.05),
+    'client_platform_fee' => env('CLIENT_PLATFORM_FEE', 0.05),
+    'rider_platform_fee'  => env('RIDER_PLATFORM_FEE',  0.05),
 
     'google_maps' => [
         'api_key' => env('GOOGLE_MAPS_API_KEY'),
@@ -68,4 +71,13 @@ return [
         ],
     ],
 
+    'client_stripe' => [
+        'key' => env('CLIENT_STRIPE_KEY'),
+        'secret' => env('CLIENT_STRIPE_SECRET'),
+    ],
+
+    'delivery_stripe' => [
+        'key' => env('DELIVERY_STRIPE_KEY'),
+        'secret' => env('DELIVERY_STRIPE_SECRET'),
+    ],
 ];

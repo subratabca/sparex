@@ -17,16 +17,17 @@ use App\Http\Controllers\Backend\CustomerListController;
 use App\Http\Controllers\Backend\AdminBannedCustomerController;
 use App\Http\Controllers\Backend\AdminComplaintController;
 use App\Http\Controllers\Backend\AdminPaymentController;
-use App\Http\Controllers\Backend\MealPaymentController;
 use App\Http\Controllers\Backend\AdminCustomerComplainController;
 use App\Http\Controllers\Backend\AdminNotificationController;
 use App\Http\Controllers\Backend\AdminReportController;
 use App\Http\Controllers\Backend\AdminContactMessageController;
-use App\Http\Controllers\Backend\MealTypeController;
-use App\Http\Controllers\Backend\MealKeywordController;
-use App\Http\Controllers\Backend\AdminMealOrderController;
-use App\Http\Controllers\Backend\MealDeliveryChargeController;
 
+use App\Http\Controllers\Backend\Meal\MealTypeController;
+use App\Http\Controllers\Backend\Meal\MealKeywordController;
+use App\Http\Controllers\Backend\Meal\MealDeliveryChargeController;
+use App\Http\Controllers\Backend\Meal\AdminMealOrderController;
+use App\Http\Controllers\Backend\Meal\MealPaymentController;
+use App\Http\Controllers\Backend\Meal\AdminMealReportController;
 
 use App\Http\Controllers\Backend\SiteSettingController;
 use App\Http\Controllers\Backend\TermsConditionsController;
@@ -57,8 +58,8 @@ use App\Http\Controllers\Client\ClientFollowerController;
 use App\Http\Controllers\Client\ClientProductUploadTermsConditionsController;
 use App\Http\Controllers\Client\ClientCustomerListController;
 
-use App\Http\Controllers\Client\ClientMealOrderController;
-use App\Http\Controllers\Client\ClientDeliveryPaymentController;
+use App\Http\Controllers\Client\Meal\ClientMealOrderController;
+use App\Http\Controllers\Client\Meal\ClientMealReportController;
 
 // Delivery
 use App\Http\Controllers\Delivery\Auth\DeliveryAuthController;
@@ -66,8 +67,7 @@ use App\Http\Controllers\Delivery\DeliveryDashboardController;
 use App\Http\Controllers\Delivery\DeliveryProfileController;
 use App\Http\Controllers\Delivery\DeliveryNotificationController;
 use App\Http\Controllers\Delivery\DeliveryMealOrderController;
-
-
+use App\Http\Controllers\Delivery\DeliveryMealReportController;
 
 // Frontend
 use App\Http\Controllers\Frontend\SocialAuthController;
@@ -92,11 +92,13 @@ use App\Http\Controllers\Frontend\CheckoutController;
 use App\Http\Controllers\Frontend\PaymentController;
 use App\Http\Controllers\Frontend\CustomerOrderTermsConditionsController;
 
-use App\Http\Controllers\Frontend\Meal\MealCartController;
-use App\Http\Controllers\Frontend\Meal\MealController;
 use App\Http\Controllers\Frontend\Meal\MealPlanController;
+use App\Http\Controllers\Frontend\Meal\MealCartController;
+use App\Http\Controllers\Frontend\Meal\MealStoreController;
 use App\Http\Controllers\Frontend\Meal\MealOrderController;
+use App\Http\Controllers\Frontend\Meal\MealReportController;
 use App\Http\Controllers\Frontend\Meal\CreditTransactionController;
+
 
 Route::controller(SocialShareController::class)->group(function () {
     Route::get('/social-share', 'index');
@@ -172,23 +174,14 @@ Route::prefix('user')->group(function () {
 });
 
 Route::prefix('user')->middleware([TokenVerificationMiddleware::class])->group(function () {
-
-    Route::controller(MealController::class)->group(function () {
-        Route::get('/favourite-meals','favouriteMealPage')->name('favourite.meals');
+    Route::controller(MealPlanController::class)->group(function () {
+        Route::get('/meal-plans','mealPlanPage')->name('meal.plan');
         Route::get('/get/meal-keywords/{mealTypeId}','getMealKeywordByType');
+        Route::get('/meal/details/{id}','mealDetailsPage');
+        Route::get('/get/meal/details/{id}','getMealDetails');
         Route::post('/search/products','searchProducts');
-
-        //Route::get('/meal/details/{id}','mealDetailsPage');
-        //Route::get('/get/meal/details/{id}','getMealDetails');
+        Route::post('/generate/meal-suggestion', 'generateMealSuggestion');
     });
-
-    // Route::controller(MealPlanController::class)->group(function () {
-    //     Route::get('/meals','index')->name('meals');
-    //     Route::get('/get/meals','getMealsByFood');
-    //     Route::get('/search-meal','searchMealByKeyword');
-    //     Route::get('/search/by/meal-type','searchByMealType');
-    //     Route::get('/get/product-meal-types/{product_id}','getMealTypeByProduct');
-    // });
 
     Route::controller(MealCartController::class)->group(function () {
         Route::post('/store/meal-cart','store');
@@ -204,13 +197,15 @@ Route::prefix('user')->middleware([TokenVerificationMiddleware::class])->group(f
         Route::get('/get/meal/courier-charge', 'getMealCourierCharge');
     });
 
-    Route::controller(MealOrderController::class)->group(function () {
+    Route::controller(MealStoreController::class)->group(function () {
         Route::post('/store/meal-order/by/cash','storeByCash');
         Route::post('/store/meal-order/by/credit','storeByCredit');
-        Route::post('/store/meal-order/by/stripe','storeByStripe');
 
+        Route::post('/store/meal-order/by/stripe','storeByStripe');
         Route::post('/create-payment-intent', 'createPaymentIntent');
-        
+    });
+
+    Route::controller(MealOrderController::class)->group(function () {
         Route::get('/meal-order','index')->name('meal.order');
         Route::get('/get/meal-order','getMealOrders');
         Route::get('/meal-order/details/{meal_order_id}','view');
@@ -219,10 +214,20 @@ Route::prefix('user')->middleware([TokenVerificationMiddleware::class])->group(f
         Route::get('/meal-order/{order_id}/date/{date}', 'viewOrderDetailsByDate');
         Route::get('/get/meal-order/{order_id}/date/{date}', 'getMealOrderDetailsByDate');
 
-        Route::get('/get/calories/history', 'getDailyCalories');
+        Route::get('/get/calories/history', 'getCalories');
 
         Route::get('/delete/meal-order-item/{itemId}','deleteMealOrderItem');
         Route::get('/delete/meal-order/{id}','deleteMealOrder');
+    });
+
+    Route::controller(MealReportController::class)->group(function () {
+        Route::get('/meal-reports',                      'index')->name('user.meal.reports');
+        Route::get('/get/meal-report/summary',           'getSummary');
+        Route::get('/get/meal-report/orders',            'getOrderReport');
+        Route::get('/get/meal-report/payment-status',    'getPaymentStatusReport');
+        Route::get('/get/meal-report/order-status',      'getOrderStatusReport');
+        Route::get('/get/meal-report/meal-type',         'getMealTypeReport');
+        Route::get('/get/meal-report/daily-spending',    'getDailySpendingReport');
     });
 
     Route::controller(CreditTransactionController::class)->group(function () {
@@ -387,22 +392,6 @@ Route::prefix('admin')->group(function () {
 });
 
 Route::prefix('admin')->middleware([AdminTokenVerificationMiddleware::class])->group(function () {
-    Route::controller(DeliveryActivationController::class)->group(function () {
-        Route::get('/delivery-persons', 'listPage')->name('admin.delivery.persons');
-        Route::get('/get/delivery-person/list','getList');
-
-        Route::get('/delivery-person/details/{delivery_person_id}','deliveryPersonDetailsPage');
-        Route::get('/get/delivery-person/details/{delivery_person_id}','getDeliveryPersonDetails');
-
-        Route::post('/delivery-person/{id}/toggle-status','toggleStatus');
-        Route::post('/delivery-person/delete','delete');
-    });
-    
-    Route::controller(AdminDashboardController::class)->group(function () {
-        Route::get('/dashboard','DashboardPage')->name('admin.dashboard');
-        Route::get('/total/information', 'TotalInfo');
-        Route::get('/logout','Logout')->name('admin.logout');
-    });
 
     Route::controller(MealKeywordController::class)->group(function () {
         Route::get('/meal-keywords','index')->name('meal.keywords');
@@ -434,6 +423,65 @@ Route::prefix('admin')->middleware([AdminTokenVerificationMiddleware::class])->g
         Route::get('/edit/meal-delivery/charge/{id}','edit');
         Route::post('/update/meal-delivery/charge','update');
         Route::post('/delete/meal-delivery/charge/{id}','delete');
+    });
+
+    Route::controller(AdminMealOrderController::class)->group(function () {
+        Route::get('/meal-order','index')->name('admin.meal.orders');
+        Route::get('/get/meal-orders','getMealOrders');
+        Route::get('/meal-order/details/{meal_order_id}','view');
+        Route::get('/get/meal-order/details/{meal_order_id}','getMealOrderDetails');
+    });
+
+    Route::controller(MealPaymentController::class)->group(function () {
+        //Client Payment
+        Route::get('/meal/payments', 'clientPaymentPage')->name('admin.client.meal.payments');
+        Route::get('/get/meal/payments','getClientPaymentList');
+
+        Route::get('/meal/payment/details/client/{client_id}/order/{order_id}', 'clientPaymentDetailsPage');
+        Route::get('/get/meal/payment/details/by/client/{client_id}/order/{order_id}','getClientPaymentDetailsInfo');
+
+        Route::post('/meal-order/create-payment-intent', 'createPaymentIntentForClient');
+        Route::post('/store/meal-order/payment/by/stripe','storeByStripeForClient');
+        Route::post('/store/meal-order/payment/by/cash','storeByCashForClient');
+
+        //Delivery Payment
+        Route::get('/meal-delivery/payments','index')->name('admin.delivery.paypents');
+        Route::get('/get/meal-delivery/payments','getMealDeliveryPayments');
+
+        Route::get('/meal-delivery/payment/details/{delivery_charge_ledger_id}','view');
+        Route::get('/get/meal-delivery/payment/details/{delivery_charge_ledger_id}','getMealOrderPaymentDetails');
+
+        Route::post('/meal-delivery/create-payment-intent', 'createPaymentIntentForDelivery');
+        Route::post('/store/meal-delivery/payment/by/stripe','storeByStripeForDelivery');
+        Route::post('/store/meal-delivery/payment/by/cash','storeByCash');
+    });
+
+    Route::controller(AdminMealReportController::class)->group(function () {
+        Route::get('/meal/reports',          'index')->name('admin.meal.reports');
+        Route::get('/get/meal/report/summary','getSummary');       // KPI cards
+        Route::get('/get/meal/report/orders', 'getOrderReport');   // Bar chart
+        Route::get('/get/meal/report/payment-status',  'getPaymentStatusReport');  // Pie chart
+        Route::get('/get/meal/report/client-payment',  'getClientPaymentReport');  // Bar chart
+        Route::get('/get/meal/report/delivery-payment','getDeliveryPaymentReport');// Pie chart
+        Route::get('/get/meal/report/meal-type',       'getMealTypeReport');       // Bar chart
+        Route::get('/get/meal/report/delivery-status', 'getDeliveryStatusReport'); // Pie chart
+    });
+
+    Route::controller(DeliveryActivationController::class)->group(function () {
+        Route::get('/delivery-persons', 'listPage')->name('admin.delivery.persons');
+        Route::get('/get/delivery-person/list','getList');
+
+        Route::get('/delivery-person/details/{delivery_person_id}','deliveryPersonDetailsPage');
+        Route::get('/get/delivery-person/details/{delivery_person_id}','getDeliveryPersonDetails');
+
+        Route::post('/delivery-person/{id}/toggle-status','toggleStatus');
+        Route::post('/delivery-person/delete','delete');
+    });
+    
+    Route::controller(AdminDashboardController::class)->group(function () {
+        Route::get('/dashboard','DashboardPage')->name('admin.dashboard');
+        Route::get('/total/information', 'TotalInfo');
+        Route::get('/logout','Logout')->name('admin.logout');
     });
 
     Route::controller(AdminAuditController::class)->group(function () {
@@ -482,17 +530,6 @@ Route::prefix('admin')->middleware([AdminTokenVerificationMiddleware::class])->g
         Route::get('/invoice/download/{order_id}','invoiceDownload')->name('admin.invoice.download');
     });
 
-    Route::controller(AdminMealOrderController::class)->group(function () {
-        Route::get('/meal-order','index')->name('admin.meal.orders');
-        Route::get('/get/meal-orders','getMealOrders');
-
-        Route::get('/meal-order/details/{meal_order_id}','view');
-        Route::get('/get/meal-order/details/{meal_order_id}','getMealOrderDetails');
-
-        Route::get('/meal-order/{order_id}/date/{date}', 'viewOrderDetailsByDate');
-        Route::get('/get/meal-order/{order_id}/date/{date}', 'getMealOrderDetailsByDate');
-    });
-
     Route::controller(AdminComplaintController::class)->group(function () {
         Route::get('/complaints', 'complaintPage')->name('admin.complaints');
         Route::get('/get/complaints','getComplaints');
@@ -522,29 +559,6 @@ Route::prefix('admin')->middleware([AdminTokenVerificationMiddleware::class])->g
         Route::get('/payment/details/client/{client_id}/order/{order_id}', 'clientPaymentDetailsPage');
         Route::get('/get/payment/details/info/client/{client_id}/order/{order_id}','getClientPaymentDetailsInfo');
         Route::post('/payment/mark-as-paid/client/{client_id}/order/{order_id}','markClientPaymentAsPaid');
-    });
-
-    Route::controller(MealPaymentController::class)->group(function () {
-        //Client Payment
-        Route::get('/meal/payments', 'clientPaymentPage')->name('admin.client.meal.payments');
-        Route::get('/get/meal/payments','getClientPaymentList');
-
-        Route::get('/meal/payment/details/client/{client_id}/order/{order_id}', 'clientPaymentDetailsPage');
-        Route::get('/get/meal/payment/details/by/client/{client_id}/order/{order_id}','getClientPaymentDetailsInfo');
-        Route::post('/meal/payment/mark-as-paid/client/{client_id}/order/{order_id}','markClientPaymentAsPaid');
-
-        //Delivery Payment
-        Route::get('/meal-delivery/payments','index')->name('admin.delivery.paypents');
-        Route::get('/get/meal-delivery/payments','getMealDeliveryPayments');
-
-        Route::get('/meal-delivery/payment/details/{delivery_charge_ledger_id}','view');
-        Route::get('/get/meal-delivery/payment/details/{delivery_charge_ledger_id}','getMealOrderPaymentDetails');
-
-        Route::post('/meal-delivery/create-payment-intent', 'createPaymentIntent');
-        Route::post('/store/meal-delivery/payment/by/stripe','storeByStripe');
-        Route::post('/store/meal-delivery/payment/by/cash','storeByCash');
-
-
     });
 
     Route::controller(ClientListController::class)->group(function () {
@@ -746,11 +760,18 @@ Route::prefix('client')->middleware([ClientTokenVerificationMiddleware::class])-
         Route::get('/meal-order/details/{meal_order_id}','view');
         Route::get('/get/meal-order/details/{meal_order_id}','getMealOrderDetails');
 
-        Route::get('/meal-order/{order_id}/date/{date}', 'viewOrderDetailsByDate');
-        Route::get('/get/meal-order/{order_id}/date/{date}', 'getMealOrderDetailsByDate');
-
         Route::post('/update/delivery-status/{orderId}', 'updateDeliveryStatus');
         Route::post('/check/delivery-acceptance/{orderId}', 'checkDeliveryAcceptance');
+    });
+
+    Route::controller(ClientMealReportController::class)->group(function () {
+        Route::get('/meal-reports',                    'index')->name('client.meal.reports');
+        Route::get('/get/meal-report/summary',         'getSummary');
+        Route::get('/get/meal-report/orders',          'getOrderReport');
+        Route::get('/get/meal-report/payment-status',  'getPaymentStatusReport');
+        Route::get('/get/meal-report/meal-type',       'getMealTypeReport');
+        Route::get('/get/meal-report/order-status',    'getOrderStatusReport');
+        Route::get('/get/meal-report/daily-revenue',   'getDailyRevenueReport');
     });
 
     Route::controller(ClientDashboardController::class)->group(function () {
@@ -933,18 +954,8 @@ Route::prefix('client')->middleware([ClientTokenVerificationMiddleware::class])-
         Route::get('/product/upload/terms-conditions/info/{name}','productUploadTermsConditionsInfo');
     });
 
-    Route::controller(ClientDeliveryPaymentController::class)->group(function () {
-        Route::get('/payments','index')->name('client.delivery.paypents');
-        Route::get('/get/meal-order/payments','getMealOrderPayments');
-
-        Route::get('/meal-order/payment/details/{delivery_charge_ledger_id}','view');
-        Route::get('/get/meal-order/payment/details/{delivery_charge_ledger_id}','getMealOrderPaymentDetails');
-
-        Route::post('/meal-delivery/create-payment-intent', 'createPaymentIntent');
-        Route::post('/store/meal-delivery/payment/by/stripe','storeByStripe');
-        Route::post('/store/meal-delivery/payment/by/cash','storeByCash');
-    });
 });
+
 
 
 // Delivery API Routes
@@ -1021,5 +1032,14 @@ Route::prefix('delivery')->middleware([DeliveryTokenVerificationMiddleware::clas
 
         Route::get('/meal-order/details/{delivery_charge_ledger_id}','view');
         Route::get('/get/meal-order/details/{delivery_charge_ledger_id}','getMealOrderDetails');
+    });
+
+    Route::controller(DeliveryMealReportController::class)->group(function () {
+        Route::get('/meal-reports', 'index')->name('delivery.meal.reports');
+        Route::get('/get/meal-report/summary',         'getSummary');
+        Route::get('/get/meal-report/orders',          'getOrderReport');
+        Route::get('/get/meal-report/order-status',    'getOrderStatusReport');
+        Route::get('/get/meal-report/payment-status',  'getPaymentStatusReport');
+        Route::get('/get/meal-report/earnings',        'getEarningsReport');
     });
 });

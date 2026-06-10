@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class DeliveryChargeLedger extends Model
 {
-    protected $fillable = ['meal_order_id','customer_id','client_id','delivery_person_id','meal_type_id','delivery_date','order_tracking','delivery_status','delivery_charge','distance_km','distance_category','payment_status','is_charge_counted','charge_key'];
+    protected $fillable = ['meal_order_id','customer_id','client_id','delivery_person_id','meal_type_id','delivery_date','order_tracking','delivery_status','delivery_charge','rider_platform_fee','payable_amount','distance_km','distance_category','payment_status','is_charge_counted','charge_key'];
 
     protected $casts = [
         'delivery_date' => 'date',

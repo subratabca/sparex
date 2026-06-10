@@ -53,6 +53,107 @@ async function updateMealCartCount() {
     }
 }
 
+// ===== Global Location Loaders =====
+async function loadCountries(selectedId = '') {
+    try {
+        const response = await axios.get('/countries');
+        const dropdown = document.getElementById('country');
+        if (!dropdown) return;
+        dropdown.innerHTML = '<option value="">Select Country</option>';
+        response.data.data.forEach(country => {
+            const option = new Option(country.name, country.id);
+            option.selected = parseInt(country.id) === parseInt(selectedId);
+            dropdown.add(option);
+        });
+    } catch (error) {
+        handleError(error);
+    }
+}
+
+async function loadCounties(countryId, selectedId = '') {
+    try {
+        const dropdown = document.getElementById('county');
+        if (!dropdown) return;
+        dropdown.innerHTML = '<option value="">Select County</option>';
+        if (!countryId) return;
+        const response = await axios.get(`/counties/${countryId}`);
+        response.data.data.forEach(county => {
+            const option = new Option(county.name, county.id);
+            option.selected = parseInt(county.id) === parseInt(selectedId);
+            dropdown.add(option);
+        });
+    } catch (error) {
+        handleError(error);
+    }
+}
+
+async function loadCities(countyId, selectedId = '') {
+    try {
+        const dropdown = document.getElementById('city');
+        if (!dropdown) return;
+        dropdown.innerHTML = '<option value="">Select City</option>';
+        if (!countyId) return;
+        const response = await axios.get(`/cities/${countyId}`);
+        response.data.data.forEach(city => {
+            const option = new Option(city.name, city.id);
+            option.selected = parseInt(city.id) === parseInt(selectedId);
+            dropdown.add(option);
+        });
+    } catch (error) {
+        handleError(error);
+    }
+}
+
+
+
+
+function handleError(error) {
+    if (error.response) {
+        const status = error.response.status;
+        const data   = error.response.data;
+        const message = data?.message || data?.error || 'An unexpected error occurred';
+
+        switch (status) {
+            case 400:
+                errorToast(message || 'Bad Request');
+                break;
+            case 401:
+                errorToast(message || 'Unauthorized. Please login.');
+                setTimeout(() => window.location.href = '/user/login', 2000);
+                break;
+            case 403:
+                errorToast(message || 'Forbidden. You do not have permission.');
+                break;
+            case 404:
+                errorToast(message || 'Resource not found.');
+                break;
+            case 409:
+                errorToast(message || 'Conflict. Duplicate entry.');
+                break;
+            case 422:
+                if (data?.errors) {
+                    Object.values(data.errors).forEach(errs => {
+                        errs.forEach(err => errorToast(err));
+                    });
+                } else {
+                    errorToast(message || 'Validation failed.');
+                }
+                break;
+            case 500:
+                errorToast(message || 'Server error. Please try again later.');
+                break;
+            default:
+                errorToast(message || 'Something went wrong.');
+        }
+    } else if (error.request) {
+        errorToast('No response from server. Check your internet connection.');
+    } else {
+        errorToast(error.message || 'An unexpected error occurred.');
+    }
+}
+
+
+
 window.getCountryCode = function(countryName) {
     const countryCodes = {
         'United States': 'US',

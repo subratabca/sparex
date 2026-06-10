@@ -81,6 +81,46 @@
     <script src="{{ asset('backend/custom-js/toastify-js.js') }}"></script>
     <script src="{{ asset('backend/custom-js/config.js') }}"></script>
     <script src="https://js.stripe.com/v3/"></script>
+
+
+@stack('styles')
+<style type="text/css">
+.loading-spinner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(255, 255, 255, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.spinner-container {
+  display: flex;
+}
+
+.spinner-circle {
+  width: 20px;
+  height: 20px;
+  margin: 0 5px;
+  border-radius: 50%;
+  background-color: #007bff;
+  animation: bouncing 0.6s infinite alternate;
+}
+
+@keyframes bouncing {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-20px);
+  }
+}
+</style>
+
   </head>
 
   <body>
@@ -171,8 +211,8 @@
 
     <script src="{{ asset('backend/assets/js/maps-leaflet.js') }}"></script>
   </body>
-</html>
 
+@stack('scripts')
 <script>
 document.addEventListener("DOMContentLoaded", async function () {
   showLoader();
@@ -465,56 +505,6 @@ async function markAllAsRead() {
       }
 }
 
-function handleError(error) {
-    if (error.response) {
-        const status = error.response.status;
-        const message = error.response.data.message || 'An unexpected error occurred';
-
-        if (status === 400) {
-            errorToast(message || 'Bad Request');
-        } else if (status === 500) {
-            errorToast(message || 'Server Error');
-        } else {
-            errorToast(message);
-        }
-    }
-}
 </script>
 
-
-<style type="text/css">
-.loading-spinner {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(255, 255, 255, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-.spinner-container {
-  display: flex;
-}
-
-.spinner-circle {
-  width: 20px;
-  height: 20px;
-  margin: 0 5px;
-  border-radius: 50%;
-  background-color: #007bff;
-  animation: bouncing 0.6s infinite alternate;
-}
-
-@keyframes bouncing {
-  0% {
-    transform: translateY(0);
-  }
-  100% {
-    transform: translateY(-20px);
-  }
-}
-</style>
+</html>

@@ -575,22 +575,6 @@ async function updateWishlistCount() {
     }
 }
 
-function handleError(error) {
-    if (error.response) {
-        const status = error.response.status;
-        const message = error.response.data.message || 'An unexpected error occurred';
-
-        if (status === 400) {
-            errorToast(message || 'Bad Request');
-        } else if (status === 401) {
-            errorToast(message || 'Server Error');
-        } else if (status === 500) {
-            errorToast(message || 'Server Error');
-        } else {
-            errorToast(message);
-        }
-    }
-}
 </script>
 
 

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class ClientMealOrder extends Model
 {
-    protected $fillable = ['meal_order_id','client_id','subtotal','tax','delivery_fee','payable_amount','paid_amount','payment_status'];
+    protected $fillable = ['meal_order_id','client_id','subtotal','tax','platform_fee','delivery_fee','payable_amount','payment_status'];
 
     public function mealOrder()
     {
@@ -28,6 +28,11 @@ class ClientMealOrder extends Model
     {
         return $this->hasMany(DeliveryChargeLedger::class, 'meal_order_id', 'meal_order_id')
                     ->where('client_id', $this->client_id);
+    }
+
+    public function paymentHistories()
+    {
+        return $this->hasMany(ClientMealPaymentHistory::class, 'client_meal_order_id');
     }
 }
 

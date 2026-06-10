@@ -109,8 +109,41 @@
                             </div>
                         </div>
 
+                        <!-- Action Buttons -->
+                        <div class="row" id="action-buttons-section">
+                            <div class="col-xl-12">
+                                <div class="card border">
+                                    <div class="card-body text-center">
+                                        <h6 class="card-subtitle mb-3 text-muted">Delivery Actions</h6>
+                                        <div id="action-buttons" class="d-flex justify-content-center gap-3">
+                                            <!-- Action buttons will be populated here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Additional Information -->
+                        <div class="row mt-4">
+                            <div class="col-xl-12">
+                                <div class="card border">
+                                    <h5 class="card-header pb-3 border-bottom mb-3">Additional Information</h5>
+                                    <div class="card-body">
+                                        <div class="mb-2">
+                                            <span class="fw-semibold">Notification Title:</span>
+                                            <span id="notification-title" class="ms-2"></span>
+                                        </div>
+                                        <div class="mb-2">
+                                            <span class="fw-semibold">Notification Message:</span>
+                                            <span id="notification-message" class="ms-2"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Delivery Summary Section -->
-                        <div class="row mb-4">
+                        <div class="row mt-4">
                             <div class="col-md-6">
                                 <div class="card border">
                                     <div class="card-body">
@@ -181,7 +214,7 @@
                         </div>
                         
                         <!-- Restaurant and Customer Information -->
-                        <div class="row mb-4">
+                        <div class="row mt-4">
                             <div class="col-md-6">
                                 <div class="card border">
                                     <div class="card-body">
@@ -232,7 +265,7 @@
                         </div>
                         
                         <!-- Order Items Section -->
-                        <div class="row mb-4">
+                        <div class="row mt-4">
                             <div class="col-xl-12">
                                 <div class="card border">
                                     <h5 class="card-header pb-3 border-bottom mb-3">Order Items</h5>
@@ -255,39 +288,6 @@
                                         <div class="mt-3">
                                             <span class="fw-semibold">Total Items:</span>
                                             <span id="total-items" class="badge bg-primary ms-2"></span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Action Buttons -->
-                        <div class="row" id="action-buttons-section">
-                            <div class="col-xl-12">
-                                <div class="card border">
-                                    <div class="card-body text-center">
-                                        <h6 class="card-subtitle mb-3 text-muted">Delivery Actions</h6>
-                                        <div id="action-buttons" class="d-flex justify-content-center gap-3">
-                                            <!-- Action buttons will be populated here -->
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Additional Information -->
-                        <div class="row mt-4">
-                            <div class="col-xl-12">
-                                <div class="card border">
-                                    <h5 class="card-header pb-3 border-bottom mb-3">Additional Information</h5>
-                                    <div class="card-body">
-                                        <div class="mb-2">
-                                            <span class="fw-semibold">Notification Title:</span>
-                                            <span id="notification-title" class="ms-2"></span>
-                                        </div>
-                                        <div class="mb-2">
-                                            <span class="fw-semibold">Notification Message:</span>
-                                            <span id="notification-message" class="ms-2"></span>
                                         </div>
                                     </div>
                                 </div>

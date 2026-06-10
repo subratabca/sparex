@@ -1,18 +1,17 @@
 <div class="card">
     <div class="card-header header-elements">
-        <span class="me-2"><h5>Meal Orders</h5></span>
+        <span class="me-2"><h5>Order List Information</h5></span>
     </div>
 
     <div class="card-datatable table-responsive pt-0">
-        <table id="mealOrderTable" class="table table-bordered">
+        <table id="orderTable" class="table table-bordered">
             <thead>
                 <tr>
                     <th>Sl</th>
+                    <th>Order Date</th>
+                    <th>Invoice No</th>
                     <th>Customer Name</th>
-                    <th>Order No</th>
-                    <th>Meal Date</th>
-                    <th>Meal Type</th>
-                    <th>Billed Amount</th>
+                    <th>Payable Amount</th>
                     <th>Payment Status</th>
                     <th>Action</th>
                 </tr>
@@ -22,149 +21,66 @@
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    getList(); 
+    getList();
 });
 
 async function getList() {
     showLoader();
     try {
         let res = await axios.get("/client/get/meal-orders");
-        
         if (res.status === 200 && res.data.status === 'success') {
             let tableList = $("#tableList");
             tableList.empty();
 
-            if (res.data.data.length === 0) {
-                tableList.append(`
-                    <tr>
-                        <td colspan="8" class="text-center py-4">
-                            <div class="text-muted">
-                                <i class="mdi mdi-cart-off me-2" style="font-size: 24px;"></i>
-                                <p class="mb-0">No meal orders found</p>
-                            </div>
-                        </td>
-                    </tr>
-                `);
-                hideLoader();
-                initializeDataTable();
-                return;
+            if ($.fn.DataTable.isDataTable('#orderTable')) {
+                $('#orderTable').DataTable().clear().destroy();
             }
 
-            // Group data by order_id to calculate rowspans
-            const orderGroups = {};
-            res.data.data.forEach(item => {
-                if (!orderGroups[item.order_id]) {
-                    orderGroups[item.order_id] = [];
+            res.data.data.forEach(function (item, index) {
+                let orderDate = item.order_date || '-';
+                let invoiceNo = item.invoice_no || '-';
+                let customerName = item.customer_name || '-';
+                let payableAmount = item.payable_amount || '£0.00';
+                let paymentStatus = item.payment_status || 'Unknown';
+
+                let badgeClass = '';
+                switch (paymentStatus.toLowerCase()) {
+                    case 'pending': badgeClass = 'bg-warning'; break;
+                    case 'due': badgeClass = 'bg-danger'; break;
+                    case 'paid': badgeClass = 'bg-success'; break;
+                    case 'refunded': badgeClass = 'bg-info'; break;
+                    case 'failed': badgeClass = 'bg-danger'; break;
+                    default: badgeClass = 'bg-light text-dark';
                 }
-                orderGroups[item.order_id].push(item);
-            });
 
-            // Render rows with merged cells
-            let rowIndex = 0;
-            
-            Object.values(orderGroups).forEach(orderItems => {
-                // Sort items by meal_date descending within the order
-                orderItems.sort((a, b) => new Date(b.meal_date) - new Date(a.meal_date));
-                
-                const rowspan = orderItems.length;
-                const orderId = orderItems[0].order_id;
-                
-                orderItems.forEach((item, itemIndex) => {
-                    // Format meal date
-                    const formattedDate = new Date(item.meal_date).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric'
-                    });
-
-                    // Format meal types
-                    let formattedMealTypes = '-';
-                    if (item.meal_types && item.meal_types.length > 0) {
-                        formattedMealTypes = item.meal_types
-                            .map(t => t ? (t.charAt(0).toUpperCase() + t.slice(1)) : '')
-                            .filter(t => t)
-                            .join(', ');
-                    }
-
-                    let row = `
-                        <tr data-order-id="${orderId}" data-row-index="${itemIndex}" class="${itemIndex === 0 ? 'first-merged-row' : itemIndex === rowspan-1 ? 'last-merged-row' : 'middle-merged-row'}">`;
-                    
-                    // SL Number
-                    row += `<td class="text-center">${item.sl}</td>`;
-                    
-                    // Customer Name (merged - only show in first row)
-                    if (itemIndex === 0) {
-                        row += `
-                            <td rowspan="${rowspan}" class="customer-name-cell">
-                                <div class="customer-info">
-                                    <div class="fw-semibold">${item.customer_name || 'N/A'}</div>
-                                    ${item.customer_email ? `<small class="text-muted">${item.customer_email}</small>` : ''}
-                                </div>
-                            </td>`;
-                    }
-                    
-                    // Order No (merged - only show in first row)
-                    if (itemIndex === 0) {
-                        row += `
-                            <td rowspan="${rowspan}" class="text-center order-number-cell">
-                                <a href="/client/meal-order/details/${item.order_id}" 
-                                   class="text-primary fw-semibold order-link"
-                                   title="View Order Details">
-                                    ${item.order_number}
-                                </a>
-                                ${item.invoice_no ? `<br><small class="text-muted">${item.invoice_no}</small>` : ''}
-                            </td>`;
-                    }
-
-                    // Regular columns (not merged)
-                    row += `
-                            <td>
-                                <div class="d-flex align-items-center">
-                                    <i class="mdi mdi-calendar-clock me-2 text-primary"></i>
-                                    <div>
-                                        <div>${formattedDate}</div>
-                                        <small class="text-muted">${item.total_items} item(s)</small>
-                                    </div>
-                                </div>
-                            </td>
-                            <td>${formattedMealTypes}</td>
-                            <td class="text-end">
-                                <span class="fw-bold">$${item.billed_amount}</span>
-                            </td>
-                            <td class="text-center">${item.payment_status_badge}</td>
-                            <td class="text-center">
-                                <div class="btn-group" role="group">
-                                    <a href="/client/meal-order/details/${item.order_id}" 
-                                       class="btn btn-sm btn-outline-primary" 
-                                       title="View Order Details">
-                                        <i class="mdi mdi-eye-outline"></i>
-                                    </a>
-                                    <a href="/client/meal-order/${item.order_id}/date/${item.meal_date}" 
-                                       class="btn btn-sm btn-outline-info" 
-                                       title="View By Date">
-                                        <i class="mdi mdi-calendar-text"></i>
-                                    </a>
-                                    <button data-id="${item.order_id}" 
-                                            data-date="${item.meal_date}"
-                                            class="btn deleteBtn btn-sm btn-outline-danger" 
-                                            title="Delete">
-                                        <i class="mdi mdi-trash-can-outline"></i>
-                                    </button>
-                                </div>
-                            </td>
-                        </tr>`;
-                    
-                    tableList.append(row);
-                    rowIndex++;
-                });
+                let row = `
+                    <tr>
+                        <td>${index + 1}</td>
+                        <td>${orderDate}</td>
+                        <td>
+                            <a href="/client/meal-order/details/${item.order_id}" class="text-primary text-decoration-underline" target="_blank">${invoiceNo}</a>
+                        </td>
+                        <td>${customerName}</td>
+                        <td>${payableAmount}</td>
+                        <td><span class="badge ${badgeClass}">${paymentStatus}</span></td>
+                        <td class="text-center">
+                            <a href="/client/meal-order/details/${item.order_id}" 
+                               class="btn btn-sm btn-outline-primary" 
+                               title="Client Payment Details">
+                                <span class="mdi mdi-eye-circle"></span>
+                            </a>
+                        </td>
+                    </tr>
+                `;
+                tableList.append(row);
             });
 
             initializeDataTable();
-            attachEventListeners();
         } else {
-            errorToast(res.data.message || "Failed to fetch orders.");
+            errorToast(res.data.message || "Failed to fetch payment records.");
         }
     } catch (error) {
         handleError(error);
@@ -174,152 +90,64 @@ async function getList() {
 }
 
 function initializeDataTable() {
-    if ($.fn.DataTable.isDataTable('#mealOrderTable')) {
-        $('#mealOrderTable').DataTable().destroy();
+    if ($.fn.DataTable.isDataTable('#orderTable')) {
+        $('#orderTable').DataTable().destroy();
     }
+    $('#orderTable').DataTable({
+        paging: true,
+        serverSide: false,
+        autoWidth: false,
+        ordering: true,
+        searching: true,
+        lengthMenu: [10, 25, 50, 100],
+        pageLength: 10,
+        order: [[1, 'desc']] // Sort by order date descending
+    });
+}
 
-    $('#mealOrderTable').DataTable({
-        "paging": true,
-        "serverSide": false,
-        "autoWidth": false,
-        "ordering": true,
-        "searching": true,
-        "lengthMenu": [10, 25, 50, 100],
-        "pageLength": 10,
-        "order": [[0, 'asc']], // Sort by SL number
-        "columnDefs": [
-            {
-                "targets": 0, // SL No column
-                "orderable": false,
-                "className": "text-center",
-                "width": "5%"
-            },
-            {
-                "targets": 1, // Customer Name (merged)
-                "orderable": true,
-                "width": "15%"
-            },
-            {
-                "targets": 2, // Order No (merged)
-                "orderable": true,
-                "className": "text-center",
-                "width": "12%"
-            },
-            {
-                "targets": 3, // Meal Date
-                "orderable": true,
-                "type": "date",
-                "width": "12%"
-            },
-            {
-                "targets": 4, // Meal Type
-                "orderable": false,
-                "width": "15%"
-            },
-            {
-                "targets": 5, // Billed Amount
-                "orderable": true,
-                "className": "text-end",
-                "width": "10%"
-            },
-            {
-                "targets": 6, // Payment Status
-                "orderable": true,
-                "className": "text-center",
-                "width": "10%"
-            },
-            {
-                "targets": 7, // Action
-                "orderable": false,
-                "className": "text-center",
-                "width": "13%"
-            }
-        ],
-        "language": {
-            "emptyTable": "No meal orders available",
-            "search": "_INPUT_",
-            "searchPlaceholder": "Search orders...",
-            "lengthMenu": "_MENU_ orders per page",
-            "paginate": {
-                "previous": "←",
-                "next": "→"
-            }
+async function confirmMarkAsPaid(clientId, orderId, button) {
+    const result = await Swal.fire({
+        title: 'Mark Payment as Paid?',
+        text: "Are you sure you want to mark this payment as paid?",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Yes, mark as paid',
+        cancelButtonText: 'Cancel',
+        width: '500px', 
+        padding: '1.2rem', 
+        customClass: {
+            popup: 'swal-sm-font',          
+            title: 'swal-title-sm',         
+            content: 'swal-content-sm',     
+            confirmButton: 'btn btn-success',
+            cancelButton: 'btn btn-outline-secondary ms-2'
         },
-        "dom": '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
-               '<"row"<"col-sm-12"tr>>' +
-               '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
-        "initComplete": function(settings, json) {
-            // Add custom styles after initialization
-            $('.dataTables_filter input').addClass('form-control form-control-sm');
-            $('.dataTables_length select').addClass('form-select form-select-sm');
-            
-            // Add border styling for merged rows
-            addMergedRowStyles();
-        },
-        "drawCallback": function(settings) {
-            // Re-apply styling after DataTable redraws
-            setTimeout(() => {
-                addMergedRowStyles();
-                attachEventListeners();
-            }, 100);
-        }
+        buttonsStyling: false
     });
-}
 
-function addMergedRowStyles() {
-    // Add styling for merged cells
-    $('td[rowspan]').each(function() {
-        const $td = $(this);
-        const rowspan = parseInt($td.attr('rowspan'));
-        
-        if (rowspan > 1) {
-            $td.addClass('merged-cell');
-            $td.css({
-                'vertical-align': 'middle',
-                'background-color': '#f8f9fa'
-            });
-        }
-    });
-}
+    if (!result.isConfirmed) return; 
 
-function attachEventListeners() {
-    // Remove existing event listeners to prevent duplicates
-    $(document).off('click', '.deleteBtn');
-    
-    // Use event delegation for delete buttons
-    $(document).on('click', '.deleteBtn', function () {
-        let id = $(this).data('id');
-        let date = $(this).data('date');
-        
-        Swal.fire({
-            title: 'Are you sure?',
-            text: `You want to delete this meal order for ${date}?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Yes, delete it!',
-            cancelButtonText: 'Cancel'
-        }).then((result) => {
-            if (result.isConfirmed) {
-                deleteOrder(id, date);
-            }
-        });
-    });
-}
-
-async function deleteOrder(orderId, date) {
-    showLoader();
     try {
-        const res = await axios.delete(`/admin/meal-order/${orderId}`, {
-            data: { meal_date: date }
-        });
-        
-        if (res.data.status === 'success') {
-            successToast(res.data.message || 'Order deleted successfully');
-            getList(); // Refresh the list
+        showLoader();
+        let res = await axios.post(`/admin/meal/payment/mark-as-paid/client/${clientId}/order/${orderId}`);
+
+        if (res.status === 200 && res.data.status === 'success') {
+            successToast(res.data.message);
+
+            // Dynamically update badge text & class
+            let row = $(button).closest("tr");
+            row.find(".badge").each(function() {
+                let badge = $(this);
+                if (badge.text().trim().toLowerCase() === 'due') {
+                    badge.removeClass()
+                         .addClass("badge bg-success")
+                         .text("Paid");
+                }
+            });
+
+            $(button).remove();
         } else {
-            errorToast(res.data.message || 'Failed to delete order');
+            errorToast(res.data.message || 'Failed to update payment status.');
         }
     } catch (error) {
         handleError(error);
@@ -333,114 +161,15 @@ function handleError(error) {
     if (error.response) {
         const { status, data } = error.response;
         switch (status) {
-            case 500:
-                message = data?.message || "Internal server error. Please try again later.";
-                break;
-            case 404:
-                message = data?.message || "Order not found.";
-                break;
-            default:
-                message = data?.message || "Something went wrong.";
+            case 500: message = data?.error || "Internal server error."; break;
+            case 404: message = data?.message || "Data not found."; break;
+            default: message = data?.message || "Something went wrong.";
         }
     } else if (error.request) {
-        message = "No response from server. Please check your connection.";
+        message = "No response from the server. Check your internet.";
     } else {
         message = error.message;
     }
     errorToast(message);
 }
 </script>
-
-<style>
-.customer-info {
-    line-height: 1.2;
-}
-
-.order-link {
-    text-decoration: none;
-    transition: all 0.2s;
-}
-
-.order-link:hover {
-    text-decoration: underline;
-    color: #0a58ca !important;
-}
-
-/* Merged cell styling */
-.merged-cell {
-    background-color: #f8f9fa !important;
-    vertical-align: middle !important;
-    position: relative;
-    border-right: 2px solid #dee2e6 !important;
-}
-
-.customer-name-cell {
-    border-left: 2px solid #dee2e6 !important;
-}
-
-.order-number-cell {
-    background-color: #f8f9fa !important;
-}
-
-/* Row border styling for merged groups */
-.first-merged-row td:not(.merged-cell) {
-    border-top: 2px solid #007bff !important;
-}
-
-.last-merged-row td:not(.merged-cell) {
-    border-bottom: 2px solid #007bff !important;
-}
-
-.middle-merged-row td:not(.merged-cell) {
-    border-top: 1px solid #dee2e6 !important;
-}
-
-/* Hover effect */
-#mealOrderTable tbody tr:hover {
-    background-color: #f8f9fa;
-}
-
-#mealOrderTable tbody tr:hover .merged-cell {
-    background-color: #e9ecef !important;
-}
-
-/* Button group styling */
-.btn-group .btn {
-    padding: 0.25rem 0.5rem;
-    margin: 0 2px;
-}
-
-/* Ensure proper vertical alignment in merged cells */
-#mealOrderTable td {
-    vertical-align: middle;
-}
-
-/* Badge styling */
-.badge {
-    font-size: 0.75em;
-    padding: 0.35em 0.65em;
-}
-
-/* DataTable customization */
-.dataTables_wrapper .dataTables_filter {
-    float: right !important;
-}
-
-.dataTables_wrapper .dataTables_length {
-    float: left !important;
-}
-
-/* Responsive adjustments */
-@media (max-width: 768px) {
-    .btn-group {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 2px;
-    }
-    
-    .btn-group .btn {
-        flex: 1;
-        min-width: 36px;
-    }
-}
-</style>

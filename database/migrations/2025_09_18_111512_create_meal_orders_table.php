@@ -16,6 +16,9 @@ return new class extends Migration
             $table->foreignId('customer_id')->constrained('users')->onDelete('cascade');
             $table->enum('status', ['pending', 'completed', 'cancelled'])->default('pending');
             $table->enum('delivery_type', ['self_pickup','courier'])->default('self_pickup');
+            $table->decimal('service_fee', 10, 2)->default(0);
+            $table->decimal('client_platform_fee', 10, 2)->default(0);
+            $table->decimal('rider_platform_fee', 10, 2)->default(0);
             $table->decimal('delivery_fee', 10, 2)->default(0);
             $table->decimal('subtotal', 10, 2)->default(0);
             $table->decimal('tax', 10, 2)->default(0);  

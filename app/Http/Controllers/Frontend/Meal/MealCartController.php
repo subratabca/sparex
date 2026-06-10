@@ -5,6 +5,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
 use App\Models\MealCart;
@@ -89,64 +90,78 @@ class MealCartController extends Controller
         try {
             $customerId = $request->header('id');
 
-            // Eager load product and meal type
-            $mealCart = MealCart::with(['product:id,name,image,price,discount_price', 'mealType:id,name','client:id,firstName,lastName'])
+            $mealCart = MealCart::with([
+                    'product:id,name,image,price,discount_price',
+                    'mealType:id,name',
+                    'client:id,firstName,lastName'
+                ])
                 ->where('customer_id', $customerId)
                 ->orderBy('meal_date', 'asc')
+                ->orderBy('meal_type_id', 'asc')
                 ->get()
-                ->groupBy('meal_date'); 
+                ->groupBy('meal_date')
+                ->map(fn($dateItems) => $dateItems->groupBy('meal_type_id'));
 
             $summary = [
-                'subtotal' => 0,
+                'subtotal'    => 0,
                 'total_items' => 0,
             ];
 
-            foreach ($mealCart as $day) {
-                foreach ($day as $item) {
-                    $summary['subtotal'] += $item->quantity * $item->unit_price;
-                    $summary['total_items'] += $item->quantity;
+            foreach ($mealCart as $dateGroup) {
+                foreach ($dateGroup as $typeGroup) {
+                    foreach ($typeGroup as $item) {
+                        $summary['subtotal']    += $item->quantity * $item->unit_price;
+                        $summary['total_items'] += $item->quantity;
+                    }
                 }
             }
 
             $taxRate = (float) config('services.tax_rate', 0.10);
-            $tax = round($summary['subtotal'] * $taxRate, 2);
-            $total = round($summary['subtotal'] + $tax, 2);
+            $serviceFeeRate = (float) config('services.service_fee', 0.05);
+
+            $tax     = round($summary['subtotal'] * $taxRate, 2);
+            $serviceFee = round($summary['subtotal'] * $serviceFeeRate, 2); 
+            $total      = round($summary['subtotal'] + $tax + $serviceFee, 2);
 
             return response()->json([
                 'status' => 'success',
-                'data' => [
-                    'meal_cart' => $mealCart->map(function($dayItems) {
-                        return $dayItems->map(function($item) {
-                            return [
-                                'id' => $item->id,
-                                'quantity' => $item->quantity,
-                                'unit_price' => $item->unit_price,
-                                'total_price' => $item->total_price,
-                                'meal_type' => $item->mealType,
-                                'meal_date' => $item->meal_date, 
-                                'meal_time' => $item->meal_time,
-                                'product' => $item->product,
-                                'client' => $item->client ? [
-                                    'firstName' => $item->client->firstName,
-                                    'lastName' => $item->client->lastName
-                                ] : null
-                            ];
+                'data'   => [
+                    'meal_cart' => $mealCart->map(function ($dateGroup) {
+                        return $dateGroup->map(function ($typeGroup) {
+                            return $typeGroup->map(function ($item) {
+                                return [
+                                    'id'          => $item->id,
+                                    'quantity'    => $item->quantity,
+                                    'unit_price'  => $item->unit_price,
+                                    'total_price' => $item->total_price,
+                                    'meal_type'   => $item->mealType,
+                                    'meal_date'   => $item->meal_date,
+                                    'meal_time'   => $item->meal_time,
+                                    'product'     => $item->product,
+                                    'client'      => $item->client ? [
+                                        'firstName' => $item->client->firstName,
+                                        'lastName'  => $item->client->lastName,
+                                    ] : null,
+                                ];
+                            });
                         });
                     }),
                     'summary' => [
-                        'subtotal' => $summary['subtotal'],
-                        'tax' => $tax,
-                        'total' => $total,
-                        'total_items' => $summary['total_items']
+                        'subtotal'    => $summary['subtotal'],
+                        'tax'         => $tax,
+                        'service_fee'      => $serviceFee,       
+                        'service_fee_rate' => $serviceFeeRate,   
+                        'total'       => $total,
+                        'total_items' => $summary['total_items'],
                     ]
                 ]
             ]);
 
         } catch (Exception $e) {
             return response()->json([
-                'status' => 'error',
+                'status'  => 'error',
                 'message' => 'Failed to load meal cart',
-                'error' => $e->getMessage()
+                'error'   => $e->getMessage()
             ], 500);
         }
     }
@@ -155,15 +170,31 @@ class MealCartController extends Controller
     {
         $request->validate([
             'meal_item_id' => 'required|exists:meal_carts,id',
-            'quantity' => 'required|integer|min:1',
+            'quantity'     => 'required|integer|min:1',
         ]);
 
-        $item = MealCart::find($request->meal_item_id);
-        $item->quantity = $request->quantity;
-        $item->total_price = $item->unit_price * $request->quantity;
-        $item->save();
+        try {
+            $customerId = $request->header('id');
 
-        return response()->json(['status' => 'success', 'message' => 'Meal item updated']);
+            $item = MealCart::where('id', $request->meal_item_id)
+                            ->where('customer_id', $customerId)
+                            ->firstOrFail();
+
+            $item->quantity    = $request->quantity;
+            $item->total_price = $item->unit_price * $request->quantity;
+            $item->save();
+
+            return response()->json([
+                'status'  => 'success',
+                'message' => 'Meal item updated'
+            ]);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'status'  => 'error',
+                'message' => 'Failed to update item or item not found'
+            ], 404);
+        }
     }
 
     public function removeMealItem(Request $request)
@@ -172,10 +203,26 @@ class MealCartController extends Controller
             'meal_item_id' => 'required|exists:meal_carts,id',
         ]);
 
-        $item = MealCart::find($request->meal_item_id);
-        $item->delete();
+        try {
+            $customerId = $request->header('id');
 
-        return response()->json(['status' => 'success', 'message' => 'Meal item removed']);
+            $item = MealCart::where('id', $request->meal_item_id)
+                            ->where('customer_id', $customerId)
+                            ->firstOrFail();
+
+            $item->delete();
+
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Meal item removed'
+            ]);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Failed to remove item or item not found'
+            ], 404);
+        }
     }
 
     public function count(Request $request)
@@ -212,17 +259,17 @@ class MealCartController extends Controller
     public function getShippingAddressInfo(Request $request)
     {
         try {
-            $email = $request->header('email');
+            $customerId = $request->header('id');
 
-            if (!$email) {
+            if (!$customerId) {
                 return response()->json([
                     'status' => 'failed',
-                    'message' => 'Email header is required'
-                ], 400);
+                    'message' => 'Unauthorized'
+                ], 401);
             }
 
             $shippingAddresses = MealShippingAddress::with(['country', 'county', 'city'])
-                ->where('email', $email)
+                ->whereHas('mealOrder', fn($q) => $q->where('customer_id', $customerId))
                 ->orderBy('created_at', 'desc')
                 ->get();
 
@@ -243,23 +290,16 @@ class MealCartController extends Controller
 
     public function getMealCourierCharge(Request $request)
     {
-        $email = $request->header('email'); 
+        $customerId = $request->header('id');
 
-        if (!$email) {
+        if (!$customerId) {
             return response()->json([
                 'status' => 'error',
-                'message' => 'Email header missing'
-            ], 422);
+                'message' => 'Unauthorized'
+            ], 401);
         }
 
-        $customer = User::where('email', $email)->first();
-
-        if (!$customer) {
-            return response()->json([
-                'status' => 'error',
-                'message' => 'Invalid customer'
-            ], 404);
-        }
+        $customer = User::findOrFail($customerId);
 
         // Validate required shipping address fields
         $request->validate([
@@ -290,6 +330,13 @@ class MealCartController extends Controller
         $totalCharge = 0;
         $chargesPerDate = [];
 
+        // Distance tiers — add new tiers here if needed
+        $distanceTiers = [
+            2  => 'inside_city_2km',
+            5  => 'inside_city_5km',
+            10 => 'inside_city_10km',
+        ];
+
         // Group cart items by meal_date
         $cartItemsByDate = $cartItems->groupBy('meal_date');
 
@@ -297,7 +344,7 @@ class MealCartController extends Controller
             $chargesPerClientMealType = [];
 
             foreach ($itemsForDate as $item) {
-                $client = $item->client;
+                $client   = $item->client;
                 $mealType = $item->mealType;
 
                 if (!$client || !$mealType) continue;
@@ -305,10 +352,7 @@ class MealCartController extends Controller
                 // Key: client_id + meal_type_id to avoid double counting
                 $key = $client->id . '_' . $mealType->id;
 
-                if (isset($chargesPerClientMealType[$key])) {
-                    // Already counted this client + meal type for this date
-                    continue;
-                }
+                if (isset($chargesPerClientMealType[$key])) continue;
 
                 // Ensure client has valid address
                 if (!$client->city_id || !$client->address1 || !$client->zip_code) continue;
@@ -319,7 +363,7 @@ class MealCartController extends Controller
                     'zip_code' => $client->zip_code,
                 ];
 
-                // Calculate distance (for now using fixed 5km as in your example)
+                // Calculate distance
                 $distance = $this->getDistanceBetweenLocations($clientAddress, $shippingAddress);
                 if ($distance === null) continue;
 
@@ -330,22 +374,18 @@ class MealCartController extends Controller
 
                 if (!$deliveryCharge) continue;
 
-                // Determine charge based on distance
-                if ($distance <= 2) {
-                    $charge = $deliveryCharge->inside_city_2km;
-                } elseif ($distance <= 5) {
-                    $charge = $deliveryCharge->inside_city_5km;
-                } elseif ($distance <= 10) {
-                    $charge = $deliveryCharge->inside_city_10km;
-                } else {
-                    $charge = $deliveryCharge->inside_city_above_10km;
+                // Dynamically determine charge based on distance tiers
+                $charge = $deliveryCharge->inside_city_above_10km; // default
+                foreach ($distanceTiers as $km => $column) {
+                    if ($distance <= $km) {
+                        $charge = $deliveryCharge->$column;
+                        break;
+                    }
                 }
 
-                // Store charge for this client + meal type (counted once)
                 $chargesPerClientMealType[$key] = $charge;
             }
 
-            // Sum charges for this date
             $dateCharge = array_sum($chargesPerClientMealType);
             $chargesPerDate[$date] = $dateCharge;
             $totalCharge += $dateCharge;
@@ -364,7 +404,6 @@ class MealCartController extends Controller
             'details' => $chargesPerDate
         ]);
     }
-
 
     private function getDistanceBetweenLocations($clientAddress, $shippingAddress)
     {
@@ -410,39 +449,4 @@ class MealCartController extends Controller
         }
     }
 
-
-    private function getDistanceBetweenLocations111($clientAddress, $shippingAddress)
-    {
-        // Google API key from .env
-        $apiKey = env('GOOGLE_MAPS_API_KEY');
-
-        if (!$apiKey) {
-            throw new \Exception('Google Maps API key not set in .env');
-        }
-
-        // Construct origin & destination strings
-        $origin = urlencode($clientAddress['address1'] . ', ' . $clientAddress['zip_code']);
-        $destination = urlencode($shippingAddress['address1'] . ', ' . $shippingAddress['zip_code']);
-
-        // Build URL for Google Distance Matrix API
-        $url = "https://maps.googleapis.com/maps/api/distancematrix/json?origins={$origin}&destinations={$destination}&mode=driving&units=metric&key={$apiKey}";
-
-        try {
-            $response = Http::get($url);
-            $data = $response->json();
-
-            if (isset($data['rows'][0]['elements'][0]['status']) && $data['rows'][0]['elements'][0]['status'] === 'OK') {
-                // Distance in meters
-                $distanceMeters = $data['rows'][0]['elements'][0]['distance']['value'];
-                // Convert to KM
-                $distanceKm = $distanceMeters / 1000;
-                return $distanceKm;
-            }
-
-            return null; // unable to calculate distance
-        } catch (\Exception $e) {
-            \Log::error("Distance calculation error: " . $e->getMessage());
-            return null;
-        }
-    }
 }

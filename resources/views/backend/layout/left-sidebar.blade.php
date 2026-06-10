@@ -68,11 +68,11 @@
       </a>
     </li>
 
-    <li class="menu-item {{ request()->routeIs(['admin.meal.orders*', 'admin.client.meal.payments*', 'admin.delivery.paypents*']) ? 'active open' : '' }}">
+    <li class="menu-item {{ request()->routeIs(['admin.meal.orders*', 'admin.client.meal.payments*', 'admin.delivery.paypents*', 'admin.meal.reports*']) ? 'active open' : '' }}">
       <a href="javascript:void(0);" class="menu-link menu-toggle">
         <i class="menu-icon tf-icons mdi mdi-food-fork-drink"></i>
         <div data-i18n="Meal Orders">Meal Orders</div>
-        <div class="badge bg-primary rounded-pill ms-auto">3</div>
+        <div class="badge bg-primary rounded-pill ms-auto">4</div>
       </a>
       <ul class="menu-sub">
         <li class="menu-item {{ request()->routeIs('admin.meal.orders*') ? 'active' : '' }}">
@@ -81,7 +81,7 @@
           </a>
         </li>
         <li class="menu-item {{ request()->routeIs('admin.client.meal.payments*') ? 'active' : '' }}">
-          <a href="{{ route('admin.delivery.paypents') }}" class="menu-link">
+          <a href="{{ route('admin.client.meal.payments') }}" class="menu-link">
             <div data-i18n="Client Payments">Client Payments</div>
           </a>
         </li>
@@ -90,22 +90,15 @@
             <div data-i18n="Delivery Payments">Delivery Payments</div>
           </a>
         </li>
+        <li class="menu-item {{ request()->routeIs('admin.meal.reports*') ? 'active' : '' }}">
+          <a href="{{ route('admin.meal.reports') }}" class="menu-link">
+            <div data-i18n="Meal Reports">Meal Reports</div>
+          </a>
+        </li>
       </ul>
     </li>
 
-<!--     <li class="menu-item {{ request()->routeIs('admin.meal.orders*') ? 'active' : '' }}">
-      <a href="{{ route('admin.meal.orders') }}" class="menu-link">
-        <i class="menu-icon tf-icons mdi mdi-food-fork-drink"></i>
-        <div data-i18n="Meal Orders">Meal Orders</div>
-      </a>
-    </li>
 
-    <li class="menu-item {{ request()->routeIs('admin.client.meal.payments*') ? 'active' : '' }}">
-      <a href="{{ route('admin.client.meal.payments') }}" class="menu-link">
-        <i class="menu-icon tf-icons mdi mdi-food-fork-drink"></i>
-        <div data-i18n="Client Meal Payment">Client Meal Payment</div>
-      </a>
-    </li> -->
 
     <li class="menu-item {{ $currentRoute == 'delivery-persons' ? 'active' : '' }}">
       <a href="{{ route('admin.delivery.persons') }}" class="menu-link">
