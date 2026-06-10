@@ -175,11 +175,12 @@ Route::prefix('user')->group(function () {
 
 Route::prefix('user')->middleware([TokenVerificationMiddleware::class])->group(function () {
     Route::controller(MealPlanController::class)->group(function () {
-        Route::get('/meal-plans','mealPlanPage')->name('meal.plan');
-        Route::get('/get/meal-keywords/{mealTypeId}','getMealKeywordByType');
-        Route::get('/meal/details/{id}','mealDetailsPage');
-        Route::get('/get/meal/details/{id}','getMealDetails');
-        Route::post('/search/products','searchProducts');
+        Route::get('/meal-plans', 'mealPlanPage')->name('meal.plan');
+        Route::get('/get/meal-keywords/{mealTypeId}', 'getMealKeywordByType');
+        Route::get('/meal/details/{id}', 'mealDetailsPage');
+        Route::get('/get/meal/details/{id}', 'getMealDetails');
+        Route::get('/get/health-profile', 'getHealthProfile');
+        Route::post('/search/products', 'searchProducts');
         Route::post('/generate/meal-suggestion', 'generateMealSuggestion');
     });
 
