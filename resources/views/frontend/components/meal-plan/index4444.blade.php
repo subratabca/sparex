@@ -15,15 +15,9 @@
                         <p class="text-muted mb-0">Get personalised meal suggestions based on your profile and past orders.</p>
                     </div>
                 </div>
-                <div class="d-flex flex-wrap gap-2">
-                    {{-- Shown only when a health profile already exists --}}
-                    <button type="button" class="btn btn-outline-primary rounded-pill px-4" id="update-health-btn" style="display:none;">
-                        <i class="mdi mdi-account-heart-outline me-1"></i> Update Health Info
-                    </button>
-                    <button type="button" class="btn btn-gradient rounded-pill px-4" id="open-planner-btn">
-                        <i class="mdi mdi-creation me-1"></i> <span id="planner-btn-label">Generate My Plan</span>
-                    </button>
-                </div>
+                <button type="button" class="btn btn-gradient rounded-pill px-4" id="open-planner-btn">
+                    <i class="mdi mdi-creation me-1"></i> <span id="planner-btn-label">Generate My Plan</span>
+                </button>
             </div>
         </div>
     </div>
@@ -142,33 +136,6 @@
                             <label class="form-label fw-semibold">Height (cm)</label>
                             <input type="number" id="ai-height" class="form-control" min="30" max="300" placeholder="e.g. 175">
                         </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Activity Level</label>
-                            <select id="ai-activity" class="form-select">
-                                @foreach(\App\Models\UserHealthProfile::ACTIVITY_LEVELS as $val => $label)
-                                    <option value="{{ $val }}" {{ $val === 'light' ? 'selected' : '' }}>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Goal</label>
-                            <select id="ai-goal" class="form-select">
-                                <option value="">Auto (based on BMI)</option>
-                                @foreach(\App\Models\UserHealthProfile::GOALS as $val => $label)
-                                    <option value="{{ $val }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Dietary Preference</label>
-                            <select id="ai-diet" class="form-select">
-                                @foreach(\App\Models\UserHealthProfile::DIETS as $val => $label)
-                                    <option value="{{ $val }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Compare Against</label>
                             <select id="ai-period" class="form-select">
@@ -176,30 +143,6 @@
                                 <option value="last_month">Last Month's Orders</option>
                             </select>
                         </div>
-
-                        {{-- Chronic conditions — multi-select with Select All --}}
-                        <div class="col-12">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label fw-semibold mb-0">Do you have any of these conditions?</label>
-                                <div class="form-check form-switch mb-0">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="conditions-select-all">
-                                    <label class="form-check-label small fw-semibold" for="conditions-select-all">Select All</label>
-                                </div>
-                            </div>
-                            <div class="row g-2 bg-light rounded-3 p-3" id="conditions-list">
-                                @foreach(\App\Models\UserHealthProfile::CONDITIONS as $val => $label)
-                                    <div class="col-sm-6 col-md-4">
-                                        <div class="form-check">
-                                            <input class="form-check-input condition-checkbox" type="checkbox"
-                                                   value="{{ $val }}" id="cond-{{ $val }}">
-                                            <label class="form-check-label" for="cond-{{ $val }}">{{ $label }}</label>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                            <small class="text-muted d-block mt-1">Optional — this only helps us flag relevant considerations, not give medical advice.</small>
-                        </div>
-
                         <div class="col-12">
                             <label class="form-label fw-semibold">Describe Your Health Goals</label>
                             <textarea id="ai-description" class="form-control" rows="3"
@@ -326,7 +269,6 @@
 .result-title { color:#1c2434; }
 .result-title:hover { color:#0d6efd; }
 .result-meal-badge { font-size:.68rem; }
-.condition-badge { font-size:.7rem; }
 </style>
 @endpush
 
@@ -342,14 +284,6 @@ let selectedMealTime   = null;
 let lastSearchTerms    = [];
 let suggestionProductMap = {};
 const MEAL_DEFAULT_TIMES = { breakfast:'08:00', lunch:'12:00', snacks:'16:00', dinner:'19:00' };
-
-// Condition value → label (mirror of UserHealthProfile::CONDITIONS for display)
-const CONDITION_LABELS = {
-    diabetes:'Diabetes', hypertension:'High blood pressure', high_cholesterol:'High cholesterol',
-    heart_disease:'Heart disease', kidney_disease:'Kidney disease', thyroid:'Thyroid disorder',
-    celiac:'Celiac / gluten intolerance', lactose:'Lactose intolerance', ibs:'IBS / digestive issues',
-    anemia:'Anaemia', obesity:'Obesity', pcos:'PCOS'
-};
 
 document.addEventListener('DOMContentLoaded', async () => {
     try {
@@ -373,19 +307,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('meal-date').addEventListener('change', updateTimeForSelectedMealType);
         selectedMealTime = document.getElementById('meal-time').value;
 
-        // Keyword Select All toggle (static element — bind once)
+        // Select All toggle (static element — bind once)
         document.getElementById('keyword-select-all').addEventListener('change', function () {
             toggleSelectAllKeywords(this.checked);
-        });
-
-        // Conditions Select All toggle + two-way sync
-        document.getElementById('conditions-select-all').addEventListener('change', function () {
-            document.querySelectorAll('.condition-checkbox').forEach(cb => { cb.checked = this.checked; });
-        });
-        document.getElementById('conditions-list').addEventListener('change', (e) => {
-            if (!e.target.classList.contains('condition-checkbox')) return;
-            const boxes = Array.from(document.querySelectorAll('.condition-checkbox'));
-            document.getElementById('conditions-select-all').checked = boxes.length > 0 && boxes.every(cb => cb.checked);
         });
 
         initAiPlanner();
@@ -407,16 +331,11 @@ async function checkHealthProfile() {
         if (res.data.status === 'success' && res.data.data.has_profile) {
             if (res.data.data.profile) prefillPlannerForm(res.data.data.profile);
             document.getElementById('planner-btn-label').textContent = 'Update My Plan';
-            // profile exists → reveal the Update Health Info button
-            document.getElementById('update-health-btn').style.display = 'inline-block';
             renderSuggestions(res.data.data);
         } else {
-            // no profile → hide update button, open planner for first-time setup
-            document.getElementById('update-health-btn').style.display = 'none';
             new bootstrap.Modal(document.getElementById('aiPlannerModal')).show();
         }
     } catch (error) {
-        document.getElementById('update-health-btn').style.display = 'none';
         new bootstrap.Modal(document.getElementById('aiPlannerModal')).show();
     }
 }
@@ -428,14 +347,6 @@ function prefillPlannerForm(p) {
     document.getElementById('ai-height').value      = p.height ?? '';
     document.getElementById('ai-period').value      = p.period ?? 'last_week';
     document.getElementById('ai-description').value = p.description ?? '';
-    document.getElementById('ai-activity').value    = p.activity_level ?? 'light';
-    document.getElementById('ai-goal').value        = p.goal ?? '';
-    document.getElementById('ai-diet').value        = p.dietary_preference ?? 'none';
-
-    const saved = p.conditions || [];
-    document.querySelectorAll('.condition-checkbox').forEach(cb => { cb.checked = saved.includes(cb.value); });
-    const boxes = Array.from(document.querySelectorAll('.condition-checkbox'));
-    document.getElementById('conditions-select-all').checked = boxes.length > 0 && boxes.every(cb => cb.checked);
 }
 
 /* ===== Time helpers ===== */
@@ -643,7 +554,7 @@ async function searchProducts(keywords, page = 1) {
     }
 }
 
-/* ===================== attractive result cards ===================== */
+/* ===================== Requirement 3: attractive result cards ===================== */
 function renderProducts(products, total) {
     allProducts = products;
     const list = document.getElementById('product-list');
@@ -821,16 +732,11 @@ function updatePagination(paginationData) {
 /* ===================== SMART MEAL PLANNER ===================== */
 function initAiPlanner() {
     document.getElementById('ai-generate-btn').addEventListener('click', generateAiPlan);
-
-    const openPlanner = () => {
+    document.getElementById('open-planner-btn').addEventListener('click', () => {
         document.getElementById('ai-form-section').style.display    = 'block';
         document.getElementById('ai-loading-section').style.display = 'none';
         new bootstrap.Modal(document.getElementById('aiPlannerModal')).show();
-    };
-
-    document.getElementById('open-planner-btn').addEventListener('click', openPlanner);
-    // Update Health Info opens the same prefilled form
-    document.getElementById('update-health-btn').addEventListener('click', openPlanner);
+    });
 }
 
 async function generateAiPlan() {
@@ -840,11 +746,7 @@ async function generateAiPlan() {
     const height      = document.getElementById('ai-height').value;
     const period      = document.getElementById('ai-period').value;
     const description = document.getElementById('ai-description').value;
-    const activity_level     = document.getElementById('ai-activity').value;
-    const goal               = document.getElementById('ai-goal').value;
-    const dietary_preference = document.getElementById('ai-diet').value;
-    const conditions = Array.from(document.querySelectorAll('.condition-checkbox:checked')).map(cb => cb.value);
-    const err = document.getElementById('ai-error');
+    const err         = document.getElementById('ai-error');
 
     err.style.display = 'none'; err.textContent = '';
     if (!gender || !age || !weight || !height) {
@@ -857,14 +759,10 @@ async function generateAiPlan() {
     document.getElementById('ai-loading-section').style.display = 'block';
 
     try {
-        const res = await axios.post('/user/generate/meal-suggestion', {
-            gender, age, weight, height, period, description,
-            activity_level, goal, dietary_preference, conditions
-        });
+        const res = await axios.post('/user/generate/meal-suggestion', { gender, age, weight, height, period, description });
         if (res.data.status === 'success') {
             bootstrap.Modal.getInstance(document.getElementById('aiPlannerModal'))?.hide();
             document.getElementById('planner-btn-label').textContent = 'Update My Plan';
-            document.getElementById('update-health-btn').style.display = 'inline-block';
             renderSuggestions(res.data.data);
             document.getElementById('suggestion-section').scrollIntoView({ behavior: 'smooth' });
         } else {
@@ -889,26 +787,13 @@ function renderSuggestions(data) {
     document.getElementById('suggestion-period-badge').textContent =
         data.period === 'last_month' ? 'Based on last month' : 'Based on last week';
 
-    let summaryHtml = `
+    document.getElementById('suggestion-summary').innerHTML = `
         <i class="mdi mdi-account-heart-outline fs-5"></i>
         <div>
             <strong>BMI: ${data.bmi} (${data.bmi_category})</strong> &middot;
             Daily target <strong>${data.target_calories} kcal</strong>.
-            Below is a suggested plan for the next 7 days, by date and meal type.`;
-
-    // Surface noted conditions as a flag (not medical advice)
-    if (data.conditions && data.conditions.length) {
-        const badges = data.conditions
-            .map(c => `<span class="badge bg-light text-dark condition-badge me-1">${CONDITION_LABELS[c] || c}</span>`)
-            .join('');
-        summaryHtml += `
-            <div class="mt-2 small text-muted">
-                <i class="mdi mdi-heart-pulse me-1"></i>Noted conditions: ${badges}
-                — please consult a professional for condition-specific dietary advice.
-            </div>`;
-    }
-    summaryHtml += `</div>`;
-    document.getElementById('suggestion-summary').innerHTML = summaryHtml;
+            Below is a suggested plan for the next 7 days, by date and meal type.
+        </div>`;
 
     const a = data.analysis || {};
     const analysisEl = document.getElementById('suggestion-analysis');

@@ -1,230 +1,145 @@
-<div class="container-xxl flex-grow-1 container-p-y">
-    <div class="row">
-        <div class="col-12">
-            <div class="card mb-4">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h5 class="card-title mb-0">Delivery Order Details</h5>
-                    <a href="{{ route('delivery.meal.orders') }}" class="btn btn-secondary">
-                        <i class="bx bx-arrow-back me-1"></i> Back to Orders
+<div class="container-xxl flex-grow-1 container-p-y px-0">
+
+    {{-- ===== Hero ===== --}}
+    <div class="mo-hero text-white rounded-4 p-4 mb-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <span class="mo-hero-icon"><i class="mdi mdi-truck-fast-outline"></i></span>
+            <div>
+                <h5 class="fw-bold mb-1">Delivery Order Details</h5>
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="badge bg-white text-dark" id="tracking-number">—</span>
+                    <span id="delivery-status-badge" class="badge bg-light text-dark">—</span>
+                </div>
+            </div>
+        </div>
+        <a href="{{ route('delivery.meal.orders') }}" class="btn btn-light rounded-pill px-3">
+            <i class="mdi mdi-arrow-left me-1"></i> Back to Orders
+        </a>
+    </div>
+
+    {{-- ===== Action banner (status update) ===== --}}
+    <div id="delivery-actions-row" class="mb-4" style="display:none;">
+        <div class="mo-action rounded-4 p-3 d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <span class="mo-action-icon"><i class="mdi mdi-progress-clock"></i></span>
+                <div>
+                    <div class="fw-bold text-success">Delivery Action Required</div>
+                    <small class="text-muted" id="delivery-action-hint"></small>
+                </div>
+            </div>
+            <button type="button" class="btn btn-success rounded-pill px-4" id="update-delivery-status-btn" onclick="handleUpdateDeliveryStatus()">
+                <i class="mdi mdi-refresh me-1"></i> Update Status
+            </button>
+        </div>
+    </div>
+
+    {{-- ===== Stat tiles ===== --}}
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="mo-stat mo-stat-distance h-100">
+                <span class="mo-stat-ico"><i class="mdi mdi-map-marker-distance"></i></span>
+                <div class="mo-stat-label">Distance</div>
+                <div class="mo-stat-value" id="stat-distance">—</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="mo-stat mo-stat-charge h-100">
+                <span class="mo-stat-ico"><i class="mdi mdi-cash"></i></span>
+                <div class="mo-stat-label">Delivery Charge</div>
+                <div class="mo-stat-value" id="delivery-charge">£0.00</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="mo-stat mo-stat-meal h-100">
+                <span class="mo-stat-ico"><i class="mdi mdi-silverware-fork-knife"></i></span>
+                <div class="mo-stat-label">Meal Type</div>
+                <div class="mo-stat-value" id="meal-type">—</div>
+            </div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="mo-stat mo-stat-date h-100">
+                <span class="mo-stat-ico"><i class="mdi mdi-calendar-outline"></i></span>
+                <div class="mo-stat-label">Delivery Date</div>
+                <div class="mo-stat-value" id="delivery-date">—</div>
+            </div>
+        </div>
+    </div>
+
+    {{-- ===== Addresses (stacked) + map ===== --}}
+    <div class="row g-4 mb-4">
+        <div class="col-lg-5 d-flex flex-column gap-3">
+            <div class="mo-addr mo-addr-pickup rounded-4 p-3 flex-fill">
+                <div class="mo-addr-head text-danger"><i class="mdi mdi-storefront-outline"></i> Pickup — Restaurant</div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <img id="restaurant-image" src="" class="rounded-circle" style="width:40px;height:40px;object-fit:cover;">
+                    <span class="fw-bold" id="restaurant-name">—</span>
+                </div>
+                <div class="small text-muted"><i class="mdi mdi-phone-outline me-1"></i><span id="restaurant-phone">—</span></div>
+                <div class="small text-muted"><i class="mdi mdi-email-outline me-1"></i><span id="restaurant-email">—</span></div>
+                <div class="small text-muted mt-1" id="restaurant-address">—</div>
+            </div>
+            <div class="mo-addr mo-addr-drop rounded-4 p-3 flex-fill">
+                <div class="mo-addr-head text-success"><i class="mdi mdi-map-marker-radius-outline"></i> Drop-off — Customer</div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <img id="customer-image" src="" class="rounded-circle" style="width:40px;height:40px;object-fit:cover;">
+                    <span class="fw-bold" id="customer-name">—</span>
+                </div>
+                <div class="small text-muted"><i class="mdi mdi-phone-outline me-1"></i><span id="customer-phone">—</span></div>
+                <div class="small text-muted"><i class="mdi mdi-email-outline me-1"></i><span id="customer-email">—</span></div>
+                <div class="small text-muted mt-1" id="shipping-address">—</div>
+                <div class="small text-muted">Recipient: <span id="shipping-name">—</span></div>
+            </div>
+        </div>
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm rounded-4 h-100 overflow-hidden">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center pt-3">
+                    <h6 class="fw-bold mb-0"><i class="mdi mdi-map-outline me-2 text-primary"></i>Route Map</h6>
+                    <a href="#" id="directions-btn" target="_blank" class="btn btn-sm btn-outline-primary rounded-pill" style="display:none;">
+                        <i class="mdi mdi-directions me-1"></i>Get Directions
                     </a>
                 </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Delivery Actions - Prominent Top Banner -->
-    <div class="row mb-4" id="delivery-actions-row" style="display: none;">
-        <div class="col-12">
-            <div class="card border border-success shadow-sm">
-                <div class="card-body d-flex align-items-center justify-content-between">
-                    <div>
-                        <h5 class="mb-1 text-success">
-                            <i class="bx bx-play-circle me-2"></i>Delivery Action Required
-                        </h5>
-                        <p class="mb-0 text-muted" id="delivery-action-hint"></p>
+                <div class="card-body p-0">
+                    <div id="locationMap" style="height:400px;width:100%;"></div>
+                    <div id="map-empty" class="text-center text-muted py-5 d-none">
+                        <i class="mdi mdi-map-marker-off-outline" style="font-size:2.5rem;"></i>
+                        <p class="mb-0 mt-2">Map locations not available for this order.</p>
                     </div>
-                    <button type="button" class="btn btn-lg btn-success" id="update-delivery-status-btn" onclick="handleUpdateDeliveryStatus()">
-                        <i class="bx bx-refresh me-1"></i> Update Status
-                    </button>
+                </div>
+                <div class="card-footer bg-white border-0 d-flex justify-content-around small pb-3">
+                    <span><i class="mdi mdi-storefront mdi-18px text-danger me-1"></i>Restaurant</span>
+                    <span><i class="mdi mdi-home-map-marker mdi-18px text-success me-1"></i>Customer</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row mb-4">
-        <!-- Delivery Information -->
-        <div class="col-lg-4 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="card-title mb-0"><i class="bx bx-truck me-2"></i>Delivery Information</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <small class="text-muted">Tracking Number</small>
-                        <h6 class="mb-0" id="tracking-number">-</h6>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Delivery Date</small>
-                        <h6 class="mb-0" id="delivery-date">-</h6>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Delivery Status</small>
-                        <div>
-                            <span class="badge" id="delivery-status-badge">-</span>
-                            <span id="delivery-status-label" class="ms-1">-</span>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Delivery Charge</small>
-                        <h6 class="mb-0 text-success" id="delivery-charge">-</h6>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Distance</small>
-                        <h6 class="mb-0" id="distance">-</h6>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Payment Status</small>
-                        <h6 class="mb-0">
-                            <span class="badge" id="payment-status">-</span>
-                        </h6>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Charge Key</small>
-                        <h6 class="mb-0 text-muted small" id="charge-key">-</h6>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Restaurant Details -->
-        <div class="col-lg-4 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-warning text-dark">
-                    <h5 class="card-title mb-0"><i class="bx bx-store me-2"></i>Restaurant Details</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <img id="restaurant-image" src="" class="rounded-circle me-2" style="width: 50px; height: 50px; object-fit: cover;">
-                        <div>
-                            <small class="text-muted">Restaurant Name</small>
-                            <h6 class="mb-0" id="restaurant-name">-</h6>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Email</small>
-                        <h6 class="mb-0" id="restaurant-email">-</h6>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Phone</small>
-                        <h6 class="mb-0" id="restaurant-phone">-</h6>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Address</small>
-                        <h6 class="mb-0 small" id="restaurant-address">-</h6>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Customer Details -->
-        <div class="col-lg-4 mb-4">
-            <div class="card h-100">
-                <div class="card-header bg-info text-white">
-                    <h5 class="card-title mb-0"><i class="bx bx-user me-2"></i>Customer Details</h5>
-                </div>
-                <div class="card-body">
-                    <div class="d-flex align-items-center mb-3">
-                        <img id="customer-image" src="" class="rounded-circle me-2" style="width: 50px; height: 50px; object-fit: cover;">
-                        <div>
-                            <small class="text-muted">Customer Name</small>
-                            <h6 class="mb-0" id="customer-name">-</h6>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Email</small>
-                        <h6 class="mb-0" id="customer-email">-</h6>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Phone</small>
-                        <h6 class="mb-0" id="customer-phone">-</h6>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Shipping Address</small>
-                        <h6 class="mb-0 small" id="shipping-address">-</h6>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Shipping Name</small>
-                        <h6 class="mb-0" id="shipping-name">-</h6>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <!-- Order Items -->
-        <div class="col-lg-8 mb-4">
-            <div class="card">
-                <div class="card-header bg-success text-white">
-                    <h5 class="card-title mb-0"><i class="bx bx-food-menu me-2"></i>Order Items</h5>
+    {{-- ===== Items + history ===== --}}
+    <div class="row g-4">
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white border-0 d-flex justify-content-between align-items-center pt-3">
+                    <h6 class="fw-bold mb-0"><i class="mdi mdi-food-outline me-2 text-primary"></i>Order Items</h6>
+                    <span class="badge bg-label-primary rounded-pill">Total: <span id="total-items">0</span></span>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Product</th>
-                                    <th>Quantity</th>
-                                    <th>Unit Price</th>
-                                    <th>Total</th>
-                                    <th>Meal Time</th>
-                                </tr>
+                        <table class="table table-hover align-middle mb-0">
+                            <thead class="table-light">
+                                <tr><th>Product</th><th>Qty</th><th>Unit</th><th>Total</th><th>Meal Time</th></tr>
                             </thead>
-                            <tbody id="order-items-table">
-                                <!-- Items will be populated here -->
-                            </tbody>
+                            <tbody id="order-items-table"></tbody>
                         </table>
                     </div>
                 </div>
             </div>
         </div>
-
-        <!-- Order Summary -->
-        <div class="col-lg-4 mb-4">
-            <div class="card">
-                <div class="card-header bg-secondary text-white">
-                    <h5 class="card-title mb-0"><i class="bx bx-receipt me-2"></i>Order Summary</h5>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <small class="text-muted">Order Number</small>
-                        <h6 class="mb-0" id="order-number">-</h6>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Invoice No</small>
-                        <h6 class="mb-0" id="invoice-no">-</h6>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Meal Type</small>
-                        <h6 class="mb-0" id="meal-type">-</h6>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Delivery Type</small>
-                        <h6 class="mb-0" id="delivery-type">-</h6>
-                    </div>
-                    <div class="mb-3">
-                        <small class="text-muted">Order Date</small>
-                        <h6 class="mb-0" id="order-date">-</h6>
-                    </div>
-                    <hr>
-                    <div class="mb-2 d-flex justify-content-between">
-                        <span>Subtotal:</span>
-                        <span id="subtotal">-</span>
-                    </div>
-                    <div class="mb-2 d-flex justify-content-between">
-                        <span>Tax:</span>
-                        <span id="tax">-</span>
-                    </div>
-                    <div class="mb-2 d-flex justify-content-between">
-                        <span>Delivery Fee:</span>
-                        <span id="delivery-fee">-</span>
-                    </div>
-                    <hr>
-                    <div class="mb-0 d-flex justify-content-between fw-bold">
-                        <span>Total:</span>
-                        <span id="total">-</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Status History -->
-            <div class="card mt-4">
-                <div class="card-header bg-dark text-white">
-                    <h5 class="card-title mb-0"><i class="bx bx-history me-2"></i>Status History</h5>
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm rounded-4 h-100">
+                <div class="card-header bg-white border-0 pt-3">
+                    <h6 class="fw-bold mb-0"><i class="mdi mdi-history me-2 text-primary"></i>Status History</h6>
                 </div>
                 <div class="card-body">
                     <div class="timeline" id="status-history">
-                        <!-- Status history will be populated here -->
                         <div class="text-center text-muted py-3">No status history available</div>
                     </div>
                 </div>
@@ -235,174 +150,113 @@
 
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    loadDeliveryOrderDetails();
-});
+document.addEventListener("DOMContentLoaded", loadDeliveryOrderDetails);
 
-let deliveryData = null; 
+let deliveryData = null;
+let moMap = null;
 
-function toTitleCase(str) {
-    if (!str) return "";
-    return str.toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+function toTitleCase(s) { return s ? s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) : ''; }
+function gbp(v) { return '£' + (v ?? '0.00'); }
+function getImageUrl(type, file) {
+    if (!file) return '/upload/no_image.jpg';
+    return ({ restaurant: '/upload/client-profile/medium/', customer: '/upload/customer-profile/medium/', product: '/upload/product/small/' }[type]) + file;
 }
-
-function getImageUrl(type, filename) {
-    if (!filename) return '/upload/no_image.jpg';
-    const basePaths = {
-        restaurant: '/upload/client-profile/medium/',
-        customer: '/upload/customer-profile/medium/',
-        product: '/upload/product/small/'
-    };
-    return basePaths[type] + filename;
+function joinAddr(a) {
+    return [a.address1, a.address2, a.city, a.county, a.country, a.zip_code].filter(Boolean).join(', ') || 'Address not available';
 }
 
 async function loadDeliveryOrderDetails() {
     try {
         showLoader();
-        
-        // Get the delivery_charge_ledger_id from URL
-        const pathSegments = window.location.pathname.split('/');
-        const ledgerId = pathSegments[pathSegments.length - 1];
-        
-        const response = await axios.get(`/delivery/get/meal-order/details/${ledgerId}`);
-        
+        const segs = window.location.pathname.split('/');
+        const response = await axios.get(`/delivery/get/meal-order/details/${segs[segs.length - 1]}`);
+
         if (response.status === 200 && response.data.status === 'success') {
-            deliveryData = response.data.data; // store globally
-            
-            // Update Delivery Information
-            document.getElementById('tracking-number').textContent = deliveryData.delivery_info.tracking_number || '-';
-            document.getElementById('delivery-date').textContent = deliveryData.delivery_info.delivery_date || '-';
-            
-            const deliveryStatusBadge = document.getElementById('delivery-status-badge');
-            deliveryStatusBadge.textContent = deliveryData.delivery_info.delivery_status_label || '-';
-            deliveryStatusBadge.className = 'badge ' + getDeliveryBadgeClass(deliveryData.delivery_info.delivery_status);
-            
-            document.getElementById('delivery-status-label').textContent = deliveryData.delivery_info.delivery_status_label || '-';
-            document.getElementById('delivery-charge').textContent = '$' + (deliveryData.delivery_info.delivery_charge || '0.00');
-            
-            const distance = deliveryData.delivery_info.distance_km ? 
-                `${deliveryData.delivery_info.distance_km} km (${deliveryData.delivery_info.distance_category})` : '-';
-            document.getElementById('distance').textContent = distance;
-            
-            const paymentStatusBadge = document.getElementById('payment-status');
-            paymentStatusBadge.textContent = deliveryData.delivery_info.payment_status || '-';
-            paymentStatusBadge.className = 'badge ' + (deliveryData.delivery_info.payment_status === 'paid' ? 'bg-success' : 'bg-warning');
-            
-            document.getElementById('charge-key').textContent = deliveryData.delivery_info.charge_key || '-';
-            
-            // Update Restaurant Details
-            if (deliveryData.restaurant_details) {
-                document.getElementById('restaurant-image').src = getImageUrl('restaurant', deliveryData.restaurant_details.image);
-                document.getElementById('restaurant-name').textContent = deliveryData.restaurant_details.name ? toTitleCase(deliveryData.restaurant_details.name) : '-';
-                document.getElementById('restaurant-email').textContent = deliveryData.restaurant_details.email || '-';
-                document.getElementById('restaurant-phone').textContent = deliveryData.restaurant_details.mobile || '-';
-                
-                const restaurantAddress = [
-                    deliveryData.restaurant_details.address1,
-                    deliveryData.restaurant_details.address2,
-                    deliveryData.restaurant_details.zip_code
-                ].filter(Boolean).join(', ') || '-';
-                document.getElementById('restaurant-address').textContent = restaurantAddress;
-            } else {
-                document.getElementById('restaurant-image').src = '/upload/no_image.jpg';
+            deliveryData = response.data.data;
+            const di = deliveryData.delivery_info;
+            const os = deliveryData.order_summary;
+
+            document.getElementById('tracking-number').textContent = di.tracking_number || '—';
+            document.getElementById('delivery-date').textContent = di.delivery_date || '—';
+
+            const badge = document.getElementById('delivery-status-badge');
+            badge.textContent = di.delivery_status_label || '—';
+            badge.className = 'badge ' + getDeliveryBadgeClass(di.delivery_status);
+
+            document.getElementById('delivery-charge').textContent = gbp(di.delivery_charge);
+            document.getElementById('stat-distance').textContent = di.distance_km ? `${di.distance_km} km` : '—';
+            document.getElementById('meal-type').textContent = toTitleCase(os.meal_type) || '—';
+
+            // Restaurant
+            const r = deliveryData.restaurant_details;
+            if (r) {
+                document.getElementById('restaurant-image').src = getImageUrl('restaurant', r.image);
+                document.getElementById('restaurant-name').textContent = toTitleCase(r.name) || '—';
+                document.getElementById('restaurant-email').textContent = r.email || '—';
+                document.getElementById('restaurant-phone').textContent = r.mobile || '—';
+                document.getElementById('restaurant-address').textContent = joinAddr(r);
             }
-            
-            // Update Customer Details
-            if (deliveryData.customer_details) {
-                document.getElementById('customer-image').src = getImageUrl('customer', deliveryData.customer_details.image);
-                document.getElementById('customer-name').textContent = deliveryData.customer_details.name ? toTitleCase(deliveryData.customer_details.name) : '-';
-                document.getElementById('customer-email').textContent = deliveryData.customer_details.email || '-';
-                document.getElementById('customer-phone').textContent = deliveryData.customer_details.mobile || '-';
-                document.getElementById('shipping-name').textContent = deliveryData.customer_details.shipping_name ? toTitleCase(deliveryData.customer_details.shipping_name) : '-';
-                
-                const shippingAddress = [
-                    deliveryData.customer_details.address1,
-                    deliveryData.customer_details.address2,
-                    deliveryData.customer_details.zip_code
-                ].filter(Boolean).join(', ') || '-';
-                document.getElementById('shipping-address').textContent = shippingAddress;
-            } else {
-                document.getElementById('customer-image').src = '/upload/no_image.jpg';
+
+            // Customer
+            const c = deliveryData.customer_details;
+            if (c) {
+                document.getElementById('customer-image').src = getImageUrl('customer', c.image);
+                document.getElementById('customer-name').textContent = toTitleCase(c.name) || '—';
+                document.getElementById('customer-email').textContent = c.email || '—';
+                document.getElementById('customer-phone').textContent = c.mobile || '—';
+                document.getElementById('shipping-name').textContent = toTitleCase(c.shipping_name) || '—';
+                document.getElementById('shipping-address').textContent = joinAddr(c);
             }
-            
-            // Update Order Summary
-            document.getElementById('order-number').textContent = deliveryData.order_summary.order_number || '-';
-            document.getElementById('invoice-no').textContent = deliveryData.order_summary.invoice_no || '-';
-            document.getElementById('meal-type').textContent = deliveryData.order_summary.meal_type ? toTitleCase(deliveryData.order_summary.meal_type) : '-';
-            document.getElementById('delivery-type').textContent = deliveryData.order_summary.delivery_type ? toTitleCase(deliveryData.order_summary.delivery_type) : '-';
-            document.getElementById('order-date').textContent = deliveryData.order_summary.order_date || '-';
-            document.getElementById('subtotal').textContent = '$' + deliveryData.order_summary.subtotal;
-            document.getElementById('tax').textContent = '$' + deliveryData.order_summary.tax;
-            document.getElementById('delivery-fee').textContent = '$' + deliveryData.order_summary.delivery_fee;
-            document.getElementById('total').textContent = '$' + deliveryData.order_summary.total;
-            
-            // Update Order Items
-            const orderItemsTable = document.getElementById('order-items-table');
-            orderItemsTable.innerHTML = '';
-            
-            if (deliveryData.order_items && deliveryData.order_items.length > 0) {
-                deliveryData.order_items.forEach(item => {
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td>
-                            <div class="d-flex align-items-center">
-                                <img src="${getImageUrl('product', item.product_image)}" 
-                                     class="rounded me-3" 
-                                     style="width: 50px; height: 50px; object-fit: cover;"
-                                     alt="${item.product_name}">
-                                <div>
-                                    <strong>${item.product_name ? toTitleCase(item.product_name) : '-'}</strong>
-                                </div>
-                            </div>
-                        </td>
-                        <td>${item.quantity}</td>
-                        <td>$${item.unit_price}</td>
-                        <td>$${item.total_price}</td>
-                        <td>${item.meal_time || '-'}</td>
-                    `;
-                    orderItemsTable.appendChild(row);
-                });
-            } else {
-                orderItemsTable.innerHTML = `
-                    <tr>
-                        <td colspan="5" class="text-center text-muted py-3">No items found</td>
-                    </tr>
-                `;
-            }
-            
-            // Update Status History
-            const statusHistory = document.getElementById('status-history');
-            statusHistory.innerHTML = '';
-            
-            if (deliveryData.status_history && deliveryData.status_history.length > 0) {
-                deliveryData.status_history.forEach(history => {
-                    const historyItem = document.createElement('div');
-                    historyItem.className = 'timeline-item mb-3';
-                    historyItem.innerHTML = `
-                        <div class="d-flex">
-                            <div class="timeline-marker"></div>
-                            <div class="timeline-content ms-3">
-                                <small class="text-muted d-block">${history.created_at}</small>
+
+            // Items
+            const tbody = document.getElementById('order-items-table');
+            tbody.innerHTML = '';
+            const items = deliveryData.order_items || [];
+            if (items.length) {
+                items.forEach(item => {
+                    tbody.insertAdjacentHTML('beforeend', `
+                        <tr>
+                            <td>
                                 <div class="d-flex align-items-center">
-                                    <span class="badge ${getDeliveryBadgeClass(history.delivery_status)} me-2">
-                                        ${history.status_label}
-                                    </span>
-                                    <small class="text-muted">Updated by: ${history.updated_by_label}</small>
+                                    <img src="${getImageUrl('product', item.product_image)}" class="rounded me-2" style="width:42px;height:42px;object-fit:cover;">
+                                    <span class="fw-semibold">${toTitleCase(item.product_name) || '—'}</span>
                                 </div>
-                                ${history.notes ? `<small class="d-block text-muted mt-1">${history.notes}</small>` : ''}
-                                ${history.pick_up_at ? `<small class="d-block text-muted mt-1">Pickup scheduled: ${history.pick_up_at}</small>` : ''}
-                            </div>
-                        </div>
-                    `;
-                    statusHistory.appendChild(historyItem);
+                            </td>
+                            <td><span class="badge bg-label-secondary">${item.quantity}</span></td>
+                            <td>${gbp(item.unit_price)}</td>
+                            <td class="fw-semibold">${gbp(item.total_price)}</td>
+                            <td>${item.meal_time || '—'}</td>
+                        </tr>`);
                 });
             } else {
-                statusHistory.innerHTML = '<div class="text-center text-muted py-3">No status history available</div>';
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No items found</td></tr>';
             }
-            
-            // Setup Delivery Actions card visibility and button (now targeting top banner)
+            document.getElementById('total-items').textContent = items.length;
+
+            // History
+            const hist = document.getElementById('status-history');
+            hist.innerHTML = '';
+            const hs = deliveryData.status_history || [];
+            if (hs.length) {
+                hs.forEach(h => {
+                    hist.insertAdjacentHTML('beforeend', `
+                        <div class="timeline-item mb-3">
+                            <div class="d-flex">
+                                <div class="timeline-marker"></div>
+                                <div class="timeline-content ms-3">
+                                    <small class="text-muted d-block">${h.created_at}</small>
+                                    <span class="badge ${getDeliveryBadgeClass(h.delivery_status)} mt-1">${h.status_label}</span>
+                                    ${h.notes ? `<small class="d-block text-muted mt-1">${h.notes}</small>` : ''}
+                                </div>
+                            </div>
+                        </div>`);
+                });
+            } else {
+                hist.innerHTML = '<div class="text-center text-muted py-3">No status history available</div>';
+            }
+
             setupDeliveryActionsCard(deliveryData);
-            
+            renderMap();
         } else {
             errorToast('Failed to load order details');
         }
@@ -413,196 +267,138 @@ async function loadDeliveryOrderDetails() {
     }
 }
 
-function setupDeliveryActionsCard(data) {
-    const actionsRow = document.getElementById('delivery-actions-row');
-    const actionBtn = document.getElementById('update-delivery-status-btn');
-    const hintEl = document.getElementById('delivery-action-hint');
+/* ===== Map ===== */
+function renderMap() {
+    const r = deliveryData.restaurant_details || {};
+    const c = deliveryData.customer_details || {};
+    const rLat = parseFloat(r.latitude), rLng = parseFloat(r.longitude);
+    const cLat = parseFloat(c.latitude), cLng = parseFloat(c.longitude);
+    const hasR = !isNaN(rLat) && !isNaN(rLng);
+    const hasC = !isNaN(cLat) && !isNaN(cLng);
 
-    // Check if delivery person is assigned (not null) and status is in allowed progression list
-    const deliveryPerson = data.delivery_person;
-    const currentStatus = data.delivery_info.delivery_status;
-    const allowedStatuses = ['ready_for_pickup', 'picked_up', 'on_the_way', 'arrived'];
-
-    if (deliveryPerson && deliveryPerson.id && allowedStatuses.includes(currentStatus)) {
-        // Determine next status and button label
-        const nextStatus = getNextDeliveryStatus(currentStatus);
-        const buttonLabel = getStatusButtonLabel(currentStatus);
-
-        actionBtn.innerHTML = `<i class="bx bx-edit me-1"></i> ${buttonLabel}`;
-        actionBtn.dataset.nextStatus = nextStatus;
-        actionBtn.dataset.ledgerId = data.delivery_info.id;
-
-        hintEl.textContent = `Current: ${data.delivery_info.delivery_status_label} → Next: ${getStatusLabel(nextStatus)}`;
-        actionsRow.style.display = 'block';
-    } else {
-        actionsRow.style.display = 'none';
-    }
-}
-
-function getNextDeliveryStatus(currentStatus) {
-    const flow = {
-        'ready_for_pickup': 'picked_up',
-        'picked_up': 'on_the_way',
-        'on_the_way': 'arrived',
-        'arrived': 'delivered'
-    };
-    return flow[currentStatus] || null;
-}
-
-function getStatusLabel(status) {
-    const labels = {
-        'pending': 'Pending',
-        'accept_order': 'Order Accepted',
-        'preparing': 'Preparing',
-        'ready_for_pickup': 'Ready for Pickup',
-        'picked_up': 'Picked Up',
-        'on_the_way': 'On the Way',
-        'arrived': 'Arrived',
-        'delivered': 'Delivered',
-        'cancelled': 'Cancelled'
-    };
-    return labels[status] || status;
-}
-
-function getStatusButtonLabel(currentStatus) {
-    const labels = {
-        'ready_for_pickup': 'Mark as Picked Up',
-        'picked_up': 'Mark as On the Way',
-        'on_the_way': 'Mark as Arrived',
-        'arrived': 'Mark as Delivered'
-    };
-    return labels[currentStatus] || 'Update Status';
-}
-
-async function handleUpdateDeliveryStatus() {
-    const btn = document.getElementById('update-delivery-status-btn');
-    const ledgerId = btn.dataset.ledgerId;
-    const nextStatus = btn.dataset.nextStatus;
-
-    if (!ledgerId || !nextStatus) {
-        errorToast('Cannot determine next status.');
+    if (!hasR && !hasC) {
+        document.getElementById('locationMap').classList.add('d-none');
+        document.getElementById('map-empty').classList.remove('d-none');
         return;
     }
 
-    const result = await Swal.fire({
-        title: 'Are you sure?',
-        text: `You are about to mark this delivery as "${getStatusLabel(nextStatus)}".`,
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'Yes, proceed!',
-        cancelButtonText: 'Cancel'
+    moMap = L.map('locationMap', { scrollWheelZoom: false });
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap', maxZoom: 19 }).addTo(moMap);
+
+    const pin = (color, icon) => L.divIcon({
+        className: '',
+        html: `<div style="background:${color};width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.35);"><i class="mdi ${icon}" style="transform:rotate(45deg);color:#fff;font-size:1.05rem;"></i></div>`,
+        iconSize: [34, 34], iconAnchor: [17, 34], popupAnchor: [0, -34]
     });
 
-    if (!result.isConfirmed) {
-        return; 
+    const bounds = [];
+    if (hasR) { L.marker([rLat, rLng], { icon: pin('#ef4444', 'mdi-storefront') }).addTo(moMap).bindPopup('<b>Restaurant</b><br>' + (r.name || '')); bounds.push([rLat, rLng]); }
+    if (hasC) { L.marker([cLat, cLng], { icon: pin('#22c55e', 'mdi-home-map-marker') }).addTo(moMap).bindPopup('<b>Customer</b><br>' + (c.name || '')); bounds.push([cLat, cLng]); }
+
+    if (hasR && hasC) {
+        L.polyline([[rLat, rLng], [cLat, cLng]], { color: '#6366f1', weight: 3, dashArray: '6,8' }).addTo(moMap);
+        moMap.fitBounds(bounds, { padding: [40, 40] });
+        const btn = document.getElementById('directions-btn');
+        btn.href = `https://www.google.com/maps/dir/?api=1&origin=${rLat},${rLng}&destination=${cLat},${cLng}`;
+        btn.style.display = 'inline-block';
+    } else {
+        moMap.setView(bounds[0], 14);
     }
+    setTimeout(() => moMap.invalidateSize(), 300);
+}
+
+/* ===== Status actions (unchanged) ===== */
+function setupDeliveryActionsCard(data) {
+    const row = document.getElementById('delivery-actions-row');
+    const btn = document.getElementById('update-delivery-status-btn');
+    const hint = document.getElementById('delivery-action-hint');
+    const dp = data.delivery_person;
+    const cur = data.delivery_info.delivery_status;
+    const allowed = ['ready_for_pickup', 'picked_up', 'on_the_way', 'arrived'];
+
+    if (dp && dp.id && allowed.includes(cur)) {
+        const next = getNextDeliveryStatus(cur);
+        btn.innerHTML = `<i class="mdi mdi-progress-check me-1"></i> ${getStatusButtonLabel(cur)}`;
+        btn.dataset.nextStatus = next;
+        btn.dataset.ledgerId = data.delivery_info.id;
+        hint.textContent = `Current: ${data.delivery_info.delivery_status_label} → Next: ${getStatusLabel(next)}`;
+        row.style.display = 'block';
+    } else {
+        row.style.display = 'none';
+    }
+}
+function getNextDeliveryStatus(s) { return ({ ready_for_pickup: 'picked_up', picked_up: 'on_the_way', on_the_way: 'arrived', arrived: 'delivered' })[s] || null; }
+function getStatusLabel(s) { return ({ pending: 'Pending', accept_order: 'Order Accepted', preparing: 'Preparing', ready_for_pickup: 'Ready for Pickup', picked_up: 'Picked Up', on_the_way: 'On the Way', arrived: 'Arrived', delivered: 'Delivered', cancelled: 'Cancelled' })[s] || s; }
+function getStatusButtonLabel(s) { return ({ ready_for_pickup: 'Mark as Picked Up', picked_up: 'Mark as On the Way', on_the_way: 'Mark as Arrived', arrived: 'Mark as Delivered' })[s] || 'Update Status'; }
+
+async function handleUpdateDeliveryStatus() {
+    const btn = document.getElementById('update-delivery-status-btn');
+    const ledgerId = btn.dataset.ledgerId, nextStatus = btn.dataset.nextStatus;
+    if (!ledgerId || !nextStatus) { errorToast('Cannot determine next status.'); return; }
+
+    const result = await Swal.fire({
+        title: 'Are you sure?',
+        text: `Mark this delivery as "${getStatusLabel(nextStatus)}".`,
+        icon: 'question', showCancelButton: true,
+        confirmButtonColor: '#3085d6', cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, proceed!', cancelButtonText: 'Cancel'
+    });
+    if (!result.isConfirmed) return;
 
     showLoader();
     try {
-        const response = await axios.post(`/delivery/update/delivery-status/${ledgerId}`, {
-            delivery_status: nextStatus,
-            notes: '' // optional notes
-        });
-
-        if (response.data.status === 'success') {
-            Swal.fire({
-                title: 'Updated!',
-                text: 'Delivery status updated successfully.',
-                icon: 'success',
-                timer: 1500,
-                showConfirmButton: false
-            });
-            setTimeout(() => {
-                window.location.reload();
-            }, 1500);
+        const res = await axios.post(`/delivery/update/delivery-status/${ledgerId}`, { delivery_status: nextStatus, notes: '' });
+        if (res.data.status === 'success') {
+            Swal.fire({ title: 'Updated!', text: 'Delivery status updated successfully.', icon: 'success', timer: 1500, showConfirmButton: false });
+            setTimeout(() => window.location.reload(), 1500);
         } else {
-            errorToast(response.data.message || 'Failed to update status.');
+            errorToast(res.data.message || 'Failed to update status.');
         }
     } catch (error) {
         handleError(error);
     } finally {
-        hideLoader(); 
+        hideLoader();
     }
-}
-
-function handleError(error) {
-    let message = "An unexpected error occurred.";
-    if (error.response) {
-        const { status, data } = error.response;
-        switch (status) {
-            case 500:
-                message = data?.message || "Internal server error. Please try again later.";
-                break;
-            case 404:
-                message = data?.message || "Order not found.";
-                break;
-            default:
-                message = data?.message || "Something went wrong.";
-        }
-    } else if (error.request) {
-        message = "No response from server. Please check your connection.";
-    } else {
-        message = error.message;
-    }
-    errorToast(message);
 }
 
 function getDeliveryBadgeClass(status) {
-    switch(status) {
-        case 'delivered': return 'bg-success';
-        case 'arrived': return 'bg-primary';
-        case 'on_the_way': return 'bg-info';
-        case 'picked_up': return 'bg-info';
-        case 'ready_for_pickup': return 'bg-warning';
-        case 'preparing': return 'bg-warning';
-        case 'accept_order': return 'bg-secondary';
-        case 'pending': return 'bg-secondary';
-        case 'cancelled': return 'bg-dark';
-        default: return 'bg-secondary';
-    }
+    return ({
+        delivered: 'bg-success', arrived: 'bg-info', on_the_way: 'bg-primary',
+        picked_up: 'bg-warning text-dark', ready_for_pickup: 'bg-warning text-dark',
+        preparing: 'bg-primary', accept_order: 'bg-info', pending: 'bg-secondary', cancelled: 'bg-danger'
+    })[status] || 'bg-secondary';
+}
+
+function handleError(error) {
+    let message = 'An unexpected error occurred.';
+    if (error.response) message = error.response.data?.message || message;
+    else if (error.request) message = 'No response from server.';
+    else message = error.message;
+    errorToast(message);
 }
 </script>
 
 <style>
-.timeline {
-    position: relative;
-    padding-left: 20px;
-}
-
-.timeline::before {
-    content: '';
-    position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background-color: #dee2e6;
-}
-
-.timeline-item {
-    position: relative;
-}
-
-.timeline-marker {
-    position: absolute;
-    left: -24px;
-    top: 6px;
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    background-color: #0d6efd;
-    border: 2px solid white;
-    box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
-}
-
-.card {
-    transition: all 0.3s ease;
-}
-
-.card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-}
+.mo-hero { background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 55%, #ec4899 100%); }
+.mo-hero-icon { width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;font-size:1.7rem; }
+.mo-action { background:#ecfdf5; border:1px solid #d1fae5; }
+.mo-action-icon { width:46px;height:46px;border-radius:12px;background:#22c55e;color:#fff;display:flex;align-items:center;justify-content:center;font-size:1.5rem; }
+.mo-stat { background:#fff;border:1px solid #eef0f4;border-radius:16px;padding:1rem 1.1rem;box-shadow:0 2px 10px rgba(0,0,0,.04);position:relative; }
+.mo-stat-ico { position:absolute;top:1rem;right:1rem;width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:1.2rem; }
+.mo-stat-label { font-size:.74rem;color:#64748b;font-weight:600; }
+.mo-stat-value { font-size:1.3rem;font-weight:800;color:#0f172a;line-height:1.2; }
+.mo-stat-distance .mo-stat-ico { background:#eef2ff;color:#6366f1; }
+.mo-stat-charge   .mo-stat-ico { background:#ecfdf5;color:#16a34a; }
+.mo-stat-meal     .mo-stat-ico { background:#fff7ed;color:#ea580c; }
+.mo-stat-date     .mo-stat-ico { background:#fdf2f8;color:#db2777; }
+.mo-addr { background:#fff;border:1px solid #eef0f4;box-shadow:0 2px 10px rgba(0,0,0,.04); }
+.mo-addr-pickup { border-left:4px solid #ef4444; }
+.mo-addr-drop   { border-left:4px solid #22c55e; }
+.mo-addr-head { font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:.5rem; }
+.timeline { position:relative; padding-left:20px; }
+.timeline::before { content:'';position:absolute;left:0;top:0;bottom:0;width:2px;background:#e9ecef; }
+.timeline-item { position:relative; }
+.timeline-marker { position:absolute;left:-24px;top:6px;width:10px;height:10px;border-radius:50%;background:#6366f1;border:2px solid #fff;box-shadow:0 0 0 3px rgba(99,102,241,.15); }
+#locationMap { z-index:1; }
+.leaflet-container { font-family:inherit; }
 </style>

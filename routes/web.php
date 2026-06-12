@@ -753,7 +753,6 @@ Route::prefix('client')->group(function () {
 });
 
 Route::prefix('client')->middleware([ClientTokenVerificationMiddleware::class])->group(function () {
-
     Route::controller(ClientMealOrderController::class)->group(function () {
         Route::get('/meal-order','index')->name('client.meal.orders');
         Route::get('/get/meal-orders','getMealOrders');
@@ -1019,6 +1018,8 @@ Route::prefix('delivery')->middleware([DeliveryTokenVerificationMiddleware::clas
 
         Route::get('/markAsRead', 'markAsRead')->name('delivery.markRead');
         Route::delete('/delete/notification/{notificationId}', 'deleteNotification');
+
+        Route::get('/get/pending-deliveries', 'getPendingDeliveryRequests');
     });
 
     Route::controller(DeliveryMealOrderController::class)->group(function () {

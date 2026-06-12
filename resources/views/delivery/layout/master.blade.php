@@ -169,6 +169,274 @@
     <script src="{{ asset('backend/assets/js/form-basic-inputs.js') }}"></script>
 
     <script src="{{ asset('backend/assets/js/maps-leaflet.js') }}"></script>
+
+    {{-- ===== Pending Delivery Requests Popup ===== --}}
+    <div class="modal fade" id="pendingDeliveryModal" tabindex="-1" aria-hidden="true"
+         data-bs-backdrop="static" data-bs-keyboard="false">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+            <div class="modal-content border-0 overflow-hidden pd-modal">
+                <div class="modal-header pd-header text-white border-0">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="pd-bell"><i class="mdi mdi-bell-ring-outline"></i></span>
+                        <div>
+                            <h5 class="modal-title fw-bold mb-0">New Delivery Requests</h5>
+                            <small class="opacity-75">Accept before another rider grabs it</small>
+                        </div>
+                    </div>
+                    <span class="badge bg-white text-dark rounded-pill fs-6 px-3" id="pdCountBadge">0</span>
+                </div>
+
+                <div class="modal-body p-3 p-md-4 bg-light">
+                    <div id="pdRequestList" class="d-flex flex-column gap-3"></div>
+                    <div id="pdEmptyState" class="text-center text-muted py-5 d-none">
+                        <i class="mdi mdi-check-decagram-outline" style="font-size:3rem;color:#22c55e;"></i>
+                        <p class="mb-0 mt-2">All caught up — no pending requests right now.</p>
+                    </div>
+                </div>
+
+                <div class="modal-footer border-0 bg-light">
+                    <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">
+                        Maybe later
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+(function () {
+    let pdModalInstance = null;
+    let pdPollTimer     = null;
+    let pdMaps          = {};   // ledgerId -> Leaflet map instance
+
+    document.addEventListener('DOMContentLoaded', async function () {
+        const requests = await fetchPendingDeliveries();
+        if (requests.length > 0) {
+            renderPendingDeliveries(requests);
+            openPendingModal();
+        }
+    });
+
+    async function fetchPendingDeliveries() {
+        try {
+            const res = await axios.get('/delivery/get/pending-deliveries');
+            if (res.status === 200 && res.data.status === 'success') {
+                return res.data.data || [];
+            }
+        } catch (e) { /* silent — popup is non-blocking */ }
+        return [];
+    }
+
+    function openPendingModal() {
+        const el = document.getElementById('pendingDeliveryModal');
+        pdModalInstance = bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el);
+        pdModalInstance.show();
+
+        // Maps are built while the modal is still hidden (0×0) — recalc once visible
+        if (!el.dataset.pdShownBound) {
+            el.dataset.pdShownBound = '1';
+            el.addEventListener('shown.bs.modal', () => {
+                Object.values(pdMaps).forEach(m => { try { m.invalidateSize(); } catch (e) {} });
+            });
+        }
+
+        // Poll every 25s while open so accepted-by-others requests vanish
+        clearInterval(pdPollTimer);
+        pdPollTimer = setInterval(refreshPendingDeliveries, 25000);
+
+        el.addEventListener('hidden.bs.modal', () => clearInterval(pdPollTimer), { once: true });
+    }
+
+    async function refreshPendingDeliveries() {
+        const requests = await fetchPendingDeliveries();
+        renderPendingDeliveries(requests);
+        if (requests.length === 0) {
+            clearInterval(pdPollTimer);
+            setTimeout(() => pdModalInstance?.hide(), 1500);
+        }
+    }
+
+    function fmtCurrency(v) {
+        return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' })
+            .format(parseFloat(v) || 0);
+    }
+
+    function renderPendingDeliveries(requests) {
+        const list  = document.getElementById('pdRequestList');
+        const empty = document.getElementById('pdEmptyState');
+        document.getElementById('pdCountBadge').textContent = requests.length;
+
+        if (!requests.length) {
+            list.innerHTML = '';
+            empty.classList.remove('d-none');
+            return;
+        }
+        empty.classList.add('d-none');
+
+        list.innerHTML = requests.map(r => {
+            const id = r.delivery_charge_ledger_id;
+            const rLat = parseFloat(r.restaurant?.latitude), rLng = parseFloat(r.restaurant?.longitude);
+            const cLat = parseFloat(r.shipping?.latitude),  cLng = parseFloat(r.shipping?.longitude);
+            const hasR = !isNaN(rLat) && !isNaN(rLng);
+            const hasC = !isNaN(cLat) && !isNaN(cLng);
+
+            let mapHtml;
+            if (hasR || hasC) {
+                const dir = (hasR && hasC)
+                    ? `<a href="https://www.google.com/maps/dir/?api=1&origin=${rLat},${rLng}&destination=${cLat},${cLng}"
+                          target="_blank" class="btn btn-sm btn-light rounded-pill"
+                          style="position:absolute;top:8px;right:8px;z-index:500;box-shadow:0 1px 4px rgba(0,0,0,.2);"
+                          title="Get directions"><i class="mdi mdi-directions"></i></a>`
+                    : '';
+                mapHtml = `<div class="pd-map-wrap">
+                        <div id="pdMap-${id}" class="pd-map"></div>
+                        <div class="pd-map-legend">
+                            <span><i class="mdi mdi-storefront text-danger"></i>Restaurant</span>
+                            <span><i class="mdi mdi-home-map-marker text-success"></i>Customer</span>
+                        </div>${dir}
+                    </div>`;
+            } else {
+                mapHtml = `<div class="pd-map-wrap"><div class="pd-map-empty">
+                        <i class="mdi mdi-map-marker-off-outline" style="font-size:2rem;"></i>
+                        <div class="small mt-1">Map not available for this order</div>
+                    </div></div>`;
+            }
+
+            return `
+            <div class="pd-card" data-ledger-id="${id}">
+                <div class="pd-card-top">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="badge pd-track"><i class="mdi mdi-pound"></i>${r.order_tracking || 'N/A'}</span>
+                        <span class="badge bg-warning text-dark">${r.meal_type}</span>
+                        <span class="text-muted small"><i class="mdi mdi-calendar-outline me-1"></i>${r.delivery_date}</span>
+                    </div>
+                </div>
+
+                <div class="row g-3 mt-1">
+                    <div class="col-lg-5 pd-addr-col">
+                        <div class="pd-addr">
+                            <div class="pd-addr-head text-danger"><i class="mdi mdi-storefront-outline"></i> Pickup — Restaurant</div>
+                            <div class="fw-semibold">${r.restaurant.name}</div>
+                            ${r.restaurant.mobile ? `<div class="small text-muted"><i class="mdi mdi-phone-outline me-1"></i>${r.restaurant.mobile}</div>` : ''}
+                            <div class="small text-muted">${r.restaurant.address || 'Address not available'}</div>
+                        </div>
+                        <div class="pd-addr">
+                            <div class="pd-addr-head text-success"><i class="mdi mdi-map-marker-radius-outline"></i> Drop-off — Customer</div>
+                            ${r.shipping.name ? `<div class="fw-semibold">${r.shipping.name}</div>` : ''}
+                            ${r.shipping.phone ? `<div class="small text-muted"><i class="mdi mdi-phone-outline me-1"></i>${r.shipping.phone}</div>` : ''}
+                            <div class="small text-muted">${r.shipping.address || 'Address not available'}</div>
+                        </div>
+                    </div>
+                    <div class="col-lg-7">
+                        ${mapHtml}
+                    </div>
+                </div>
+
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mt-3">
+                    <div class="d-flex gap-2">
+                        <div class="pd-stat">
+                            <div class="pd-stat-label"><i class="mdi mdi-map-marker-distance"></i> Distance</div>
+                            <div class="pd-stat-value">${r.distance_km ?? '0'} km</div>
+                        </div>
+                        <div class="pd-stat pd-stat-charge">
+                            <div class="pd-stat-label"><i class="mdi mdi-cash"></i> Delivery Charge</div>
+                            <div class="pd-stat-value">${fmtCurrency(r.delivery_charge)}</div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <a href="/delivery/meal-order/details/${r.delivery_charge_ledger_id}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Details</a>
+                        <button class="btn btn-sm pd-accept-btn rounded-pill px-4"
+                                onclick="acceptPendingDelivery(${r.delivery_charge_ledger_id}, this)">
+                            <i class="mdi mdi-check-circle-outline me-1"></i>Accept
+                        </button>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+
+        buildCardMaps(requests);
+    }
+
+    // Build a small route map inside each request card
+    function buildCardMaps(requests) {
+        // tear down any maps from a previous render
+        Object.values(pdMaps).forEach(m => { try { m.remove(); } catch (e) {} });
+        pdMaps = {};
+
+        requests.forEach(r => {
+            const rLat = parseFloat(r.restaurant?.latitude), rLng = parseFloat(r.restaurant?.longitude);
+            const cLat = parseFloat(r.shipping?.latitude),  cLng = parseFloat(r.shipping?.longitude);
+            const hasR = !isNaN(rLat) && !isNaN(rLng);
+            const hasC = !isNaN(cLat) && !isNaN(cLng);
+            if (!hasR && !hasC) return;
+
+            const el = document.getElementById('pdMap-' + r.delivery_charge_ledger_id);
+            if (!el || typeof L === 'undefined') return;
+
+            const map = L.map(el, { scrollWheelZoom: false, attributionControl: false });
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+            const pin = (color, icon) => L.divIcon({
+                className: '',
+                html: `<div style="background:${color};width:30px;height:30px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.35);"><i class="mdi ${icon}" style="transform:rotate(45deg);color:#fff;font-size:.95rem;"></i></div>`,
+                iconSize: [30, 30], iconAnchor: [15, 30], popupAnchor: [0, -30]
+            });
+
+            const bounds = [];
+            if (hasR) { L.marker([rLat, rLng], { icon: pin('#ef4444', 'mdi-storefront') }).addTo(map).bindPopup('<b>Restaurant</b>'); bounds.push([rLat, rLng]); }
+            if (hasC) { L.marker([cLat, cLng], { icon: pin('#22c55e', 'mdi-home-map-marker') }).addTo(map).bindPopup('<b>Customer</b>'); bounds.push([cLat, cLng]); }
+
+            if (hasR && hasC) {
+                L.polyline([[rLat, rLng], [cLat, cLng]], { color: '#6366f1', weight: 3, dashArray: '6,8' }).addTo(map);
+                map.fitBounds(bounds, { padding: [30, 30] });
+            } else {
+                map.setView(bounds[0], 14);
+            }
+
+            pdMaps[r.delivery_charge_ledger_id] = map;
+            setTimeout(() => map.invalidateSize(), 250);
+        });
+    }
+
+    // Exposed globally for the inline onclick
+    window.acceptPendingDelivery = async function (ledgerId, btn) {
+        const original = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Accepting...';
+        try {
+            const res = await axios.post('/delivery/accept/meal/delivery', {
+                delivery_charge_ledger_id: ledgerId
+            });
+            if (res.status === 200 && res.data.status === 'success') {
+                successToast(res.data.message || 'Delivery accepted!');
+                const card = document.querySelector(`.pd-card[data-ledger-id="${ledgerId}"]`);
+                if (card) {
+                    card.classList.add('pd-card-accepted');
+                    setTimeout(() => { card.remove(); afterCardRemoved(); }, 400);
+                }
+            } else {
+                errorToast(res.data.message || 'Failed to accept delivery.');
+                btn.disabled = false; btn.innerHTML = original;
+            }
+        } catch (error) {
+            const msg = error.response?.data?.message || 'This order may have already been accepted.';
+            errorToast(msg);
+            // Likely taken by someone else — refresh the list
+            refreshPendingDeliveries();
+        }
+    };
+
+    function afterCardRemoved() {
+        const remaining = document.querySelectorAll('#pdRequestList .pd-card').length;
+        document.getElementById('pdCountBadge').textContent = remaining;
+        if (remaining === 0) {
+            document.getElementById('pdEmptyState').classList.remove('d-none');
+            clearInterval(pdPollTimer);
+            setTimeout(() => pdModalInstance?.hide(), 1200);
+        }
+    }
+})();
+</script>
   </body>
 </html>
 
@@ -467,4 +735,58 @@ function handleError(error) {
     transform: translateY(-20px);
   }
 }
+
+
+
+.pd-modal { border-radius: 18px; }
+.pd-header {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 60%, #ec4899 100%);
+    padding: 1.1rem 1.5rem;
+}
+.pd-bell {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center;
+    font-size: 1.5rem; animation: pdRing 1.6s ease-in-out infinite;
+}
+@keyframes pdRing {
+    0%,100% { transform: rotate(0); }
+    20% { transform: rotate(12deg); } 40% { transform: rotate(-10deg); }
+    60% { transform: rotate(6deg); } 80% { transform: rotate(-4deg); }
+}
+.pd-card {
+    background: #fff; border: 1px solid #eef0f4; border-radius: 14px; padding: 1rem 1.1rem;
+    box-shadow: 0 2px 10px rgba(0,0,0,.04); transition: transform .35s ease, opacity .35s ease;
+}
+.pd-card-top { border-bottom: 1px dashed #eef0f4; padding-bottom: .6rem; }
+.pd-card-accepted { transform: translateX(40px); opacity: 0; }
+.pd-track { background:#eef2ff; color:#6366f1; }
+.pd-addr { background:#f8f9fb; border-radius:10px; padding:.7rem .85rem; }
+/* Left column: stack the two address boxes and let them evenly fill the map height */
+.pd-addr-col { display:flex; flex-direction:column; gap:.6rem; }
+.pd-addr-col .pd-addr { flex:1 1 0; }
+.pd-addr-head { font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; margin-bottom:.25rem; }
+.pd-stat {
+    background:#f1f5f9; border-radius:10px; padding:.45rem .9rem; text-align:center; min-width:110px;
+}
+.pd-stat-charge { background:#ecfdf5; }
+.pd-stat-label { font-size:.7rem; color:#64748b; font-weight:600; }
+.pd-stat-value { font-size:1.05rem; font-weight:800; color:#0f172a; }
+.pd-accept-btn { background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff; border:none; font-weight:600; }
+.pd-accept-btn:hover { filter:brightness(.95); color:#fff; }
+.pd-accept-btn:disabled { opacity:.7; }
+
+/* Route map inside the request card */
+.pd-map-wrap { position:relative; height:100%; min-height:230px; border-radius:10px; overflow:hidden; border:1px solid #eef0f4; }
+.pd-map { width:100%; height:100%; min-height:230px; }
+.pd-map-empty {
+    height:100%; min-height:230px; background:#f8f9fb; color:#94a3b8;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:1rem;
+}
+.pd-map-legend {
+    position:absolute; bottom:8px; left:8px; z-index:500;
+    background:rgba(255,255,255,.92); border-radius:8px; padding:.25rem .55rem;
+    font-size:.7rem; font-weight:600; display:flex; gap:.7rem; box-shadow:0 1px 4px rgba(0,0,0,.15);
+}
+.pd-map-legend span { display:flex; align-items:center; gap:.2rem; }
+
 </style>

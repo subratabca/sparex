@@ -202,22 +202,26 @@ class MealPlanController extends Controller
             }
 
             $data = $this->buildSuggestionResponse($customerId, [
-                'gender'      => $profile->gender,
-                'age'         => $profile->age,
-                'weight'      => $profile->weight,
-                'height'      => $profile->height,
-                'description' => $profile->description,
-                'period'      => $profile->period,
+                'gender'         => $profile->gender,
+                'age'            => $profile->age,
+                'weight'         => $profile->weight,
+                'height'         => $profile->height,
+                'description'    => $profile->description,
+                'period'         => $profile->period,
+                'conditions'     => $profile->conditions ?? [],
+                'activity_level' => $profile->activity_level,
+                'goal'           => $profile->goal,
             ]);
 
-            $data['has_profile'] = true;
-            $data['profile']     = [
-                'gender'      => $profile->gender,
-                'age'         => $profile->age,
-                'weight'      => $profile->weight,
-                'height'      => $profile->height,
-                'description' => $profile->description,
-                'period'      => $profile->period,
+            $data['profile'] = [
+                'gender' => $profile->gender, 'age' => $profile->age,
+                'weight' => $profile->weight, 'height' => $profile->height,
+                'description' => $profile->description, 'period' => $profile->period,
+                'conditions' => $profile->conditions ?? [],
+                'activity_level' => $profile->activity_level,
+                'goal' => $profile->goal,
+                'allergies' => $profile->allergies ?? [],
+                'dietary_preference' => $profile->dietary_preference,
             ];
 
             return response()->json(['status' => 'success', 'data' => $data], 200);
@@ -235,27 +239,38 @@ class MealPlanController extends Controller
     {
         try {
             $validated = $request->validate([
-                'gender'      => 'required|in:male,female,other',
-                'age'         => 'required|integer|min:1|max:120',
-                'weight'      => 'required|numeric|min:1|max:500',
-                'height'      => 'required|numeric|min:30|max:300',
-                'description' => 'nullable|string|max:1000',
-                'period'      => 'nullable|in:last_week,last_month',
+                'gender'             => 'required|in:male,female,other',
+                'age'                => 'required|integer|min:1|max:120',
+                'weight'             => 'required|numeric|min:1|max:500',
+                'height'             => 'required|numeric|min:30|max:300',
+                'description'        => 'nullable|string|max:1000',
+                'period'             => 'nullable|in:last_week,last_month',
+                'conditions'         => 'nullable|array',
+                'conditions.*'       => 'string|in:' . implode(',', array_keys(\App\Models\UserHealthProfile::CONDITIONS)),
+                'activity_level'     => 'nullable|in:' . implode(',', array_keys(\App\Models\UserHealthProfile::ACTIVITY_LEVELS)),
+                'goal'               => 'nullable|in:' . implode(',', array_keys(\App\Models\UserHealthProfile::GOALS)),
+                'allergies'          => 'nullable|array',
+                'allergies.*'        => 'string|max:100',
+                'dietary_preference' => 'nullable|in:' . implode(',', array_keys(\App\Models\UserHealthProfile::DIETS)),
             ]);
 
             $customerId = $request->header('id');
             $validated['period'] = $validated['period'] ?? 'last_week';
 
-            // Save / update the health profile (one per user)
             UserHealthProfile::updateOrCreate(
                 ['user_id' => $customerId],
                 [
-                    'gender'      => $validated['gender'],
-                    'age'         => $validated['age'],
-                    'weight'      => $validated['weight'],
-                    'height'      => $validated['height'],
-                    'description' => $validated['description'] ?? null,
-                    'period'      => $validated['period'],
+                    'gender'             => $validated['gender'],
+                    'age'                => $validated['age'],
+                    'weight'             => $validated['weight'],
+                    'height'             => $validated['height'],
+                    'description'        => $validated['description'] ?? null,
+                    'period'             => $validated['period'],
+                    'conditions'         => $validated['conditions'] ?? [],
+                    'activity_level'     => $validated['activity_level'] ?? 'light',
+                    'goal'               => $validated['goal'] ?? null,
+                    'allergies'          => $validated['allergies'] ?? [],
+                    'dietary_preference' => $validated['dietary_preference'] ?? null,
                 ]
             );
 
@@ -274,6 +289,55 @@ class MealPlanController extends Controller
     /* =========================================================
      | Shared: build full suggestion payload
      ========================================================= */
+    private function buildSuggestionResponse1111($customerId, array $profile): array
+    {
+        $heightM     = $profile['height'] / 100;
+        $bmi         = round($profile['weight'] / ($heightM * $heightM), 1);
+        $bmiCategory = $this->getBmiCategory($bmi);
+
+        $bmr = (10 * $profile['weight'])
+             + (6.25 * $profile['height'])
+             - (5 * $profile['age'])
+             + ($profile['gender'] === 'male' ? 5 : -161);
+
+        // activity multiplier replaces the flat 1.4
+        $multipliers = [
+            'sedentary' => 1.2, 'light' => 1.375, 'moderate' => 1.55,
+            'active' => 1.725, 'very_active' => 1.9,
+        ];
+        $activity    = $profile['activity_level'] ?? 'light';
+        $maintenance = round($bmr * ($multipliers[$activity] ?? 1.375));
+
+        // explicit goal wins; otherwise fall back to BMI-based logic
+        $goal = $profile['goal'] ?? null;
+        $targetCalories = match ($goal) {
+            'lose'     => max(1200, $maintenance - 400),
+            'gain'     => $maintenance + 300,
+            'maintain' => $maintenance,
+            default    => match ($bmiCategory) {
+                'Underweight'         => $maintenance + 300,
+                'Overweight', 'Obese' => max(1200, $maintenance - 400),
+                default               => $maintenance,
+            },
+        };
+
+        // ... rest unchanged (history pull, analysis, weekly plan) ...
+
+        return [
+            'bmi'             => $bmi,
+            'bmi_category'    => $bmiCategory,
+            'target_calories' => $targetCalories,
+            'period'          => $profile['period'] ?? 'last_week',
+            'conditions'      => $profile['conditions'] ?? [],   // ← surface to UI
+            'analysis'        => $analysis,
+            'weekly_plan'     => $weeklyPlan,
+            'has_history'     => $pastItems->isNotEmpty(),
+        ];
+    }
+
+    /* =========================================================
+     | Shared: build full suggestion payload
+     ========================================================= */
     private function buildSuggestionResponse($customerId, array $profile): array
     {
         $heightM     = $profile['height'] / 100;
@@ -285,24 +349,42 @@ class MealPlanController extends Controller
              - (5 * $profile['age'])
              + ($profile['gender'] === 'male' ? 5 : -161);
 
-        $maintenance    = round($bmr * 1.4);
-        $targetCalories = match ($bmiCategory) {
-            'Underweight'          => $maintenance + 300,
-            'Overweight', 'Obese'  => max(1200, $maintenance - 400),
-            default                => $maintenance,
+        // activity multiplier replaces the flat 1.4
+        $multipliers = [
+            'sedentary' => 1.2, 'light' => 1.375, 'moderate' => 1.55,
+            'active' => 1.725, 'very_active' => 1.9,
+        ];
+        $activity    = $profile['activity_level'] ?? 'light';
+        $maintenance = round($bmr * ($multipliers[$activity] ?? 1.375));
+
+        // explicit goal wins; otherwise fall back to BMI-based logic
+        $goal = $profile['goal'] ?? null;
+        $targetCalories = match ($goal) {
+            'lose'     => max(1200, $maintenance - 400),
+            'gain'     => $maintenance + 300,
+            'maintain' => $maintenance,
+            default    => match ($bmiCategory) {
+                'Underweight'         => $maintenance + 300,
+                'Overweight', 'Obese' => max(1200, $maintenance - 400),
+                default               => $maintenance,
+            },
         };
 
+        // ===== History pull (period window) =====
         $period = $profile['period'] ?? 'last_week';
         $start  = $period === 'last_month'
             ? Carbon::now()->subMonth()->startOfDay()
             : Carbon::now()->subWeek()->startOfDay();
-        $end = Carbon::now()->endOfDay();
+        $end    = Carbon::now()->endOfDay();
 
         $pastItems = MealOrderItem::with(['product.nutrient', 'mealType'])
             ->whereHas('mealOrder', fn($q) =>
-                $q->where('customer_id', $customerId)->whereBetween('created_at', [$start, $end])
-            )->get();
+                $q->where('customer_id', $customerId)
+                  ->whereBetween('created_at', [$start, $end])
+            )
+            ->get();
 
+        // ===== Analysis + weekly plan =====
         $analysis   = $this->analysePastOrders($pastItems);
         $weeklyPlan = $this->buildWeeklyPlan($targetCalories);
 
@@ -311,6 +393,7 @@ class MealPlanController extends Controller
             'bmi_category'    => $bmiCategory,
             'target_calories' => $targetCalories,
             'period'          => $period,
+            'conditions'      => $profile['conditions'] ?? [],   // surfaced to UI
             'analysis'        => $analysis,
             'weekly_plan'     => $weeklyPlan,
             'has_history'     => $pastItems->isNotEmpty(),

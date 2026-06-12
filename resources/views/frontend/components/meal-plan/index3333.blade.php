@@ -15,15 +15,9 @@
                         <p class="text-muted mb-0">Get personalised meal suggestions based on your profile and past orders.</p>
                     </div>
                 </div>
-                <div class="d-flex flex-wrap gap-2">
-                    {{-- Shown only when a health profile already exists --}}
-                    <button type="button" class="btn btn-outline-primary rounded-pill px-4" id="update-health-btn" style="display:none;">
-                        <i class="mdi mdi-account-heart-outline me-1"></i> Update Health Info
-                    </button>
-                    <button type="button" class="btn btn-gradient rounded-pill px-4" id="open-planner-btn">
-                        <i class="mdi mdi-creation me-1"></i> <span id="planner-btn-label">Generate My Plan</span>
-                    </button>
-                </div>
+                <button type="button" class="btn btn-gradient rounded-pill px-4" id="open-planner-btn">
+                    <i class="mdi mdi-creation me-1"></i> <span id="planner-btn-label">Generate My Plan</span>
+                </button>
             </div>
         </div>
     </div>
@@ -75,14 +69,7 @@
 
             {{-- Keyword filter + editable search --}}
             <div id="keyword-section" class="bg-light rounded-3 p-3 mb-4" style="display:none;">
-                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
-                    <h6 class="fw-bold mb-0"><i class="mdi mdi-tag-multiple-outline me-1"></i>Filter by Keywords</h6>
-                    {{-- Select All toggle --}}
-                    <div class="form-check form-switch mb-0">
-                        <input class="form-check-input" type="checkbox" role="switch" id="keyword-select-all">
-                        <label class="form-check-label fw-semibold small" for="keyword-select-all">Select All</label>
-                    </div>
-                </div>
+                <h6 class="fw-bold mb-2"><i class="mdi mdi-tag-multiple-outline me-1"></i>Filter by Keywords</h6>
                 <div id="keyword-checkboxes" class="d-flex flex-wrap gap-3 mb-3"></div>
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                     <input type="text" id="keyword-input" class="form-control" style="max-width:400px;"
@@ -91,15 +78,10 @@
                         <i class="mdi mdi-magnify me-1"></i>Search
                     </button>
                 </div>
-                <small class="text-muted d-block mt-1">Tip: type a food name (e.g. "egg roll"), pick keywords, or use Select All — then search.</small>
+                <small class="text-muted d-block mt-1">Tip: you can type a food name (e.g. "egg roll") or tick keywords — or both.</small>
                 <small id="keyword-error" class="text-danger mt-1 d-block" style="display:none;"></small>
             </div>
 
-            {{-- Search results --}}
-            <div id="results-heading" class="d-flex align-items-center gap-2 mb-3" style="display:none !important;">
-                <h6 class="fw-bold mb-0"><i class="mdi mdi-silverware-variant me-1 text-primary"></i>Matching Meals</h6>
-                <span class="badge bg-light text-dark" id="results-count"></span>
-            </div>
             <div class="row gy-4 mb-4" id="product-list"></div>
 
             <nav class="d-flex justify-content-center">
@@ -142,33 +124,6 @@
                             <label class="form-label fw-semibold">Height (cm)</label>
                             <input type="number" id="ai-height" class="form-control" min="30" max="300" placeholder="e.g. 175">
                         </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Activity Level</label>
-                            <select id="ai-activity" class="form-select">
-                                @foreach(\App\Models\UserHealthProfile::ACTIVITY_LEVELS as $val => $label)
-                                    <option value="{{ $val }}" {{ $val === 'light' ? 'selected' : '' }}>{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Goal</label>
-                            <select id="ai-goal" class="form-select">
-                                <option value="">Auto (based on BMI)</option>
-                                @foreach(\App\Models\UserHealthProfile::GOALS as $val => $label)
-                                    <option value="{{ $val }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Dietary Preference</label>
-                            <select id="ai-diet" class="form-select">
-                                @foreach(\App\Models\UserHealthProfile::DIETS as $val => $label)
-                                    <option value="{{ $val }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
                         <div class="col-md-6">
                             <label class="form-label fw-semibold">Compare Against</label>
                             <select id="ai-period" class="form-select">
@@ -176,30 +131,6 @@
                                 <option value="last_month">Last Month's Orders</option>
                             </select>
                         </div>
-
-                        {{-- Chronic conditions — multi-select with Select All --}}
-                        <div class="col-12">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <label class="form-label fw-semibold mb-0">Do you have any of these conditions?</label>
-                                <div class="form-check form-switch mb-0">
-                                    <input class="form-check-input" type="checkbox" role="switch" id="conditions-select-all">
-                                    <label class="form-check-label small fw-semibold" for="conditions-select-all">Select All</label>
-                                </div>
-                            </div>
-                            <div class="row g-2 bg-light rounded-3 p-3" id="conditions-list">
-                                @foreach(\App\Models\UserHealthProfile::CONDITIONS as $val => $label)
-                                    <div class="col-sm-6 col-md-4">
-                                        <div class="form-check">
-                                            <input class="form-check-input condition-checkbox" type="checkbox"
-                                                   value="{{ $val }}" id="cond-{{ $val }}">
-                                            <label class="form-check-label" for="cond-{{ $val }}">{{ $label }}</label>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                            <small class="text-muted d-block mt-1">Optional — this only helps us flag relevant considerations, not give medical advice.</small>
-                        </div>
-
                         <div class="col-12">
                             <label class="form-label fw-semibold">Describe Your Health Goals</label>
                             <textarea id="ai-description" class="form-control" rows="3"
@@ -303,30 +234,11 @@
 #meal-type-buttons button:hover { transform:translateY(-2px); }
 #meal-type-buttons button.active { background-color:#0d6efd;color:#fff;box-shadow:0 4px 12px rgba(13,110,253,.35); }
 .form-check-label { text-transform:capitalize; }
-.suggest-meal-card { transition:transform .2s ease, box-shadow .2s ease; }
-.suggest-meal-card:hover { transform:translateY(-3px); box-shadow:0 8px 20px rgba(0,0,0,.08) !important; }
+#product-list .card { transition:transform .2s ease,box-shadow .2s ease; }
+#product-list .card:hover { transform:translateY(-4px);box-shadow:0 8px 24px rgba(0,0,0,.1) !important; }
+.suggest-meal-card { transition:transform .2s ease; }
+.suggest-meal-card:hover { transform:translateY(-3px); }
 .meal-badge { width:30px;height:30px;border-radius:7px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0; }
-
-/* ===== Redesigned search result cards ===== */
-.product-result-card { transition:transform .2s ease, box-shadow .2s ease; }
-.product-result-card:hover { transform:translateY(-5px); box-shadow:0 12px 30px rgba(0,0,0,.12) !important; }
-.product-result-card .result-img { height:185px; width:100%; object-fit:cover; }
-.cal-pill {
-    position:absolute; bottom:10px; left:10px;
-    background:rgba(25,135,84,.94); color:#fff; font-size:.72rem; font-weight:600;
-    padding:.28rem .65rem; border-radius:999px;
-}
-.nutrient-fab {
-    position:absolute; top:10px; right:10px; width:36px; height:36px; border-radius:50%;
-    background:rgba(255,255,255,.92); border:none; color:#198754;
-    display:flex; align-items:center; justify-content:center; box-shadow:0 2px 8px rgba(0,0,0,.18);
-    transition:all .2s ease;
-}
-.nutrient-fab:hover { background:#198754; color:#fff; transform:scale(1.08); }
-.result-title { color:#1c2434; }
-.result-title:hover { color:#0d6efd; }
-.result-meal-badge { font-size:.68rem; }
-.condition-badge { font-size:.7rem; }
 </style>
 @endpush
 
@@ -342,14 +254,6 @@ let selectedMealTime   = null;
 let lastSearchTerms    = [];
 let suggestionProductMap = {};
 const MEAL_DEFAULT_TIMES = { breakfast:'08:00', lunch:'12:00', snacks:'16:00', dinner:'19:00' };
-
-// Condition value → label (mirror of UserHealthProfile::CONDITIONS for display)
-const CONDITION_LABELS = {
-    diabetes:'Diabetes', hypertension:'High blood pressure', high_cholesterol:'High cholesterol',
-    heart_disease:'Heart disease', kidney_disease:'Kidney disease', thyroid:'Thyroid disorder',
-    celiac:'Celiac / gluten intolerance', lactose:'Lactose intolerance', ibs:'IBS / digestive issues',
-    anemia:'Anaemia', obesity:'Obesity', pcos:'PCOS'
-};
 
 document.addEventListener('DOMContentLoaded', async () => {
     try {
@@ -373,25 +277,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('meal-date').addEventListener('change', updateTimeForSelectedMealType);
         selectedMealTime = document.getElementById('meal-time').value;
 
-        // Keyword Select All toggle (static element — bind once)
-        document.getElementById('keyword-select-all').addEventListener('change', function () {
-            toggleSelectAllKeywords(this.checked);
-        });
-
-        // Conditions Select All toggle + two-way sync
-        document.getElementById('conditions-select-all').addEventListener('change', function () {
-            document.querySelectorAll('.condition-checkbox').forEach(cb => { cb.checked = this.checked; });
-        });
-        document.getElementById('conditions-list').addEventListener('change', (e) => {
-            if (!e.target.classList.contains('condition-checkbox')) return;
-            const boxes = Array.from(document.querySelectorAll('.condition-checkbox'));
-            document.getElementById('conditions-select-all').checked = boxes.length > 0 && boxes.every(cb => cb.checked);
-        });
-
         initAiPlanner();
-        bindWeeklyPlanButtons();
+        bindWeeklyPlanAddButtons();
 
-        await checkHealthProfile();
+        await checkHealthProfile();   // ← requirement 2
 
     } catch (error) {
         handleError(error);
@@ -400,23 +289,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 });
 
-/* ===================== Profile check on load ===================== */
+/* ===================== Requirement 2: profile check on load ===================== */
 async function checkHealthProfile() {
     try {
         const res = await axios.get('/user/get/health-profile');
         if (res.data.status === 'success' && res.data.data.has_profile) {
             if (res.data.data.profile) prefillPlannerForm(res.data.data.profile);
             document.getElementById('planner-btn-label').textContent = 'Update My Plan';
-            // profile exists → reveal the Update Health Info button
-            document.getElementById('update-health-btn').style.display = 'inline-block';
             renderSuggestions(res.data.data);
         } else {
-            // no profile → hide update button, open planner for first-time setup
-            document.getElementById('update-health-btn').style.display = 'none';
+            // No profile yet → open the planner modal so the user fills it
             new bootstrap.Modal(document.getElementById('aiPlannerModal')).show();
         }
     } catch (error) {
-        document.getElementById('update-health-btn').style.display = 'none';
+        // If the check fails, fail open by showing the modal
         new bootstrap.Modal(document.getElementById('aiPlannerModal')).show();
     }
 }
@@ -428,14 +314,6 @@ function prefillPlannerForm(p) {
     document.getElementById('ai-height').value      = p.height ?? '';
     document.getElementById('ai-period').value      = p.period ?? 'last_week';
     document.getElementById('ai-description').value = p.description ?? '';
-    document.getElementById('ai-activity').value    = p.activity_level ?? 'light';
-    document.getElementById('ai-goal').value        = p.goal ?? '';
-    document.getElementById('ai-diet').value        = p.dietary_preference ?? 'none';
-
-    const saved = p.conditions || [];
-    document.querySelectorAll('.condition-checkbox').forEach(cb => { cb.checked = saved.includes(cb.value); });
-    const boxes = Array.from(document.querySelectorAll('.condition-checkbox'));
-    document.getElementById('conditions-select-all').checked = boxes.length > 0 && boxes.every(cb => cb.checked);
 }
 
 /* ===== Time helpers ===== */
@@ -521,10 +399,6 @@ async function loadMealKeywords(mealTypeId) {
     const container = document.getElementById('keyword-checkboxes');
     section.style.display = 'block';
     container.innerHTML   = `<div class="text-muted">Loading keywords...</div>`;
-
-    // reset Select All when keywords reload
-    document.getElementById('keyword-select-all').checked = false;
-
     try {
         showLoader();
         const res = await axios.get(`/user/get/meal-keywords/${mealTypeId}`);
@@ -551,12 +425,12 @@ async function loadMealKeywords(mealTypeId) {
     }
 }
 
-/* ===================== Keyword + Select All handling ===================== */
+/* ===================== Requirement 3: editable search (name + keywords) ===================== */
 function parseTerms(value) {
     return value.split(',').map(t => t.trim()).filter(Boolean);
 }
 
-function syncKeywordInput() {
+function handleKeywordSelection() {
     const input        = document.getElementById('keyword-input');
     const allKeywords  = Array.from(document.querySelectorAll('.keyword-checkbox')).map(cb => cb.value.toLowerCase());
     const checked      = Array.from(document.querySelectorAll('.keyword-checkbox:checked')).map(cb => cb.value);
@@ -564,26 +438,8 @@ function syncKeywordInput() {
     // keep free-typed terms (anything not in the keyword list), then re-add checked keywords
     let terms = parseTerms(input.value).filter(t => !allKeywords.includes(t.toLowerCase()));
     checked.forEach(k => terms.push(k));
+
     input.value = terms.join(', ');
-
-    updateSelectAllState();
-}
-
-function updateSelectAllState() {
-    const boxes     = Array.from(document.querySelectorAll('.keyword-checkbox'));
-    const selectAll = document.getElementById('keyword-select-all');
-    if (!selectAll || boxes.length === 0) { if (selectAll) selectAll.checked = false; return; }
-    selectAll.checked = boxes.every(cb => cb.checked);
-}
-
-function handleKeywordSelection() {
-    syncKeywordInput();
-}
-
-// Select All switch → check/uncheck every keyword box
-function toggleSelectAllKeywords(checked) {
-    document.querySelectorAll('.keyword-checkbox').forEach(cb => { cb.checked = checked; });
-    syncKeywordInput();
 }
 
 document.getElementById('search-btn').addEventListener('click', async () => {
@@ -607,6 +463,7 @@ document.getElementById('search-btn').addEventListener('click', async () => {
     await searchProducts(terms);
 });
 
+// allow pressing Enter in the search box
 document.getElementById('keyword-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); document.getElementById('search-btn').click(); }
 });
@@ -623,17 +480,10 @@ async function searchProducts(keywords, page = 1) {
             longitude:    userLongitude
         });
         if (res.status === 200 && res.data.status === 'success' && res.data.products.data.length > 0) {
-            renderProducts(res.data.products.data, res.data.total);
+            renderProducts(res.data.products.data);
             updatePagination(res.data.products);
         } else {
-            document.getElementById('results-heading').style.display = 'none';
-            list.innerHTML = `
-                <div class="col-12">
-                    <div class="text-center text-muted py-5">
-                        <i class="mdi mdi-food-off-outline" style="font-size:2.5rem;"></i>
-                        <p class="mb-0 mt-2">No meals found. Try different keywords or a food name.</p>
-                    </div>
-                </div>`;
+            list.innerHTML = `<div class="text-danger text-center py-3">No products found.</div>`;
             document.querySelector('.pagination').innerHTML = '';
         }
     } catch (error) {
@@ -643,50 +493,40 @@ async function searchProducts(keywords, page = 1) {
     }
 }
 
-/* ===================== attractive result cards ===================== */
-function renderProducts(products, total) {
+function renderProducts(products) {
     allProducts = products;
     const list = document.getElementById('product-list');
     list.innerHTML = '';
 
-    // results heading
-    const heading = document.getElementById('results-heading');
-    heading.style.display = 'flex';
-    document.getElementById('results-count').textContent = `${total ?? products.length} found`;
-
     products.forEach((p, index) => {
         const mealTypesHTML = (p.meal_types && p.meal_types.length > 0)
-            ? p.meal_types.map(mt => `<span class="badge rounded-pill bg-primary-subtle text-primary result-meal-badge me-1 mb-1 text-capitalize">${mt.name}</span>`).join('')
-            : '';
+            ? p.meal_types.map(mt => `<span class="badge rounded-pill bg-primary text-white me-1 mb-1">${mt.name}</span>`).join('')
+            : '<span class="text-muted">N/A</span>';
+        const category   = p.category?.name ?? 'N/A';
         const providedBy = (p.client_info && p.client_info.last_name)
-            ? `<small class="text-muted d-block mb-2"><i class="mdi mdi-storefront-outline me-1"></i>${p.client_info.first_name} ${p.client_info.last_name}</small>` : '';
-        const calPill = (p.nutrients && p.nutrients.calories)
-            ? `<span class="cal-pill"><i class="mdi mdi-fire"></i> ${p.nutrients.calories} ${p.nutrients.calories_unit}</span>` : '';
+            ? `<p class="text-muted small mb-2"><strong>Provided by:</strong> ${p.client_info.first_name} ${p.client_info.last_name}</p>` : '';
+        const caloriesInfo = (p.nutrients && p.nutrients.calories)
+            ? `<p class="text-success small mb-2"><strong>Calories:</strong> ${p.nutrients.calories} ${p.nutrients.calories_unit}</p>` : '';
         const productName = p.name.replace(/\b\w/g, l => l.toUpperCase());
         const hasNutrient = p.nutrients && Object.values(p.nutrients).some(v => v !== null && v !== '');
-        const img = p.image ? `{{ asset('upload/product/medium') }}/${p.image}` : `{{ asset('upload/product/medium/no_image.jpg') }}`;
 
         list.insertAdjacentHTML('beforeend', `
-            <div class="col-xl-3 col-lg-4 col-md-6">
-                <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden product-result-card">
-                    <div class="position-relative">
-                        <a href="/user/meal/details/${p.id}">
-                            <img src="${img}" class="result-img" alt="${p.name}">
-                        </a>
-                        ${calPill}
-                        ${hasNutrient ? `<button class="nutrient-fab" title="View nutrients" onclick="openNutrientModal(${index})"><i class="mdi mdi-nutrition"></i></button>` : ''}
-                    </div>
-                    <div class="card-body d-flex flex-column p-3">
-                        <a href="/user/meal/details/${p.id}" class="text-decoration-none">
-                            <h6 class="fw-bold mb-1 result-title">${productName}</h6>
-                        </a>
+            <div class="col-md-4 col-sm-6">
+                <div class="card h-100 shadow-sm border-0 rounded-3">
+                    <a href="/user/meal/details/${p.id}">
+                        <img src="{{ asset('upload/product/medium') }}/${p.image}" class="card-img-top rounded-top-3"
+                             alt="${p.name}" style="height:200px;object-fit:cover;">
+                    </a>
+                    <div class="card-body text-center d-flex flex-column">
+                        <h6 class="fw-bold mb-2">${productName}</h6>
+                        ${caloriesInfo}
+                        <p class="text-muted mb-1"><strong>Category:</strong> ${category}</p>
+                        <div class="mb-2"><strong>Available for:</strong><br>${mealTypesHTML}</div>
                         ${providedBy}
-                        <div class="d-flex flex-wrap mb-2">${mealTypesHTML}</div>
-                        <div class="d-flex justify-content-between align-items-center mt-auto pt-2">
-                            <span class="fw-bold text-primary fs-6">£${p.price}</span>
-                            <button class="btn btn-sm btn-gradient rounded-pill px-3" onclick="openAddMealModal(${index})">
-                                <i class="mdi mdi-plus"></i> Add
-                            </button>
+                        <p class="fw-semibold text-primary mb-3">£${p.price}</p>
+                        <div class="d-flex justify-content-center gap-2 mt-auto">
+                            <button class="btn btn-outline-primary rounded-pill px-3" onclick="openAddMealModal(${index})">Add to Plan</button>
+                            ${hasNutrient ? `<button class="btn btn-outline-success rounded-pill px-3" onclick="openNutrientModal(${index})">Nutrients</button>` : ''}
                         </div>
                     </div>
                 </div>
@@ -821,16 +661,11 @@ function updatePagination(paginationData) {
 /* ===================== SMART MEAL PLANNER ===================== */
 function initAiPlanner() {
     document.getElementById('ai-generate-btn').addEventListener('click', generateAiPlan);
-
-    const openPlanner = () => {
+    document.getElementById('open-planner-btn').addEventListener('click', () => {
         document.getElementById('ai-form-section').style.display    = 'block';
         document.getElementById('ai-loading-section').style.display = 'none';
         new bootstrap.Modal(document.getElementById('aiPlannerModal')).show();
-    };
-
-    document.getElementById('open-planner-btn').addEventListener('click', openPlanner);
-    // Update Health Info opens the same prefilled form
-    document.getElementById('update-health-btn').addEventListener('click', openPlanner);
+    });
 }
 
 async function generateAiPlan() {
@@ -840,11 +675,7 @@ async function generateAiPlan() {
     const height      = document.getElementById('ai-height').value;
     const period      = document.getElementById('ai-period').value;
     const description = document.getElementById('ai-description').value;
-    const activity_level     = document.getElementById('ai-activity').value;
-    const goal               = document.getElementById('ai-goal').value;
-    const dietary_preference = document.getElementById('ai-diet').value;
-    const conditions = Array.from(document.querySelectorAll('.condition-checkbox:checked')).map(cb => cb.value);
-    const err = document.getElementById('ai-error');
+    const err         = document.getElementById('ai-error');
 
     err.style.display = 'none'; err.textContent = '';
     if (!gender || !age || !weight || !height) {
@@ -857,14 +688,10 @@ async function generateAiPlan() {
     document.getElementById('ai-loading-section').style.display = 'block';
 
     try {
-        const res = await axios.post('/user/generate/meal-suggestion', {
-            gender, age, weight, height, period, description,
-            activity_level, goal, dietary_preference, conditions
-        });
+        const res = await axios.post('/user/generate/meal-suggestion', { gender, age, weight, height, period, description });
         if (res.data.status === 'success') {
             bootstrap.Modal.getInstance(document.getElementById('aiPlannerModal'))?.hide();
             document.getElementById('planner-btn-label').textContent = 'Update My Plan';
-            document.getElementById('update-health-btn').style.display = 'inline-block';
             renderSuggestions(res.data.data);
             document.getElementById('suggestion-section').scrollIntoView({ behavior: 'smooth' });
         } else {
@@ -889,27 +716,15 @@ function renderSuggestions(data) {
     document.getElementById('suggestion-period-badge').textContent =
         data.period === 'last_month' ? 'Based on last month' : 'Based on last week';
 
-    let summaryHtml = `
+    document.getElementById('suggestion-summary').innerHTML = `
         <i class="mdi mdi-account-heart-outline fs-5"></i>
         <div>
             <strong>BMI: ${data.bmi} (${data.bmi_category})</strong> &middot;
             Daily target <strong>${data.target_calories} kcal</strong>.
-            Below is a suggested plan for the next 7 days, by date and meal type.`;
+            Below is a suggested plan for the next 7 days, by date and meal type.
+        </div>`;
 
-    // Surface noted conditions as a flag (not medical advice)
-    if (data.conditions && data.conditions.length) {
-        const badges = data.conditions
-            .map(c => `<span class="badge bg-light text-dark condition-badge me-1">${CONDITION_LABELS[c] || c}</span>`)
-            .join('');
-        summaryHtml += `
-            <div class="mt-2 small text-muted">
-                <i class="mdi mdi-heart-pulse me-1"></i>Noted conditions: ${badges}
-                — please consult a professional for condition-specific dietary advice.
-            </div>`;
-    }
-    summaryHtml += `</div>`;
-    document.getElementById('suggestion-summary').innerHTML = summaryHtml;
-
+    // Analysis cards
     const a = data.analysis || {};
     const analysisEl = document.getElementById('suggestion-analysis');
     if (data.has_history) {
@@ -932,6 +747,7 @@ function renderSuggestions(data) {
             No past order history for this period — suggestions are based on your calorie target only.</div></div>`;
     }
 
+    // Weekly plan accordion (by date)
     const mealIcons = {
         Breakfast: { icon: 'mdi-coffee-outline',        bg: 'bg-warning' },
         Lunch:     { icon: 'mdi-food-outline',          bg: 'bg-primary' },
@@ -954,31 +770,22 @@ function renderSuggestions(data) {
                 const img = p.image ? `/upload/product/small/${p.image}` : '/upload/no_image.jpg';
                 const name = (p.name || '').replace(/\b\w/g, l => l.toUpperCase());
                 body = `
-                    <a href="/user/meal/details/${p.id}" class="text-decoration-none text-dark">
-                        <div class="d-flex align-items-center gap-2 mb-2">
-                            <img src="${img}" class="rounded" style="width:54px;height:54px;object-fit:cover;">
-                            <div class="flex-grow-1">
-                                <div class="fw-semibold small">${name}</div>
-                                <small class="text-success">${p.calories} ${p.calories_unit}</small>
-                                <div class="fw-bold text-primary small">£${p.price}</div>
-                            </div>
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <img src="${img}" class="rounded" style="width:54px;height:54px;object-fit:cover;">
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold small">${name}</div>
+                            <small class="text-success">${p.calories} ${p.calories_unit}</small>
+                            <div class="fw-bold text-primary small">£${p.price}</div>
                         </div>
-                    </a>
-                    <div class="d-flex gap-1 mb-1">
-                        <button class="btn btn-sm btn-outline-primary rounded-pill flex-grow-1 suggest-setmeal-btn"
-                                data-meal-type-id="${meal.meal_type_id}">
-                            <i class="mdi mdi-silverware-variant"></i> Set Meal
-                        </button>
-                        <button class="btn btn-sm btn-success rounded-pill flex-grow-1 suggest-add-btn"
-                                data-product-id="${p.id}" data-date="${day.date}"
-                                data-meal-type-id="${meal.meal_type_id}" data-meal-type-name="${meal.meal_type}">
-                            <i class="mdi mdi-plus"></i> Add
-                        </button>
                     </div>
-                    <button class="btn btn-sm btn-outline-secondary rounded-pill w-100 suggest-similar-btn"
-                            data-name="${p.name}" data-meal-type-id="${meal.meal_type_id}">
-                        <i class="mdi mdi-magnify"></i> Find Similar
-                    </button>`;
+                    <div class="d-flex gap-1">
+                        <a href="/user/meal/details/${p.id}" class="btn btn-sm btn-outline-primary rounded-pill flex-grow-1">View</a>
+                        <button class="btn btn-sm btn-outline-success rounded-pill flex-grow-1 suggest-add-btn"
+                                data-product-id="${p.id}" data-date="${day.date}"
+                                data-meal-type-id="${meal.meal_type_id}" data-meal-type-name="${meal.meal_type}">Add</button>
+                        <button class="btn btn-sm btn-outline-secondary rounded-pill flex-grow-1 suggest-similar-btn"
+                                data-name="${p.name}" data-meal-type-id="${meal.meal_type_id}">Similar</button>
+                    </div>`;
             } else {
                 body = `<div class="text-muted small text-center py-3">No matching product.</div>`;
             }
@@ -1021,35 +828,8 @@ function renderSuggestions(data) {
     document.getElementById('suggestion-section').style.display = 'block';
 }
 
-/* ===== Set Meal: select that meal type, check Select All, show its food ===== */
-async function setMeal(mealTypeId) {
-    const btn = Array.from(document.querySelectorAll('#meal-type-buttons button'))
-        .find(b => b.dataset.mealTypeId == mealTypeId);
-
-    if (btn) {
-        await selectMealType({ target: btn }, mealTypeId);   // loads keywords + clears input
-    } else {
-        selectedMealTypeId = mealTypeId;
-        await loadMealKeywords(mealTypeId);
-    }
-
-    // tick Select All → checks every keyword + fills the search input
-    const selectAll = document.getElementById('keyword-select-all');
-    selectAll.checked = true;
-    toggleSelectAllKeywords(true);
-
-    // search using all selected keywords
-    const terms = parseTerms(document.getElementById('keyword-input').value);
-    if (terms.length) {
-        lastSearchTerms = terms;
-        await searchProducts(terms);
-    }
-
-    document.getElementById('keyword-section').scrollIntoView({ behavior: 'smooth' });
-}
-
-/* ===== Find Similar: search the food name across all clients ===== */
 async function findSimilarFood(foodName, mealTypeId) {
+    // Activate the matching meal-type button so keywords + time defaults sync
     const btn = Array.from(document.querySelectorAll('#meal-type-buttons button'))
         .find(b => b.dataset.mealTypeId == mealTypeId);
 
@@ -1059,15 +839,17 @@ async function findSimilarFood(foodName, mealTypeId) {
         selectedMealTypeId = mealTypeId;
     }
 
+    // Put the food name into the (now editable) search box and search by name
     document.getElementById('keyword-input').value = foodName;
     lastSearchTerms = [foodName];
     await searchProducts([foodName]);
 
+    // Bring the browse/results section into view
     document.getElementById('product-list').scrollIntoView({ behavior: 'smooth' });
 }
 
-/* ===== Suggestion plan button delegation ===== */
-function bindWeeklyPlanButtons() {
+/* ===== Add a suggested product to the plan ===== */
+function bindWeeklyPlanAddButtons() {
     const wp = document.getElementById('weekly-plan');
 
     wp.addEventListener('click', (e) => {
@@ -1079,12 +861,6 @@ function bindWeeklyPlanButtons() {
                 addBtn.dataset.mealTypeName,
                 parseInt(addBtn.dataset.productId)
             );
-            return;
-        }
-
-        const setMealBtn = e.target.closest('.suggest-setmeal-btn');
-        if (setMealBtn) {
-            setMeal(parseInt(setMealBtn.dataset.mealTypeId));
             return;
         }
 

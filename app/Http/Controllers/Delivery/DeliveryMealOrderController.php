@@ -117,7 +117,9 @@ class DeliveryMealOrderController extends Controller
                 ], 404);
             }
 
-            $shippingAddress = MealShippingAddress::where('meal_order_id', $deliveryLedger->meal_order_id)->first();
+            $shippingAddress = MealShippingAddress::with(['city', 'county', 'country'])
+                ->where('meal_order_id', $deliveryLedger->meal_order_id)
+                ->first();
 
             $orderItems = MealOrderItem::with(['product', 'mealType'])
                 ->where('meal_order_id', $deliveryLedger->meal_order_id)
@@ -133,7 +135,7 @@ class DeliveryMealOrderController extends Controller
             $deliveryFee = $deliveryLedger->delivery_charge;
             $total = $subtotal + $tax + $deliveryFee;
 
-            $client = User::find($deliveryLedger->client_id);
+            $client   = User::with(['city', 'county', 'country'])->find($deliveryLedger->client_id);
             $customer = User::find($mealOrder->customer_id);
             $mealType = MealType::find($deliveryLedger->meal_type_id);
 
@@ -157,31 +159,39 @@ class DeliveryMealOrderController extends Controller
                     'updated_at' => $deliveryLedger->updated_at->format('Y-m-d H:i:s'),
                 ],
                 'restaurant_details' => $client ? [
-                    'id' => $client->id,
-                    'name' => $client->firstName . ' ' . $client->lastName,
-                    'email' => $client->email,
-                    'mobile' => $client->mobile,
-                    'address1' => $client->address1,
-                    'address2' => $client->address2,
-                    'zip_code' => $client->zip_code,
-                    'city_id' => $client->city_id,
-                    'image' => $client->image,
+                    'id'        => $client->id,
+                    'name'      => $client->firstName . ' ' . $client->lastName,
+                    'email'     => $client->email,
+                    'mobile'    => $client->mobile,
+                    'address1'  => $client->address1,
+                    'address2'  => $client->address2,
+                    'city'      => $client->city->name   ?? null,
+                    'county'    => $client->county->name ?? null,
+                    'country'   => $client->country->name ?? null,
+                    'zip_code'  => $client->zip_code,
+                    'latitude'  => $client->latitude,
+                    'longitude' => $client->longitude,
+                    'image'     => $client->image,
                 ] : null,
                 'customer_details' => $customer ? [
-                    'id' => $customer->id,
-                    'name' => $customer->firstName . ' ' . $customer->lastName,
-                    'email' => $customer->email,
-                    'mobile' => $customer->mobile,
-                    'image' => $customer->image,
-                    'address1' => $shippingAddress->address1 ?? null,
-                    'address2' => $shippingAddress->address2 ?? null,
-                    'zip_code' => $shippingAddress->zip_code ?? null,
-                    'city_id' => $shippingAddress->city_id ?? null,
-                    'shipping_name' => $shippingAddress->name ?? null,
+                    'id'             => $customer->id,
+                    'name'           => $customer->firstName . ' ' . $customer->lastName,
+                    'email'          => $customer->email,
+                    'mobile'         => $customer->mobile,
+                    'image'          => $customer->image,
+                    'address1'       => $shippingAddress->address1 ?? null,
+                    'address2'       => $shippingAddress->address2 ?? null,
+                    'city'           => $shippingAddress->city->name   ?? null,
+                    'county'         => $shippingAddress->county->name ?? null,
+                    'country'        => $shippingAddress->country->name ?? null,
+                    'zip_code'       => $shippingAddress->zip_code ?? null,
+                    'latitude'       => $shippingAddress->latitude  ?? null,
+                    'longitude'      => $shippingAddress->longitude ?? null,
+                    'shipping_name'  => $shippingAddress->name  ?? null,
                     'shipping_phone' => $shippingAddress->phone ?? null,
                     'shipping_email' => $shippingAddress->email ?? null,
                 ] : null,
-                'order_summary' => [
+                                'order_summary' => [
                     'order_number' => $mealOrder->order_number,
                     'invoice_no' => $mealOrder->invoice_no,
                     'subtotal' => number_format($subtotal, 2),
@@ -384,6 +394,11 @@ class DeliveryMealOrderController extends Controller
             ]);
 
             $this->deleteOtherNotifications($deliveryLedger->id, $user->id);
+
+            $user->unreadNotifications()
+                ->whereJsonContains('data->data->delivery_charge_ledger_id', (int) $deliveryLedger->id)
+                ->get()
+                ->each->markAsRead();
 
             return response()->json([
                 'status' => 'success',

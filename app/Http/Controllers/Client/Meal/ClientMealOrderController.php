@@ -373,8 +373,6 @@ class ClientMealOrderController extends Controller
         }
     }
 
-
-
     public function updateDeliveryStatus(Request $request, $orderId)
     {
         try {
@@ -982,3 +980,5 @@ class ClientMealOrderController extends Controller
     }
 
 }
+
+
