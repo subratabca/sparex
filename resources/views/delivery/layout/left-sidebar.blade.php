@@ -38,12 +38,7 @@
       </a>
     </li>
 
-    <li class="menu-item {{ request()->routeIs('delivery.meal.reports*') ? 'active' : '' }}">
-      <a href="{{ route('delivery.meal.reports') }}" class="menu-link">
-        <i class="menu-icon tf-icons mdi mdi-food-fork-drink"></i>
-        <div data-i18n="Meal Reports">Meal Reports</div>
-      </a>
-    </li>
+
   </ul>
 </aside>
 

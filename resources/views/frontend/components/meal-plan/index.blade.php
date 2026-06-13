@@ -114,7 +114,7 @@
     <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content border-0 shadow-lg">
             <div class="modal-header bg-gradient-primary text-white">
-                <h5 class="modal-title fw-semibold"><i class="mdi mdi-clipboard-pulse-outline me-2"></i>Smart Meal Planner</h5>
+                <h5 class="modal-title fw-semibold"><i class="mdi mdi-clipboard-pulse-outline me-2"></i><span id="aiPlannerTitleText">Smart Meal Planner</span></h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
@@ -214,7 +214,7 @@
                     <div class="text-end mt-4">
                         <button type="button" class="btn btn-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
                         <button type="button" id="ai-generate-btn" class="btn btn-gradient rounded-pill px-4">
-                            <i class="mdi mdi-creation me-1"></i>Generate Plan
+                            <i class="mdi mdi-creation me-1"></i><span id="ai-generate-btn-label">Generate Plan</span>
                         </button>
                     </div>
                 </div>
@@ -411,13 +411,17 @@ async function checkHealthProfile() {
             document.getElementById('update-health-btn').style.display = 'inline-block';
             renderSuggestions(res.data.data);
         } else {
-            // no profile → hide update button, open planner for first-time setup
+            // no profile → show order-based suggestions if any, then open "Update Health Info"
             document.getElementById('update-health-btn').style.display = 'none';
-            new bootstrap.Modal(document.getElementById('aiPlannerModal')).show();
+            const d = res.data.data || {};
+            if (d.has_history && (d.weekly_plan || []).length) {
+                renderSuggestions(d);
+            }
+            openPlanner('health');
         }
     } catch (error) {
         document.getElementById('update-health-btn').style.display = 'none';
-        new bootstrap.Modal(document.getElementById('aiPlannerModal')).show();
+        openPlanner('health');
     }
 }
 
@@ -819,18 +823,78 @@ function updatePagination(paginationData) {
 }
 
 /* ===================== SMART MEAL PLANNER ===================== */
-function initAiPlanner() {
-    document.getElementById('ai-generate-btn').addEventListener('click', generateAiPlan);
+let plannerMode = 'plan'; // 'plan' = generate suggestions | 'health' = update profile only
 
-    const openPlanner = () => {
-        document.getElementById('ai-form-section').style.display    = 'block';
-        document.getElementById('ai-loading-section').style.display = 'none';
-        new bootstrap.Modal(document.getElementById('aiPlannerModal')).show();
+// Opens the planner modal in the given mode (top-level so checkHealthProfile can call it)
+function openPlanner(mode = 'plan') {
+    plannerMode = mode;
+    document.getElementById('aiPlannerTitleText').textContent =
+        mode === 'health' ? 'Update Health Info' : 'Smart Meal Planner';
+    document.getElementById('ai-generate-btn-label').textContent =
+        mode === 'health' ? 'Update' : 'Generate Plan';
+
+    document.getElementById('ai-form-section').style.display    = 'block';
+    document.getElementById('ai-loading-section').style.display = 'none';
+    new bootstrap.Modal(document.getElementById('aiPlannerModal')).show();
+}
+
+function initAiPlanner() {
+    document.getElementById('ai-generate-btn').addEventListener('click', () => {
+        if (plannerMode === 'health') updateHealthInfo();
+        else                          generateAiPlan();
+    });
+
+    document.getElementById('open-planner-btn').addEventListener('click', () => openPlanner('plan'));
+    // Update Health Info opens the same prefilled form, but only saves the profile
+    document.getElementById('update-health-btn').addEventListener('click', () => openPlanner('health'));
+}
+
+/* Update Health Info — saves the UserHealthProfile only (no plan regeneration) */
+async function updateHealthInfo() {
+    const gender = document.getElementById('ai-gender').value;
+    const age    = document.getElementById('ai-age').value;
+    const weight = document.getElementById('ai-weight').value;
+    const height = document.getElementById('ai-height').value;
+    const err    = document.getElementById('ai-error');
+
+    err.style.display = 'none'; err.textContent = '';
+    if (!gender || !age || !weight || !height) {
+        err.textContent = 'Please fill in gender, age, weight, and height.';
+        err.style.display = 'block';
+        return;
+    }
+
+    const payload = {
+        gender, age, weight, height,
+        period:             document.getElementById('ai-period').value,
+        description:        document.getElementById('ai-description').value,
+        activity_level:     document.getElementById('ai-activity').value,
+        goal:               document.getElementById('ai-goal').value,
+        dietary_preference: document.getElementById('ai-diet').value,
+        conditions:         Array.from(document.querySelectorAll('.condition-checkbox:checked')).map(cb => cb.value),
+        update_only:        true,
     };
 
-    document.getElementById('open-planner-btn').addEventListener('click', openPlanner);
-    // Update Health Info opens the same prefilled form
-    document.getElementById('update-health-btn').addEventListener('click', openPlanner);
+    try {
+        showLoader();
+        const res = await axios.post('/user/generate/meal-suggestion', payload);
+        if (res.data.status === 'success') {
+            bootstrap.Modal.getInstance(document.getElementById('aiPlannerModal'))?.hide();
+            successToast(res.data.message || 'Health information updated successfully.');
+            // Profile now exists → reflect it in the banner (first-time creation included)
+            document.getElementById('planner-btn-label').textContent = 'Update My Plan';
+            document.getElementById('update-health-btn').style.display = 'inline-block';
+        } else {
+            err.textContent = res.data.message || 'Failed to update health info.';
+            err.style.display = 'block';
+        }
+    } catch (error) {
+        const msg = error.response?.data?.message || error.response?.data?.errors || 'Failed to update health info.';
+        err.textContent = typeof msg === 'object' ? Object.values(msg).flat().join(' ') : msg;
+        err.style.display = 'block';
+    } finally {
+        hideLoader();
+    }
 }
 
 async function generateAiPlan() {
@@ -889,12 +953,22 @@ function renderSuggestions(data) {
     document.getElementById('suggestion-period-badge').textContent =
         data.period === 'last_month' ? 'Based on last month' : 'Based on last week';
 
+    const hasProfileData = data.bmi !== undefined && data.bmi !== null;
     let summaryHtml = `
         <i class="mdi mdi-account-heart-outline fs-5"></i>
-        <div>
+        <div>`;
+    if (hasProfileData) {
+        summaryHtml += `
             <strong>BMI: ${data.bmi} (${data.bmi_category})</strong> &middot;
             Daily target <strong>${data.target_calories} kcal</strong>.
             Below is a suggested plan for the next 7 days, by date and meal type.`;
+    } else {
+        summaryHtml += `
+            <strong>Based on your previous orders.</strong>
+            Below is a suggested plan for the next 7 days, by date and meal type.
+            <div class="mt-1 small text-muted"><i class="mdi mdi-information-outline me-1"></i>
+            Add your health profile to get calorie-targeted suggestions.</div>`;
+    }
 
     // Surface noted conditions as a flag (not medical advice)
     if (data.conditions && data.conditions.length) {
@@ -965,14 +1039,14 @@ function renderSuggestions(data) {
                         </div>
                     </a>
                     <div class="d-flex gap-1 mb-1">
-                        <button class="btn btn-sm btn-outline-primary rounded-pill flex-grow-1 suggest-setmeal-btn"
-                                data-meal-type-id="${meal.meal_type_id}">
-                            <i class="mdi mdi-silverware-variant"></i> Set Meal
-                        </button>
                         <button class="btn btn-sm btn-success rounded-pill flex-grow-1 suggest-add-btn"
                                 data-product-id="${p.id}" data-date="${day.date}"
                                 data-meal-type-id="${meal.meal_type_id}" data-meal-type-name="${meal.meal_type}">
                             <i class="mdi mdi-plus"></i> Add
+                        </button>
+                        <button class="btn btn-sm btn-outline-primary rounded-pill flex-grow-1 suggest-setmeal-btn"
+                                data-meal-type-id="${meal.meal_type_id}">
+                            <i class="mdi mdi-silverware-variant"></i> Set Meal
                         </button>
                     </div>
                     <button class="btn btn-sm btn-outline-secondary rounded-pill w-100 suggest-similar-btn"

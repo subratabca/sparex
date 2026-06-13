@@ -63,6 +63,48 @@ class MealOrderHelper
     }
 
     /**
+     * Geocode an address string into coordinates via the Google Geocoding API.
+     * Returns ['latitude' => float, 'longitude' => float] or null on failure.
+     */
+    public static function getCoordinatesFromAddress(string $address): ?array
+    {
+        $apiKey = config('services.google_maps.api_key');
+
+        if (!$apiKey) {
+            Log::error('Google Maps API key not configured');
+            return null;
+        }
+
+        if (trim($address) === '') {
+            return null;
+        }
+
+        try {
+            $url = "https://maps.googleapis.com/maps/api/geocode/json?address=" . urlencode($address) . "&key={$apiKey}";
+
+            $response = Http::timeout(10)->get($url);
+            $data     = $response->json();
+
+            if (($data['status'] ?? null) === 'OK' &&
+                isset($data['results'][0]['geometry']['location'])) {
+                $loc = $data['results'][0]['geometry']['location'];
+                Log::info("Geocoded '{$address}' -> {$loc['lat']}, {$loc['lng']}");
+                return [
+                    'latitude'  => round($loc['lat'], 8),
+                    'longitude' => round($loc['lng'], 8),
+                ];
+            }
+
+            Log::warning('Geocode API status: ' . ($data['status'] ?? 'UNKNOWN') . " for: {$address}");
+            return null;
+
+        } catch (Exception $e) {
+            Log::error('Geocoding error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Get delivery charge based on distance using dynamic tiers
      */
     public static function getChargeByDistance(MealDeliveryCharge $deliveryCharge, float $distance): float

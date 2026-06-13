@@ -198,7 +198,10 @@ class MealPlanController extends Controller
             $profile    = UserHealthProfile::where('user_id', $customerId)->first();
 
             if (!$profile) {
-                return response()->json(['status' => 'success', 'data' => ['has_profile' => false]], 200);
+                // No profile → still suggest from past order history (if any)
+                $data = $this->buildHistorySuggestionResponse($customerId);
+                $data['has_profile'] = false;
+                return response()->json(['status' => 'success', 'data' => $data], 200);
             }
 
             $data = $this->buildSuggestionResponse($customerId, [
@@ -213,6 +216,7 @@ class MealPlanController extends Controller
                 'goal'           => $profile->goal,
             ]);
 
+            $data['has_profile'] = true;
             $data['profile'] = [
                 'gender' => $profile->gender, 'age' => $profile->age,
                 'weight' => $profile->weight, 'height' => $profile->height,
@@ -252,6 +256,7 @@ class MealPlanController extends Controller
                 'allergies'          => 'nullable|array',
                 'allergies.*'        => 'string|max:100',
                 'dietary_preference' => 'nullable|in:' . implode(',', array_keys(\App\Models\UserHealthProfile::DIETS)),
+                'update_only'        => 'nullable|boolean',
             ]);
 
             $customerId = $request->header('id');
@@ -273,6 +278,15 @@ class MealPlanController extends Controller
                     'dietary_preference' => $validated['dietary_preference'] ?? null,
                 ]
             );
+
+            // "Update Health Info" only persists the profile — no plan regeneration
+            if ($request->boolean('update_only')) {
+                return response()->json([
+                    'status'  => 'success',
+                    'message' => 'Health information updated successfully.',
+                    'data'    => ['has_profile' => true, 'update_only' => true],
+                ], 200);
+            }
 
             $data = $this->buildSuggestionResponse($customerId, $validated);
 
@@ -519,6 +533,117 @@ class MealPlanController extends Controller
                     'meal_type'      => $mealTypeName,
                     'meal_type_id'   => $pool['meal_type_id'],
                     'calorie_target' => $pool['target'],
+                    'product'        => $product,
+                ];
+            }
+
+            $weekly[] = [
+                'date'      => $date->format('Y-m-d'),
+                'day_label' => $date->format('D, d M Y'),
+                'meals'     => $meals,
+            ];
+        }
+
+        return $weekly;
+    }
+
+    /**
+     * Build the suggestion payload from past order history only
+     * (no profile → no BMI / no calorie target).
+     */
+    private function buildHistorySuggestionResponse($customerId, string $period = 'last_week'): array
+    {
+        $start = $period === 'last_month'
+            ? Carbon::now()->subMonth()->startOfDay()
+            : Carbon::now()->subWeek()->startOfDay();
+        $end = Carbon::now()->endOfDay();
+
+        $pastItems = MealOrderItem::with([
+                'product.nutrient',
+                'product.client:id,firstName,lastName',
+                'mealType',
+            ])
+            ->whereHas('mealOrder', fn($q) =>
+                $q->where('customer_id', $customerId)
+                  ->whereBetween('created_at', [$start, $end]))
+            ->get();
+
+        $hasHistory = $pastItems->isNotEmpty();
+
+        return [
+            'period'        => $period,
+            'conditions'    => [],
+            'analysis'      => $this->analysePastOrders($pastItems),
+            'weekly_plan'   => $hasHistory ? $this->buildWeeklyPlanFromHistory($pastItems) : [],
+            'has_history'   => $hasHistory,
+            'profile_based' => false,
+        ];
+    }
+
+    /**
+     * Build a 7-day plan purely from the customer's previously ordered products,
+     * grouped by meal type and rotated for daily variety.
+     */
+    private function buildWeeklyPlanFromHistory($pastItems): array
+    {
+        $mealOrder = ['Breakfast', 'Lunch', 'Snacks', 'Dinner'];
+
+        // Group distinct products per meal type, tallying order frequency
+        $byMealType = [];
+        foreach ($pastItems as $item) {
+            if (!$item->product) continue;
+            $mtName = $item->mealType->name ?? 'Other';
+            $pid    = $item->product->id;
+            if (!isset($byMealType[$mtName][$pid])) {
+                $byMealType[$mtName][$pid] = [
+                    'product'      => $item->product,
+                    'meal_type_id' => $item->meal_type_id,
+                    'count'        => 0,
+                ];
+            }
+            $byMealType[$mtName][$pid]['count'] += $item->quantity;
+        }
+
+        // Map each meal type's products (most-ordered first) to the card shape
+        $pools = [];
+        foreach ($mealOrder as $mtName) {
+            $entries    = collect($byMealType[$mtName] ?? [])->sortByDesc('count')->values();
+            $mealTypeId = $entries->isNotEmpty()
+                ? $entries->first()['meal_type_id']
+                : optional(MealType::whereRaw('LOWER(name) = ?', [strtolower($mtName)])->first())->id;
+
+            $products = $entries->map(function ($entry) {
+                $p = $entry['product'];
+                return [
+                    'id'            => $p->id,
+                    'name'          => $p->name,
+                    'image'         => $p->image,
+                    'price'         => $p->price,
+                    'calories'      => $p->nutrient->calories ?? 0,
+                    'calories_unit' => $p->nutrient->calories_unit ?? 'kcal',
+                    'client_name'   => $p->client ? trim($p->client->firstName . ' ' . $p->client->lastName) : null,
+                ];
+            })->values()->all();
+
+            $pools[$mtName] = ['meal_type_id' => $mealTypeId, 'products' => $products];
+        }
+
+        // Build the next 7 days, rotating through each meal type's product list
+        $weekly = [];
+        for ($i = 1; $i <= 7; $i++) {
+            $date  = Carbon::now()->addDays($i);
+            $meals = [];
+
+            foreach ($mealOrder as $mtName) {
+                $pool    = $pools[$mtName];
+                $product = count($pool['products']) > 0
+                    ? $pool['products'][($i - 1) % count($pool['products'])]
+                    : null;
+
+                $meals[] = [
+                    'meal_type'      => $mtName,
+                    'meal_type_id'   => $pool['meal_type_id'],
+                    'calorie_target' => $product['calories'] ?? 0,
                     'product'        => $product,
                 ];
             }

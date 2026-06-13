@@ -42,7 +42,9 @@ async function getList() {
             res.data.data.forEach(function (item, index) {
                 let orderDate = item.order_date || '-';
                 let invoiceNo = item.invoice_no || '-';
-                let customerName = item.customer_name || '-';
+                let customerName = item.customer_name
+                    ? item.customer_name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase())
+                    : '-';
                 let payableAmount = item.payable_amount || '£0.00';
                 let paymentStatus = item.payment_status || 'Unknown';
 

@@ -194,6 +194,22 @@ class DeliveryProfileController extends Controller
         }
     }
 
+    public function Logout()
+    {
+        try {
+            return response()->json([
+                'status' => 'success',
+                'message' => 'Successfully logged out',
+            ], 200)->withCookie(cookie()->forget('token'));
+        } catch (Exception $e) {
+            return response()->json([
+                'status' => 'failed',
+                'message' => 'An error occurred while logging out',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function deliveryDetailsPage(Request $request)
     {
         $email = $request->header('email');

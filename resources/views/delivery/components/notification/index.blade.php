@@ -10,7 +10,7 @@
                     <th>Sl</th>
                     <th>Title</th>
                     <th>Meal Type</th>
-                    <th>Date</th>
+                    <th>Delivery Date</th>
                     <th>Time</th>
                     <th>Charge</th>
                     <th>Status</th>
@@ -29,6 +29,15 @@
 document.addEventListener("DOMContentLoaded", function () {
     getList();
 });
+
+// e.g. "2026-06-05T18:00:00.000000Z" -> "05-June-2026"
+function formatDateOnly(value) {
+    if (!value) return 'N/A';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return value;
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return `${String(d.getUTCDate()).padStart(2, '0')}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
+}
 
 async function getList() {
     showLoader();
@@ -64,7 +73,7 @@ async function getList() {
             // Get the values with fallbacks
             const notificationTitle = notificationData.title || 'No Title';
             const mealType = deliveryDetails.meal_type || 'N/A';
-            const deliveryDate = deliveryDetails.delivery_date || 'N/A';
+            const deliveryDate = formatDateOnly(deliveryDetails.delivery_date);
             
             // Extract and format meal_time
             let deliveryTime = 'N/A';

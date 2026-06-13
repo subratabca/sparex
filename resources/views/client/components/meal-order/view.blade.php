@@ -14,7 +14,7 @@
                 <!-- Order Header -->
                 <div class="d-flex justify-content-between align-items-center mb-4 border-bottom pb-3">
                     <div>
-                        <h4 class="mb-1" id="mealPlanTitle">Client Payment Details</h4>
+                        <h4 class="mb-1" id="mealPlanTitle">Client Payment Details11</h4>
                         <p class="mb-0 text-muted" id="orderNumberText"></p>
                     </div>
                 </div>

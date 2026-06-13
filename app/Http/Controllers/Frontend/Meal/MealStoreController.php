@@ -108,6 +108,14 @@ class MealStoreController extends Controller
     // ===== Shared shipping address creation =====
     private function createShippingAddress(Request $request, int $mealOrderId): void
     {
+        // Geocode the shipping address so the delivery map & distance have real coordinates
+        $coords = MealOrderHelper::getCoordinatesFromAddress(
+            trim(implode(', ', array_filter([
+                $request->address1,
+                $request->zip_code,
+            ])))
+        );
+
         MealShippingAddress::create([
             'meal_order_id' => $mealOrderId,
             'name'          => $request->name,
@@ -119,8 +127,8 @@ class MealStoreController extends Controller
             'country_id'    => $request->country_id,
             'county_id'     => $request->county_id,
             'city_id'       => $request->city_id,
-            'latitude'      => null,
-            'longitude'     => null,
+            'latitude'      => $coords['latitude']  ?? null,
+            'longitude'     => $coords['longitude'] ?? null,
         ]);
     }
 

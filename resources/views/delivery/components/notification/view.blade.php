@@ -85,7 +85,51 @@
             </div>
         </div>
 
+        {{-- ===== Delivery Actions (hidden when delivered) ===== --}}
+        <div id="delivery-actions-card" class="card border-0 shadow-sm rounded-4 mb-4 nd-action-card d-none">
+            <div class="card-body p-4">
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+                    <h6 class="fw-bold mb-0"><i class="mdi mdi-truck-check-outline me-2 text-primary"></i>Delivery Actions</h6>
+                    <div id="action-buttons" class="d-flex gap-2 flex-wrap"></div>
+                </div>
+                <div id="notification-message-wrap" class="d-none">
+                    <hr class="my-3">
+                    <div class="d-flex flex-column gap-2 small">
+                        <div>
+                            <span class="text-muted"><i class="mdi mdi-pound text-primary me-1"></i>Order Tracking:</span>
+                            <span class="nd-hl ms-1" id="ready-order-tracking">—</span>
+                        </div>
+                        <div>
+                            <span class="text-muted"><i class="mdi mdi-clock-outline text-primary me-1"></i>Pickup Time:</span>
+                            <span class="fw-semibold ms-1" id="ready-pickup-time">—</span>
+                        </div>
+                        <div>
+                            <span class="text-muted"><i class="mdi mdi-message-text-outline text-primary me-1"></i>Message:</span>
+                            <span id="notification-message" class="ms-1"></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="row g-4">
+            {{-- ===== Pickup & Drop-off (stacked) ===== --}}
+            <div class="col-lg-5 d-flex flex-column gap-3">
+                <div class="nd-addr nd-addr-pickup rounded-4 p-3 flex-fill">
+                    <div class="nd-addr-head text-danger"><i class="mdi mdi-storefront-outline"></i> Pickup — Restaurant</div>
+                    <div class="fw-bold" id="client-name">—</div>
+                    <div class="small text-muted mb-1"><i class="mdi mdi-phone-outline me-1"></i><span id="client-mobile">—</span></div>
+                    <div class="small text-muted" id="client-address">—</div>
+                </div>
+                <div class="nd-addr nd-addr-drop rounded-4 p-3 flex-fill">
+                    <div class="nd-addr-head text-success"><i class="mdi mdi-map-marker-radius-outline"></i> Drop-off — Customer</div>
+                    <div class="fw-bold" id="customer-name">—</div>
+                    <div class="small text-muted mb-1"><i class="mdi mdi-phone-outline me-1"></i><span id="customer-mobile">—</span></div>
+                    <div class="small text-muted mb-1"><i class="mdi mdi-email-outline me-1"></i><span id="customer-email">—</span></div>
+                    <div class="small text-muted" id="delivery-address">—</div>
+                </div>
+            </div>
+
             {{-- ===== Map ===== --}}
             <div class="col-lg-7">
                 <div class="card border-0 shadow-sm rounded-4 h-100 overflow-hidden">
@@ -106,23 +150,6 @@
                         <span><i class="mdi mdi-storefront mdi-18px text-danger me-1"></i>Restaurant</span>
                         <span><i class="mdi mdi-home-map-marker mdi-18px text-success me-1"></i>Customer</span>
                     </div>
-                </div>
-            </div>
-
-            {{-- ===== Pickup & Drop-off ===== --}}
-            <div class="col-lg-5">
-                <div class="nd-addr nd-addr-pickup rounded-4 p-3 mb-3">
-                    <div class="nd-addr-head text-danger"><i class="mdi mdi-storefront-outline"></i> Pickup — Restaurant</div>
-                    <div class="fw-bold" id="client-name">—</div>
-                    <div class="small text-muted mb-1"><i class="mdi mdi-phone-outline me-1"></i><span id="client-mobile">—</span></div>
-                    <div class="small text-muted" id="client-address">—</div>
-                </div>
-                <div class="nd-addr nd-addr-drop rounded-4 p-3">
-                    <div class="nd-addr-head text-success"><i class="mdi mdi-map-marker-radius-outline"></i> Drop-off — Customer</div>
-                    <div class="fw-bold" id="customer-name">—</div>
-                    <div class="small text-muted mb-1"><i class="mdi mdi-phone-outline me-1"></i><span id="customer-mobile">—</span></div>
-                    <div class="small text-muted mb-1"><i class="mdi mdi-email-outline me-1"></i><span id="customer-email">—</span></div>
-                    <div class="small text-muted" id="delivery-address">—</div>
                 </div>
             </div>
         </div>
@@ -150,29 +177,6 @@
             </div>
         </div>
 
-        {{-- ===== Action buttons ===== --}}
-        <div class="card border-0 shadow-sm rounded-4 mt-4" id="action-buttons-section">
-            <div class="card-body text-center">
-                <h6 class="fw-bold text-muted mb-3">Delivery Actions</h6>
-                <div id="action-buttons" class="d-flex justify-content-center gap-3 flex-wrap"></div>
-            </div>
-        </div>
-
-        {{-- ===== Meta info ===== --}}
-        <div class="card border-0 shadow-sm rounded-4 mt-4">
-            <div class="card-body">
-                <div class="row g-3 small">
-                    <div class="col-md-3"><span class="text-muted">Order Number</span><div class="fw-semibold" id="order-number">—</div></div>
-                    <div class="col-md-3"><span class="text-muted">Payment Status</span><div id="payment-status" class="mt-1"></div></div>
-                    <div class="col-md-3"><span class="text-muted">Delivery Time</span><div class="fw-semibold" id="delivery-time">—</div></div>
-                    <div class="col-md-3"><span class="text-muted">Notified</span><div class="fw-semibold" id="notification-time">—</div></div>
-                    <div class="col-12">
-                        <span class="text-muted">Message:</span>
-                        <span id="notification-message" class="ms-1"></span>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
@@ -190,6 +194,37 @@ let ndMap                 = null;
 
 function fmtGBP(v) {
     return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(parseFloat(v) || 0);
+}
+
+// Title Case for names (rider, meal type, product, customer, restaurant)
+function toTitleCase(s) {
+    if (s === null || s === undefined || s === '') return '';
+    return String(s).toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+
+// e.g. "2026-06-05T18:00:00.000000Z" -> "05-June-2026 6:00 PM"
+function fmtDateTimeFull(value) {
+    if (!value) return 'N/A';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return value;
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const day   = String(d.getUTCDate()).padStart(2, '0');
+    const month = months[d.getUTCMonth()];
+    const year  = d.getUTCFullYear();
+    let h = d.getUTCHours();
+    const m = String(d.getUTCMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    h = h % 12 || 12;
+    return `${day}-${month}-${year} ${h}:${m} ${ampm}`;
+}
+
+// e.g. "2026-06-05T18:00:00.000000Z" -> "05-June-2026"
+function fmtDateOnly(value) {
+    if (!value) return 'N/A';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return value;
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return `${String(d.getUTCDate()).padStart(2, '0')}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
 }
 
 async function loadNotificationDetails() {
@@ -257,7 +292,7 @@ function showDeliveryPersonSection() {
         acceptSection.classList.add('d-none');
         assignedSection.classList.remove('d-none');
         document.getElementById('delivery-person-name').textContent =
-            notificationData.data?.delivery_person?.name || 'Delivery Person Assigned';
+            toTitleCase(notificationData.data?.delivery_person?.name) || 'Delivery Person Assigned';
         document.getElementById('delivery-person-id').textContent = deliveryPersonId;
     }
 }
@@ -293,54 +328,76 @@ function populateNotificationDetails() {
     const deliveryAddress = data.delivery_address || {};
     const customerDetails = data.customer_details || {};
 
-    document.getElementById('order-tracking').textContent = data.order_tracking || 'N/A';
-    document.getElementById('order-number').textContent   = data.order_number || 'N/A';
+    document.getElementById('order-tracking').textContent = data.order_number || 'N/A';
 
-    // Stat tiles
-    document.getElementById('stat-mealtype').textContent = deliveryDetails.meal_type || 'N/A';
-    document.getElementById('stat-date').textContent     = deliveryDetails.delivery_date || 'N/A';
+    // Stat tiles — Delivery Date uses the date + the actual delivery (meal) time
+    document.getElementById('stat-mealtype').textContent = toTitleCase(deliveryDetails.meal_type) || 'N/A';
+    document.getElementById('stat-date').innerHTML       =
+        fmtDateOnly(deliveryDetails.delivery_date) +
+        (deliveryDetails.meal_time ? ` <span class="nd-hl">${formatTime(deliveryDetails.meal_time)}</span>` : '');
     document.getElementById('stat-distance').textContent = deliveryDetails.distance_km ?? '0';
     document.getElementById('stat-charge').textContent   = fmtGBP(deliveryDetails.delivery_charge);
 
-    // Delivery time
-    document.getElementById('delivery-time').textContent =
-        deliveryDetails.meal_time ? formatTime(deliveryDetails.meal_time) : 'N/A';
-
-    // Status badges
+    // Status badge (hero)
     document.getElementById('status-badge').innerHTML  = statusBadge(data.delivery_status || 'pending');
-    document.getElementById('payment-status').innerHTML = statusBadge(data.payment_status || 'due');
 
     // Restaurant
-    document.getElementById('client-name').textContent   = data.client_name || 'N/A';
+    document.getElementById('client-name').textContent   = toTitleCase(data.client_name) || 'N/A';
     document.getElementById('client-mobile').textContent = data.client_mobile || 'N/A';
     document.getElementById('client-address').textContent = joinAddress(clientAddress);
 
     // Customer
-    document.getElementById('customer-name').textContent    = customerDetails.name || 'N/A';
+    document.getElementById('customer-name').textContent    = toTitleCase(customerDetails.name) || 'N/A';
     document.getElementById('customer-mobile').textContent  = customerDetails.mobile || 'N/A';
     document.getElementById('customer-email').textContent   = customerDetails.email || 'N/A';
     document.getElementById('delivery-address').textContent = joinAddress(deliveryAddress);
 
-    // Notified time
-    if (data.notification_time) {
-        document.getElementById('notification-time').textContent = new Date(data.notification_time).toLocaleString('en-GB');
-    }
-    document.getElementById('notification-message').textContent = notificationData.message || '—';
+    // Ready-for-pickup block: order tracking, client-set pickup time, message
+    document.getElementById('ready-order-tracking').textContent = data.order_tracking || 'N/A';
+    document.getElementById('ready-pickup-time').textContent    = data.pickup_time || 'Not set';
+    document.getElementById('notification-message').textContent =
+        data.client_name
+            ? `New delivery order from ${toTitleCase(data.client_name)}`
+            : (notificationData.message || '—');
+    applyDeliveryActionsVisibility(data.delivery_status || 'pending');
 
     // Items
     const items = data.items || [];
     const body = document.getElementById('order-items-body');
     body.innerHTML = '';
     items.forEach((item, i) => {
+        const img = item.product_image ? `/upload/product/small/${item.product_image}` : '/upload/no_image.jpg';
         body.insertAdjacentHTML('beforeend', `
             <tr>
                 <td>${i + 1}</td>
-                <td class="fw-semibold">${item.product_name || 'N/A'}</td>
+                <td>
+                    <div class="d-flex align-items-center gap-2">
+                        <img src="${img}" class="rounded" style="width:42px;height:42px;object-fit:cover;border:1px solid #eef0f4;"
+                             onerror="this.onerror=null;this.src='/upload/no_image.jpg';">
+                        <span class="fw-semibold">${toTitleCase(item.product_name) || 'N/A'}</span>
+                    </div>
+                </td>
                 <td><span class="badge bg-label-secondary">${item.quantity || 1}</span></td>
                 <td>${item.meal_time ? formatTime(item.meal_time) : 'N/A'}</td>
             </tr>`);
     });
     document.getElementById('total-items').textContent = items.length;
+}
+
+// Show/hide the Delivery Actions card + its message based on delivery status
+function applyDeliveryActionsVisibility(status) {
+    const card    = document.getElementById('delivery-actions-card');
+    const msgWrap = document.getElementById('notification-message-wrap');
+
+    // Delivered → hide the whole section
+    if (status === 'delivered') {
+        card.classList.add('d-none');
+        return;
+    }
+    card.classList.remove('d-none');
+
+    // Message only shows when the order is ready for pickup
+    msgWrap.classList.toggle('d-none', status !== 'ready_for_pickup');
 }
 
 function joinAddress(a) {
@@ -540,6 +597,8 @@ function handleError(error) {
 .nd-stat-charge   .nd-stat-ico { background:#ecfdf5; color:#16a34a; }
 .nd-stat-meal     .nd-stat-ico { background:#fff7ed; color:#ea580c; }
 .nd-stat-date     .nd-stat-ico { background:#fdf2f8; color:#db2777; }
+/* Delivery Date is longer than the other stats — shrink, wrap, and keep clear of the icon */
+.nd-stat-date .nd-stat-value { font-size:1.02rem; line-height:1.3; white-space:normal; padding-right:2.4rem; }
 
 .nd-addr { background:#fff; border:1px solid #eef0f4; box-shadow:0 2px 10px rgba(0,0,0,.04); }
 .nd-addr-pickup { border-left:4px solid #ef4444; }
@@ -548,4 +607,10 @@ function handleError(error) {
 
 #locationMap { border-radius:0 0 0 0; z-index:1; }
 .leaflet-container { font-family:inherit; }
+
+.nd-action-card { border-left:4px solid #6366f1; background:linear-gradient(180deg,#fbfbff,#ffffff); }
+.nd-action-card hr { border-color:#eef0f4; opacity:1; }
+
+/* Highlight chip for emphasised values (delivery time, tracking number) */
+.nd-hl { background:#eef2ff; color:#4f46e5; font-weight:700; padding:.05rem .4rem; border-radius:5px; letter-spacing:.02em; }
 </style>

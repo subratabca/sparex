@@ -7,6 +7,9 @@ use Illuminate\Support\Facades\Notification;
 use App\Models\User;
 use App\Models\DeliveryChargeLedger;
 use App\Models\MealShippingAddress;
+use App\Models\MealOrderItem;
+use App\Models\MealDeliveryStatusHistory;
+use App\Models\MealOrder;
 use Exception;
 use Carbon\Carbon;
 
@@ -158,10 +161,44 @@ class DeliveryNotificationController extends Controller
                     if ($deliveryChargeLedger->delivery_person_id) {
                         $innerData['delivery_person'] = [
                             'id' => $deliveryChargeLedger->delivery_person_id,
-                            'name' => $deliveryChargeLedger->deliveryPerson ? 
+                            'name' => $deliveryChargeLedger->deliveryPerson ?
                             $deliveryChargeLedger->deliveryPerson->firstName . ' ' . $deliveryChargeLedger->deliveryPerson->lastName : null
                         ];
                     }
+
+                    // Enrich order items with product name + image (works for old & new notifications)
+                    $orderItems = MealOrderItem::with('product')
+                        ->where('meal_order_id', $deliveryChargeLedger->meal_order_id)
+                        ->where('client_id', $deliveryChargeLedger->client_id)
+                        ->where('meal_type_id', $deliveryChargeLedger->meal_type_id)
+                        ->whereDate('meal_date', $deliveryChargeLedger->delivery_date)
+                        ->get();
+
+                    if ($orderItems->isNotEmpty()) {
+                        $innerData['items'] = $orderItems->map(function ($item) {
+                            return [
+                                'product_name'  => $item->product->name ?? 'N/A',
+                                'product_image' => $item->product->image ?? null,
+                                'quantity'      => $item->quantity,
+                                'meal_time'     => $item->meal_time,
+                            ];
+                        })->values()->all();
+                    }
+
+                    // Scheduled pickup time set by the client when marking "ready for pickup"
+                    $readyStatus = MealDeliveryStatusHistory::where('delivery_charge_ledger_id', $deliveryChargeLedger->id)
+                        ->where('delivery_status', 'ready_for_pickup')
+                        ->latest()
+                        ->first();
+                    // Format the wall-clock time directly (no timezone conversion) so it
+                    // matches exactly what the client selected, e.g. "06-June-2026 10:15 AM"
+                    $innerData['pickup_time'] = ($readyStatus && $readyStatus->pick_up_at)
+                        ? $readyStatus->pick_up_at->format('d-F-Y g:i A')
+                        : null;
+
+                    // MealOrder order_number for the top "Delivery Request" section
+                    $mealOrder = MealOrder::find($deliveryChargeLedger->meal_order_id);
+                    $innerData['order_number'] = $mealOrder->order_number ?? null;
                 }
             }
 

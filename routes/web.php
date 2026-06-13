@@ -67,7 +67,6 @@ use App\Http\Controllers\Delivery\DeliveryDashboardController;
 use App\Http\Controllers\Delivery\DeliveryProfileController;
 use App\Http\Controllers\Delivery\DeliveryNotificationController;
 use App\Http\Controllers\Delivery\DeliveryMealOrderController;
-use App\Http\Controllers\Delivery\DeliveryMealReportController;
 
 // Frontend
 use App\Http\Controllers\Frontend\SocialAuthController;
@@ -984,9 +983,12 @@ Route::prefix('delivery')->group(function () {
 
 Route::prefix('delivery')->middleware([DeliveryTokenVerificationMiddleware::class])->group(function () {
     Route::controller(DeliveryDashboardController::class)->group(function () {
-        Route::get('/dashboard','DashboardPage')->name('delivery.dashboard');
-        Route::get('/total/information', 'TotalInfo');
-        Route::get('/logout','Logout')->name('delivery.logout');
+        Route::get('/dashboard', 'index')->name('delivery.dashboard');
+        Route::get('/get/meal-report/summary',         'getSummary');
+        Route::get('/get/meal-report/orders',          'getOrderReport');
+        Route::get('/get/meal-report/order-status',    'getOrderStatusReport');
+        Route::get('/get/meal-report/payment-status',  'getPaymentStatusReport');
+        Route::get('/get/meal-report/earnings',        'getEarningsReport');
     });
 
     Route::controller(DeliveryProfileController::class)->group(function () {
@@ -995,6 +997,7 @@ Route::prefix('delivery')->middleware([DeliveryTokenVerificationMiddleware::clas
         Route::post('/profile/update','updateProfile');
         Route::get('/password','passwordPage');
         Route::post('/password/update','updatePassword');
+        Route::get('/logout','Logout')->name('delivery.logout');
 
         Route::get('/account/details/{delivery_id}','deliveryDetailsPage');
         Route::get('/account/details/info/{delivery_id}','getDeliveryDetails');
@@ -1034,14 +1037,5 @@ Route::prefix('delivery')->middleware([DeliveryTokenVerificationMiddleware::clas
 
         Route::get('/meal-order/details/{delivery_charge_ledger_id}','view');
         Route::get('/get/meal-order/details/{delivery_charge_ledger_id}','getMealOrderDetails');
-    });
-
-    Route::controller(DeliveryMealReportController::class)->group(function () {
-        Route::get('/meal-reports', 'index')->name('delivery.meal.reports');
-        Route::get('/get/meal-report/summary',         'getSummary');
-        Route::get('/get/meal-report/orders',          'getOrderReport');
-        Route::get('/get/meal-report/order-status',    'getOrderStatusReport');
-        Route::get('/get/meal-report/payment-status',  'getPaymentStatusReport');
-        Route::get('/get/meal-report/earnings',        'getEarningsReport');
     });
 });
