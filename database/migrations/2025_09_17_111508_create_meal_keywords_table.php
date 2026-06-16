@@ -13,10 +13,8 @@ return new class extends Migration
     {
         Schema::create('meal_keywords', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('meal_type_id')->constrained('meal_types')->onDelete('cascade');
-            $table->string('name', 50);
+            $table->string('name', 50)->unique();
             $table->timestamps();
-            $table->unique(['meal_type_id', 'name']);
         });
     }
 

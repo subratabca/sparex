@@ -114,7 +114,7 @@ async function loadMealOrderDetailsByDate() {
     try {
         showLoader();
 
-        const res = await axios.get(`/user/get/meal-order/${currentOrderId}/date/${currentDate}`);
+        const res = await axios.get(`/get/meal-order/${currentOrderId}/date/${currentDate}`);
 
         if (res.status === 200 && res.data.status === 'success') {
             const d = res.data.data;
@@ -346,7 +346,7 @@ async function loadDailyCalories(range) {
             params.date     = currentDate;
         }
 
-        const res = await axios.get('/user/get/calories/history', { params });
+        const res = await axios.get('/get/calories/history', { params });
 
         if (res.data.status === 'success') {
             mealTypeBreakdown = { ...res.data.meal_type_breakdown };

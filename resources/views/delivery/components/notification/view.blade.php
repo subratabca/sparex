@@ -233,7 +233,7 @@ async function loadNotificationDetails() {
         const segments = window.location.pathname.split('/');
         notificationId = segments[segments.length - 1];
 
-        const response = await axios.get(`/delivery/get/notification/details/${notificationId}`);
+        const response = await axios.get(`/rider/get/notification/details/${notificationId}`);
 
         if (response.status === 200 && response.data.status === 'success') {
             notificationData = response.data.data;
@@ -300,7 +300,7 @@ function showDeliveryPersonSection() {
 async function acceptDelivery() {
     try {
         showLoader();
-        const res = await axios.post('/delivery/accept/meal/delivery', {
+        const res = await axios.post('/rider/accept/meal/delivery', {
             delivery_charge_ledger_id: deliveryChargeLedgerId
         });
         if (res.status === 200 && res.data.status === 'success') {
@@ -529,7 +529,7 @@ function getStatusButtonLabel(s) {
 
 async function handleUpdateDeliveryStatus() {
     try {
-        const checkRes = await axios.post(`/delivery/check/delivery-status/${deliveryChargeLedgerId}`);
+        const checkRes = await axios.post(`/rider/check/delivery-status/${deliveryChargeLedgerId}`);
         if (checkRes.data.status !== 'success') { errorToast(checkRes.data.message || 'Failed to check delivery status.'); return; }
 
         const currentStatus = checkRes.data.data.delivery_status;
@@ -545,7 +545,7 @@ async function handleUpdateDeliveryStatus() {
         if (!result.isConfirmed) return;
 
         showLoader();
-        const updateRes = await axios.post(`/delivery/update/delivery-status/${deliveryChargeLedgerId}`, {
+        const updateRes = await axios.post(`/rider/update/delivery-status/${deliveryChargeLedgerId}`, {
             delivery_status: nextStatus, notes: ''
         });
         if (updateRes.data.status === 'success') {

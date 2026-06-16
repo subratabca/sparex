@@ -137,52 +137,18 @@ async function updateMultiImg(imageId, imgIndex) {
       errorToast(res.data.message || "Request failed");
     }
   } catch (error) {
-      handleError(error);
+      if (error.response?.status === 422) {
+          Object.entries(error.response.data.errors).forEach(([key, val]) => {
+              const span = document.getElementById(`update_${key}-error${imgIndex}`);
+              if (span) span.innerText = val[0];
+              else errorToast(val[0]);
+          });
+      } else {
+          handleError(error);
+      }
   } finally {
       hideLoader();
   }
-}
-
-function handleError(error, imgIndex = null) {
-    let message = 'An unexpected error occurred';
-
-    if (error.response) {
-        const status = error.response.status;
-        const serverMessage = error.response.data?.message;
-
-        switch (status) {
-            case 404:
-                message = serverMessage || 'Data not found.';
-                break;
-            case 422:
-                if (imgIndex !== null && error.response.data.errors) {
-                    const errorMessages = error.response.data.errors;
-                    for (let field in errorMessages) {
-                        if (errorMessages.hasOwnProperty(field)) {
-                            const errorEl = document.getElementById(`update_${field}-error${imgIndex}`);
-                            if (errorEl) {
-                                errorEl.innerText = errorMessages[field][0];
-                            }
-                        }
-                    }
-                    return; // Already handled specific errors
-                } else {
-                    message = serverMessage || 'Validation error.';
-                }
-                break;
-            case 500:
-                message = error.response.data?.error || serverMessage || 'Server error. Please try again later.';
-                break;
-            default:
-                message = serverMessage || message;
-        }
-    } else if (error.request) {
-        message = 'No response received from the server.';
-    } else {
-        message = error.message || message;
-    }
-
-    errorToast(message);
 }
 </script>
 

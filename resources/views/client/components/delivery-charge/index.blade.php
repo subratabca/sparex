@@ -2,7 +2,7 @@
     <div class="card-header header-elements">
         <span class="me-2"><h5>Delivery Charge List</h5></span>
         <div id="addNewButtonContainer" class="card-header-elements ms-auto">
-            <a href="/client/create/delivery-charge" type="button" class="btn btn-primary waves-effect waves-light">
+            <a href="/restaurant/create/delivery-charge" type="button" class="btn btn-primary waves-effect waves-light">
                 <span class="tf-icon mdi mdi-plus me-1"></span>Add New
             </a>
         </div>
@@ -36,7 +36,7 @@ document.addEventListener("DOMContentLoaded", function () {
 async function getList() {
     showLoader();
     try {
-        let res = await axios.get("/client/delivery-charge/list");
+        let res = await axios.get("/restaurant/delivery-charge/list");
         let tableList = $("#tableList");
         tableList.empty(); 
 
@@ -61,7 +61,7 @@ async function getList() {
                     <td>${item.outside_city_10kg}</td>
                     <td>${item.outside_city_above_10kg}</td>
                     <td>
-                        <a href="/client/edit/delivery-charge/${item.id}" class="btn btn-sm btn-outline-success">
+                        <a href="/restaurant/edit/delivery-charge/${item.id}" class="btn btn-sm btn-outline-success">
                             <span class="mdi mdi-pencil-outline"></span>
                         </a>
                         <button data-id="${item.id}" class="btn deleteBtn btn-sm btn-outline-danger">

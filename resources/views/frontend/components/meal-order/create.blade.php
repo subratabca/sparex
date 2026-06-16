@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 // Load all meal types
 async function loadMealTypes() {
     try {
-        const res = await axios.get('/user/get/meal-types');
+        const res = await axios.get('/get/meal-types');
         const container = document.getElementById('mealTypesContainer');
         container.innerHTML = '';
 
@@ -84,7 +84,7 @@ async function loadMealTypes() {
 async function loadMenusForDate(date) {
     showLoader();
     try {
-        const res = await axios.get('/user/get/menus/group-by-meal-type');
+        const res = await axios.get('/get/menus/group-by-meal-type');
 
         if (res.data.status === 'success') {
             const groupedMenus = res.data.data; // Already grouped by meal type
@@ -166,7 +166,7 @@ async function submitOrder() {
 
     showLoader();
     try {
-        const res = await axios.post('/user/store/meal-order', orderData, {
+        const res = await axios.post('/store/meal-order', orderData, {
             headers: { 'Content-Type': 'application/json' } 
         });
 
@@ -226,7 +226,7 @@ async function submitOrder22222() {
 
     showLoader();
     try {
-        const res = await axios.post('/user/store/meal-order', orderData);
+        const res = await axios.post('/store/meal-order', orderData);
 
         if (res.data.status === 'success') {
             successToast(res.data.message || 'Order placed successfully');
@@ -260,7 +260,7 @@ async function submitOrder11111() {
 
     showLoader();
     try {
-        const res = await axios.post('/user/store/meal-order', formData);
+        const res = await axios.post('/store/meal-order', formData);
         if (res.data.status === 'success') {
             successToast(res.data.message || 'Order placed successfully');
             await loadMenusForDate(date);

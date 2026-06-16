@@ -76,10 +76,10 @@
     <script src="{{ asset('backend/assets/vendor/js/template-customizer.js') }}"></script>
     <script src="{{ asset('backend/assets/js/config.js') }}"></script>
 
-    <script src="{{ asset('backend/custom-js/axios.min.js') }}"></script>
-    <link href="{{ asset('backend/custom-css/toastify.min.css') }}" rel="stylesheet" />
-    <script src="{{ asset('backend/custom-js/toastify-js.js') }}"></script>
-    <script src="{{ asset('backend/custom-js/config.js') }}"></script>
+    <script src="{{ asset('common/custom-js/axios.min.js') }}"></script>
+    <link href="{{ asset('common/custom-css/toastify.min.css') }}" rel="stylesheet" />
+    <script src="{{ asset('common/custom-js/toastify-js.js') }}"></script>
+    <script src="{{ asset('common/custom-js/config.js') }}"></script>
     <script src="https://js.stripe.com/v3/"></script>
 
 
@@ -119,6 +119,27 @@
     transform: translateY(-20px);
   }
 }
+
+/* ===== New meal-order popup ===== */
+.no-modal { border-radius: 18px; }
+.no-header { background: linear-gradient(135deg,#6366f1 0%,#8b5cf6 60%,#ec4899 100%); padding: 1.1rem 1.5rem; }
+.no-bell {
+  width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.2);
+  display:flex; align-items:center; justify-content:center; font-size: 1.5rem;
+}
+.no-summary { background:#fff; border:1px solid #eef0f4; border-radius:14px; padding:1rem 1.1rem; box-shadow:0 2px 10px rgba(0,0,0,.04); }
+.no-track { background:#eef2ff; color:#6366f1; }
+.no-chip { background:#f1f5f9; border-radius:20px; padding:.3rem .8rem; font-size:.8rem; font-weight:600; color:#0f172a; }
+.no-chip-amt { background:#ecfdf5; color:#047857; }
+.no-items { display:flex; flex-direction:column; gap:.5rem; }
+.no-item { display:flex; gap:.7rem; align-items:center; background:#fff; border:1px solid #eef0f4; border-radius:12px; padding:.6rem .8rem; }
+.no-item-thumb {
+  width:46px; height:46px; border-radius:10px; background:#f1f5f9; flex-shrink:0;
+  display:flex; align-items:center; justify-content:center; font-size:1.4rem; color:#94a3b8; overflow:hidden;
+}
+.no-item-thumb img { width:100%; height:100%; object-fit:cover; }
+.no-accept-btn { background:linear-gradient(135deg,#6366f1,#8b5cf6); color:#fff; border:none; font-weight:600; }
+.no-accept-btn:hover { filter:brightness(.95); color:#fff; }
 </style>
 
   </head>
@@ -210,6 +231,250 @@
     <script src="{{ asset('backend/assets/js/form-basic-inputs.js') }}"></script>
 
     <script src="{{ asset('backend/assets/js/maps-leaflet.js') }}"></script>
+
+    <!-- Rider-accepted popup (auto-shows when a rider accepts one of this client's deliveries) -->
+    <div class="modal fade" id="riderAcceptedModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header bg-success text-white">
+            <h5 class="modal-title"><i class="mdi mdi-bike-fast me-2"></i>Rider Accepted Your Delivery</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <div class="d-flex align-items-center gap-3 mb-3">
+              <img id="raRiderImg" src="/upload/no_image.jpg" alt="Rider"
+                   class="rounded-circle" style="width:64px;height:64px;object-fit:cover;border:2px solid #e9ecef;">
+              <div>
+                <div class="fw-semibold fs-5" id="raRiderName">Rider</div>
+                <div class="text-muted small"><i class="mdi mdi-phone-outline me-1"></i><span id="raRiderMobile">N/A</span></div>
+              </div>
+            </div>
+            <div class="border-top pt-3 small">
+              <div class="d-flex justify-content-between mb-1">
+                <span class="text-muted">Order Number</span>
+                <span class="fw-semibold" id="raOrderNumber">N/A</span>
+              </div>
+              <div class="d-flex justify-content-between">
+                <span class="text-muted">Tracking</span>
+                <span class="fw-semibold" id="raTracking">N/A</span>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+            <a href="#" id="raDetailsBtn" class="btn btn-success">Details</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    (function () {
+        const RA_POLL_MS = 10000;                 // how often to check for new acceptances
+        const RA_SEEN_KEY = 'raSeenAcceptances';  // dedupe across page navigations (per tab)
+        let raPollTimer = null;
+        let raModal = null;
+        let raLastCount = null;   // last unread count we rendered to the bell badge
+
+        function raGetSeen() {
+            try { return new Set(JSON.parse(sessionStorage.getItem(RA_SEEN_KEY) || '[]')); }
+            catch (e) { return new Set(); }
+        }
+        function raAddSeen(id) {
+            const s = raGetSeen(); s.add(id);
+            sessionStorage.setItem(RA_SEEN_KEY, JSON.stringify([...s]));
+        }
+
+        async function raFetch() {
+            try {
+                const res = await axios.get('/restaurant/get/delivery-acceptances');
+                if (res.status === 200 && res.data.status === 'success') return res.data;
+            } catch (e) { /* silent — popup is non-blocking */ }
+            return null;
+        }
+
+        // Live-update the bell badge count (no page refresh).
+        function raUpdateBadge(count) {
+            const c = (count === undefined || count === null) ? 0 : count;
+            const badge  = document.getElementById('notificationCount');
+            const badge1 = document.getElementById('notificationCount1');
+            if (badge)  badge.innerText  = c;
+            if (badge1) badge1.innerText = c;
+
+            // When the count changes, refresh the dropdown list so new items
+            // appear there too — also without a refresh.
+            if (raLastCount !== null && c !== raLastCount &&
+                typeof refreshNotificationDropdown === 'function') {
+                refreshNotificationDropdown();
+            }
+            raLastCount = c;
+        }
+
+        function raShow(item) {
+            const el = document.getElementById('riderAcceptedModal');
+            if (!el || typeof bootstrap === 'undefined') return;
+
+            const rider = item.rider || {};
+            document.getElementById('raRiderName').textContent   = rider.name || 'Rider';
+            document.getElementById('raRiderMobile').textContent = rider.mobile || 'N/A';
+            document.getElementById('raRiderImg').src = rider.image
+                ? ('/upload/delivery-profile/small/' + rider.image)
+                : '/upload/no_image.jpg';
+            document.getElementById('raOrderNumber').textContent = item.order_number || 'N/A';
+            document.getElementById('raTracking').textContent    = item.order_tracking || 'N/A';
+            document.getElementById('raDetailsBtn').href =
+                `/restaurant/meal-order/details/${item.meal_order_id}?notification_id=${item.notification_id}`;
+
+            raModal = bootstrap.Modal.getInstance(el) || new bootstrap.Modal(el);
+            raModal.show();
+        }
+
+        async function raPoll() {
+            const payload = await raFetch();
+            if (!payload) return;
+
+            // 1) Live-update the bell count regardless of acceptances.
+            raUpdateBadge(payload.unread_count);
+
+            // 2) Pop the rider-accepted modal for any new acceptance.
+            const items = payload.data || [];
+            if (!items.length) return;
+            const seen = raGetSeen();
+            const fresh = items.filter(i => !seen.has(i.notification_id));
+            if (!fresh.length) return;
+
+            // Show the most recent unseen acceptance; mark all fresh ones as seen
+            // so they don't re-pop on the next poll / navigation.
+            const latest = fresh[0];
+            fresh.forEach(i => raAddSeen(i.notification_id));
+            raShow(latest);
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            raPoll();
+            clearInterval(raPollTimer);
+            raPollTimer = setInterval(raPoll, RA_POLL_MS);
+        });
+    })();
+    </script>
+
+    <!-- New meal-order popup (auto-shows when a customer places an order with this client's items) -->
+    <div class="modal fade" id="newOrderModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 overflow-hidden no-modal">
+          <div class="modal-header no-header text-white border-0">
+            <div class="d-flex align-items-center gap-3">
+              <span class="no-bell"><i class="mdi mdi-food-outline"></i></span>
+              <div>
+                <h5 class="modal-title fw-bold mb-0">New Meal Order</h5>
+                <small class="opacity-75">A customer just ordered your food</small>
+              </div>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body p-3 p-md-4 bg-light">
+            <div id="noBody" class="d-flex flex-column gap-3"></div>
+          </div>
+          <div class="modal-footer border-0 bg-light">
+            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+            <a href="#" id="noDetailsBtn" class="btn no-accept-btn rounded-pill px-4"><i class="mdi mdi-eye-outline me-1"></i>View Details</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    (function () {
+        const NO_POLL_MS  = 12000;
+        const NO_SEEN_KEY = 'noSeenOrderIds';
+        let   noModal = null;
+        let   noQueue = [];
+
+        function noLoadSeen() {
+            try { return new Set(JSON.parse(localStorage.getItem(NO_SEEN_KEY) || '[]')); }
+            catch (e) { return new Set(); }
+        }
+        function noSaveSeen(set) {
+            try { localStorage.setItem(NO_SEEN_KEY, JSON.stringify(Array.from(set).slice(-50))); } catch (e) {}
+        }
+        let noSeen = noLoadSeen();
+
+        async function noFetch() {
+            try {
+                const res = await axios.get('/restaurant/get/new-meal-orders');
+                if (res.status === 200 && res.data.status === 'success') return res.data.data || [];
+            } catch (e) { /* silent */ }
+            return [];
+        }
+
+        function fmtCurrency(v) {
+            return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(parseFloat(v) || 0);
+        }
+
+        function noShowNext() {
+            const el = document.getElementById('newOrderModal');
+            if (!el || typeof bootstrap === 'undefined') return;
+            if (el.classList.contains('show')) return;
+            const o = noQueue.shift();
+            if (!o) return;
+
+            const itemsHtml = (o.items || []).map(i => `
+                <div class="no-item">
+                    <div class="no-item-thumb">${i.product_image
+                        ? `<img src="/upload/product/small/${i.product_image}" onerror="this.src='/upload/no_image.jpg'">`
+                        : `<i class="mdi mdi-silverware-variant"></i>`}</div>
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold">${i.product_name} <span class="text-muted">× ${i.quantity}</span></div>
+                        <div class="small text-muted">
+                            ${i.meal_type ? `<span class="me-2"><i class="mdi mdi-tag-outline"></i> ${i.meal_type}</span>` : ''}
+                            ${i.meal_date ? `<span class="me-2"><i class="mdi mdi-calendar-outline"></i> ${i.meal_date}</span>` : ''}
+                            ${i.meal_time ? `<span><i class="mdi mdi-clock-outline"></i> ${i.meal_time}</span>` : ''}
+                        </div>
+                    </div>
+                </div>`).join('');
+
+            document.getElementById('noBody').innerHTML = `
+                <div class="no-summary">
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <span class="badge no-track"><i class="mdi mdi-pound"></i>${o.order_number || 'N/A'}</span>
+                        <span class="text-muted small"><i class="mdi mdi-account-outline me-1"></i>${o.customer_name || 'Customer'}</span>
+                    </div>
+                    <div class="d-flex gap-2 mt-2">
+                        <span class="no-chip"><i class="mdi mdi-food-fork-drink"></i> ${o.item_count} item(s)</span>
+                        <span class="no-chip no-chip-amt"><i class="mdi mdi-cash"></i> ${fmtCurrency(o.total_amount)}</span>
+                    </div>
+                </div>
+                <div class="no-items">${itemsHtml || '<div class="text-muted">No items.</div>'}</div>`;
+
+            document.getElementById('noDetailsBtn').href =
+                `/restaurant/meal-order/details/${o.meal_order_id}?notification_id=${o.notification_id}`;
+
+            const elModal = document.getElementById('newOrderModal');
+            noModal = bootstrap.Modal.getInstance(elModal) || new bootstrap.Modal(elModal);
+            if (!elModal.dataset.noHiddenBound) {
+                elModal.dataset.noHiddenBound = '1';
+                elModal.addEventListener('hidden.bs.modal', () => setTimeout(noShowNext, 300));
+            }
+            noModal.show();
+        }
+
+        async function noPoll() {
+            const orders = await noFetch();
+            if (!orders.length) return;
+            const fresh = orders.filter(o => !noSeen.has(o.notification_id));
+            if (!fresh.length) return;
+            fresh.forEach(o => noSeen.add(o.notification_id));
+            noSaveSeen(noSeen);
+            noQueue.push(...fresh);
+            noShowNext();
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            noPoll();
+            setInterval(noPoll, NO_POLL_MS);
+        });
+    })();
+    </script>
   </body>
 
 @stack('scripts')
@@ -217,7 +482,7 @@
 document.addEventListener("DOMContentLoaded", async function () {
   showLoader();
   try {
-      const response = await axios.get('/client/limited/notification/list');
+      const response = await axios.get('/restaurant/limited/notification/list');
 
       if (response.status === 200) {
           const userData = response.data.data;
@@ -247,6 +512,20 @@ document.addEventListener("DOMContentLoaded", async function () {
     }
 });
 
+// Re-fetch the limited notification list and re-render the bell dropdown,
+// so new notifications appear without a page refresh.
+async function refreshNotificationDropdown() {
+    try {
+        const response = await axios.get('/restaurant/limited/notification/list');
+        if (response.status === 200) {
+            displayNotifications(
+                response.data.unreadNotifications || [],
+                response.data.readNotifications || []
+            );
+        }
+    } catch (error) { /* silent — non-blocking */ }
+}
+
 function displayNotifications(unreadNotifications, readNotifications) {
     const notificationsContainer = document.querySelector('.dropdown-notifications-list ul');
     let notificationsHTML = '';
@@ -271,22 +550,23 @@ function displayNotifications(unreadNotifications, readNotifications) {
         switch (data.type) {
             case 'meal_order':
             case 'client_meal_order':
-                return `/client/meal-order/details/${data.meal_order_id}?notification_id=${notificationId}`;
+            case 'delivery_accepted':
+                return `/restaurant/meal-order/details/${data.meal_order_id}?notification_id=${notificationId}`;
 
             case 'client_order':
-                return `/client/account/details/${data.client_id}?notification_id=${notificationId}`;
+                return `/restaurant/account/details/${data.client_id}?notification_id=${notificationId}`;
 
             case 'order':
-                return `/client/order/details/${data.order_id}?notification_id=${notificationId}`;
+                return `/restaurant/order/details/${data.order_id}?notification_id=${notificationId}`;
 
             case 'complaint':
-                return `/client/complaint/details/${data.complaint_id}?notification_id=${notificationId}`;
+                return `/restaurant/complaint/details/${data.complaint_id}?notification_id=${notificationId}`;
 
             case 'product':
-                return `/client/product/details/${data.product_id}?notification_id=${notificationId}`;
+                return `/restaurant/product/details/${data.product_id}?notification_id=${notificationId}`;
 
             case 'customer_complain':
-                return `/client/customer-complain/details/${data.customer_complain_id}?notification_id=${notificationId}`;
+                return `/restaurant/customer-complain/details/${data.customer_complain_id}?notification_id=${notificationId}`;
 
             default:
                 return '#';
@@ -377,17 +657,17 @@ function displayNotifications11(unreadNotifications, readNotifications) {
             let notificationId = notification.data.original_notification_id ?? notification.id; // Get original ID if reminder
 
             if (notification.data.order_id) {
-                return `/client/order/details/${notification.data.order_id}?notification_id=${notificationId}`;
+                return `/restaurant/order/details/${notification.data.order_id}?notification_id=${notificationId}`;
             } else if (notification.data.complaint_id) {
-                return `/client/complaint/details/${notification.data.complaint_id}?notification_id=${notificationId}`;
+                return `/restaurant/complaint/details/${notification.data.complaint_id}?notification_id=${notificationId}`;
             } else if (notification.data.product_id) {
-                return `/client/product/details/${notification.data.product_id}?notification_id=${notificationId}`;
+                return `/restaurant/product/details/${notification.data.product_id}?notification_id=${notificationId}`;
             } else if (notification.data.client_id) {
-                return `/client/account/details/${notification.data.client_id}?notification_id=${notificationId}`;
+                return `/restaurant/account/details/${notification.data.client_id}?notification_id=${notificationId}`;
             } else if (notification.data.customer_complain_id) {
-                return `/client/customer-complain/details/${notification.data.customer_complain_id}?notification_id=${notificationId}`;
+                return `/restaurant/customer-complain/details/${notification.data.customer_complain_id}?notification_id=${notificationId}`;
             } else if (notification.data.meal_order_id) {
-                return `/client/meal-order/details/${notification.data.meal_order_id}?notification_id=${notificationId}`;
+                return `/restaurant/meal-order/details/${notification.data.meal_order_id}?notification_id=${notificationId}`;
             }
         }
         return '#';
@@ -436,7 +716,7 @@ function displayNotifications11(unreadNotifications, readNotifications) {
 
 async function deleteNotification(notificationId) {
     try {
-        const response = await axios.delete(`/client/delete/notification/${notificationId}`);
+        const response = await axios.delete(`/restaurant/delete/notification/${notificationId}`);
 
         if (response.status === 200) {
             successToast(response.data.message || 'Request success');
@@ -470,7 +750,7 @@ async function deleteNotification(notificationId) {
 
 async function markAllAsRead() {
       try {
-          const response = await axios.get('/client/markAsRead');
+          const response = await axios.get('/restaurant/markAsRead');
 
           if (response.status === 200 && response.data.status === 'success') {
               document.getElementById('notificationCount').innerText = response.data.unreadCount === 0 ? '0 New' : `${response.data.unreadCount} New`;

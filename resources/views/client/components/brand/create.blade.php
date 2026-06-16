@@ -91,10 +91,10 @@ function resetCreateForm() {
           };
 
       try {
-        const res = await axios.post('/client/store/brand', formData, config);
+        const res = await axios.post('/restaurant/store/brand', formData, config);
         if (res.status === 201) {
           successToast(res.data.message || 'Request success');
-          window.location.href = '/client/brand/page';
+          window.location.href = '/restaurant/brand/page';
           resetCreateForm();
         } else {
           errorToast(res.data.message || "Request failed");

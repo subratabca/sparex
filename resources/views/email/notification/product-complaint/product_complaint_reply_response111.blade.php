@@ -2,13 +2,13 @@
     <div style="margin: 50px auto; width: 80%; max-width: 600px; padding: 30px 0;">
         <!-- Header -->
 @php
-    $sender = $mailSender->role === 'client' ? 'Client' : 'Customer';
-    $senderRole = $mailSender->role === 'client' ? 'seller' : 'customer';
+    $sender = $mailSender->role === 'restaurant' ? 'Client' : 'Customer';
+    $senderRole = $mailSender->role === 'restaurant' ? 'seller' : 'customer';
     $link = $recipientType === 'admin' 
         ? 'http://127.0.0.1:8000/admin/complaint/details/'.$complaint->id 
         : ($senderRole === 'seller' 
-            ? 'http://127.0.0.1:8000/user/complaint/details/'.$complaint->id 
-            : 'http://127.0.0.1:8000/client/complaint/details/'.$complaint->id);
+            ? 'http://127.0.0.1:8000/complaint/details/'.$complaint->id 
+            : 'http://127.0.0.1:8000/restaurant/complaint/details/'.$complaint->id);
 @endphp
         <div style="border-bottom: 1px solid #eee; padding-bottom: 20px; margin-bottom: 30px; text-align: center;">
             <a href="{{ url('/') }}" style="font-size: 1.8em; color: #00466a; text-decoration: none; font-weight: 700;">

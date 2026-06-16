@@ -33,7 +33,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/client/current/stock/information");
+            let res = await axios.get("/restaurant/current/stock/information");
             if (res.status === 200 && res.data.status === 'success') {
                 let tableList = $("#tableList");
                 tableList.empty(); 
@@ -62,7 +62,7 @@
                                 </span>
                             </td>
                             <td>
-                                <a  href="/client/product/stock-details/${item['id']}" class="btn btn-sm btn-outline-primary" target="_blank" title="Product Details"><span class="mdi mdi-eye-circle"></span>
+                                <a  href="/restaurant/product/stock-details/${item['id']}" class="btn btn-sm btn-outline-primary" target="_blank" title="Product Details"><span class="mdi mdi-eye-circle"></span>
                                 </a>
                             </td>
                         </tr>`;

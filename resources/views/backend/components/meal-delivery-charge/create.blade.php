@@ -8,19 +8,8 @@
         <form id="save-form">
           <div class="row">
 
-            <!-- Client Dropdown -->
-            <div class="col-md-4">
-              <div class="form-floating form-floating-outline">
-                <select id="client_id" name="client_id" class="form-select w-100">
-                  <option value="" disabled selected>Select Client</option>
-                </select>
-                <label for="client_id">Select Client<span class="text-danger">*</span></label>
-              </div>
-              <span class="error-message text-danger" id="client_id-error"></span>
-            </div>
-
             <!-- Meal Type Dropdown -->
-            <div class="col-md-4">
+            <div class="col-md-6">
               <div class="form-floating form-floating-outline">
                 <select id="meal_type_id" name="meal_type_id" class="form-select w-100">
                   <option value="" disabled selected>Select Meal Type</option>
@@ -87,7 +76,6 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", async function () {
-    await loadClients();
     await loadMealTypeDropdown();
 });
 
@@ -97,29 +85,6 @@ function toTitleCase(str) {
     });
 }
 
-
-async function loadClients() {
-    showLoader();
-    try {
-        const res = await axios.get("/clients");
-        const select = document.getElementById("client_id");
-
-        res.data.data.forEach(client => {
-            let option = document.createElement("option");
-            option.value = client.id;
-
-            let fullName = `${client.firstName} ${client.lastName}`;
-            option.text = toTitleCase(fullName); 
-
-            select.appendChild(option);
-        });
-
-    } catch (error) {
-        errorToast("Failed to load clients");
-    } finally {
-        hideLoader();
-    }
-}
 
 async function loadMealTypeDropdown() {
     showLoader();
@@ -149,7 +114,6 @@ async function storeInfo() {
 
     document.querySelectorAll(".error-message").forEach(span => span.innerText = "");
 
-    let client_id = document.getElementById("client_id").value;
     let meal_type_id = document.getElementById("meal_type_id").value;
     let inside_city_2km = document.getElementById("inside_city_2km").value;
     let inside_city_5km = document.getElementById("inside_city_5km").value;
@@ -158,10 +122,6 @@ async function storeInfo() {
 
     let isValid = true;
 
-    if (!client_id) {
-        document.getElementById("client_id-error").innerText = "Client is required!";
-        isValid = false;
-    }
     if (!meal_type_id) {
         document.getElementById("meal_type_id-error").innerText = "Meal type is required!";
         isValid = false;
@@ -170,7 +130,6 @@ async function storeInfo() {
     if (!isValid) return;
 
     const formData = new FormData();
-    formData.append("client_id", client_id);
     formData.append("meal_type_id", meal_type_id);
     formData.append("inside_city_2km", inside_city_2km);
     formData.append("inside_city_5km", inside_city_5km);
@@ -188,22 +147,18 @@ async function storeInfo() {
         }
     }
     catch (error) {
-        handleError(error);
+        if (error.response?.status === 422) {
+            Object.entries(error.response.data.errors).forEach(([key, val]) => {
+                const span = document.getElementById(`${key}-error`);
+                if (span) span.innerText = val[0];
+                else errorToast(val[0]);
+            });
+        } else {
+            handleError(error);
+        }
     }
     finally {
         hideLoader();
     }
-}
-
-function handleError(error) {
-    if (error.response?.status === 422) {
-        Object.entries(error.response.data.errors).forEach(([key, val]) => {
-            let span = document.getElementById(`${key}-error`);
-            if (span) span.innerText = val[0];
-        });
-        return;
-    }
-
-    errorToast(error.response?.data?.message ?? "Unexpected error occurred");
 }
 </script>

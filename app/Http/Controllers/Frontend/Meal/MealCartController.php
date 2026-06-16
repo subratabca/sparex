@@ -149,8 +149,9 @@ class MealCartController extends Controller
                     'summary' => [
                         'subtotal'    => $summary['subtotal'],
                         'tax'         => $tax,
-                        'service_fee'      => $serviceFee,       
-                        'service_fee_rate' => $serviceFeeRate,   
+                        'tax_rate'         => $taxRate,
+                        'service_fee'      => $serviceFee,
+                        'service_fee_rate' => $serviceFeeRate,
                         'total'       => $total,
                         'total_items' => $summary['total_items'],
                     ]
@@ -367,9 +368,8 @@ class MealCartController extends Controller
                 $distance = $this->getDistanceBetweenLocations($clientAddress, $shippingAddress);
                 if ($distance === null) continue;
 
-                // Get delivery charge for this client + meal type
-                $deliveryCharge = MealDeliveryCharge::where('client_id', $client->id)
-                    ->where('meal_type_id', $mealType->id)
+                // Get delivery charge for this meal type (distance-based)
+                $deliveryCharge = MealDeliveryCharge::where('meal_type_id', $mealType->id)
                     ->first();
 
                 if (!$deliveryCharge) continue;

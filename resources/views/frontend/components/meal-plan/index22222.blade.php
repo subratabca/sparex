@@ -281,7 +281,7 @@ async function loadMealKeywords(mealTypeId) {
 
     try {
         showLoader();
-        const res = await axios.get(`/user/get/meal-keywords/${mealTypeId}`);
+        const res = await axios.get(`/get/meal-keywords/${mealTypeId}`);
         if (res.status === 200 && res.data.status === 'success' && res.data.data.length > 0) {
             keywordContainer.innerHTML = '';
             res.data.data.forEach(keyword => {
@@ -339,7 +339,7 @@ async function searchProducts(keywords, page = 1) {
 
     try {
         showLoader();
-        const res = await axios.post(`/user/search/products?page=${page}`, {
+        const res = await axios.post(`/search/products?page=${page}`, {
             keywords,
             meal_type_id: selectedMealTypeId,
             latitude:     userLatitude,
@@ -387,7 +387,7 @@ function renderProducts(products) {
         const card = `
             <div class="col-md-4 col-sm-6 mb-4">
                 <div class="card h-100 shadow-sm border-0 rounded-3">
-                    <a href="/user/meal/details/${p.id}">
+                    <a href="/meal/details/${p.id}">
                         <img src="{{ asset('upload/product/medium') }}/${p.image}" 
                              class="card-img-top rounded-top-3" 
                              alt="${p.name}" 
@@ -529,7 +529,7 @@ document.getElementById('confirm-add-meal').addEventListener('click', async () =
 
     try {
         showLoader();
-        const res = await axios.post('/user/store/meal-cart', {
+        const res = await axios.post('/store/meal-cart', {
             product_id:   selectedProduct.id,
             meal_type_id: mealTypeId,
             meal_date:    selectedDate,

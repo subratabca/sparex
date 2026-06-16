@@ -264,7 +264,7 @@ async function loadDeliveryOrderDetails() {
         const pathSegments = window.location.pathname.split('/');
         const ledgerId = pathSegments[pathSegments.length - 1];
         
-        const response = await axios.get(`/delivery/get/meal-order/details/${ledgerId}`);
+        const response = await axios.get(`/rider/get/meal-order/details/${ledgerId}`);
         
         if (response.status === 200 && response.data.status === 'success') {
             deliveryData = response.data.data; // store globally
@@ -501,7 +501,7 @@ async function handleUpdateDeliveryStatus() {
 
     showLoader();
     try {
-        const response = await axios.post(`/delivery/update/delivery-status/${ledgerId}`, {
+        const response = await axios.post(`/rider/update/delivery-status/${ledgerId}`, {
             delivery_status: nextStatus,
             notes: '' // optional notes
         });

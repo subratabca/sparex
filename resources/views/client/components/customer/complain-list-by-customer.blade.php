@@ -37,7 +37,7 @@
         
         showLoader();
         try {
-            let res = await axios.get("/client/get/complaint/list/by/customer/" + customer_id);
+            let res = await axios.get("/restaurant/get/complaint/list/by/customer/" + customer_id);
             if (res.status === 200 && res.data.status === 'success') {
                 let tableList = $("#tableList");
                 tableList.empty(); 
@@ -68,7 +68,7 @@
                             <td>${index + 1}</td>
                             <td>${customerName}</td>
                             <td>
-                                <a href="/client/order/details/${item['order']['id']}" target="_blank" title="Order details">
+                                <a href="/restaurant/order/details/${item['order']['id']}" target="_blank" title="Order details">
                                     ${item['order']['order_number']}
                                 </a>
                             </td>
@@ -88,7 +88,7 @@
                                 </span>
                             </td>
                             <td>
-                                <a href="/client/complaint/details/${item['id']}" class="btn btn-sm btn-outline-primary" target="_blank" title="Complaint details">
+                                <a href="/restaurant/complaint/details/${item['id']}" class="btn btn-sm btn-outline-primary" target="_blank" title="Complaint details">
                                     <span class="mdi mdi-eye-circle"></span>
                                 </a>
                             </td>

@@ -91,8 +91,9 @@
     } else if (password !== cpassword) {
       document.getElementById('cpassword-error').innerText = 'Password and Confirm Password must be the same';
     } else {
+      showLoader();
       try {
-        let res = await axios.post("/admin/reset-password", { 
+        let res = await axios.post("/admin/reset-password", {
           password: password,
           email: email
         });
@@ -107,25 +108,17 @@
           errorToast(res.data['message']);
         }
       } catch (error) {
-        if (error.response) {
-          if (error.response.status === 422) {
-            const errors = error.response.data.errors;
-            for (const key in errors) {
-              if (errors.hasOwnProperty(key)) {
-                const errorMessage = errors[key][0];
-                document.getElementById(`${key}-error`).innerText = errorMessage;
-              }
-            }
-          } else if (error.response.status === 404) {
-            errorToast(error.response.data.message || 'User not found');
-          } else if (error.response.status === 500) {
-            errorToast(error.response.data.message || 'Something went wrong. Please try again later.');
-          } else {
-            errorToast(error.response.data.message || 'An unexpected error occurred.');
-          }
+        if (error.response?.status === 422) {
+          Object.entries(error.response.data.errors).forEach(([key, val]) => {
+            const span = document.getElementById(`${key}-error`);
+            if (span) span.innerText = val[0];
+            else errorToast(val[0]);
+          });
         } else {
-          errorToast('An unexpected error occurred.');
+          errorToast(error.response?.data?.message || 'An unexpected error occurred.');
         }
+      } finally {
+        hideLoader();
       }
     }
   }

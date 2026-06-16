@@ -1,6 +1,6 @@
 <div class="card">
     <div class="card-header header-elements">
-        <span class="me-2"><h5>Meal Types</h5></span>
+        <span class="me-2"><h5>Meal Keywords</h5></span>
         <div class="card-header-elements ms-auto">
             <a href="{{ route('create.meal.keyword')}}" type="button" class="btn btn-primary waves-effect waves-light">
                 <span class="tf-icon mdi mdi-plus me-1"></span>Add New
@@ -9,25 +9,23 @@
     </div>
 
     <div class="card-datatable table-responsive pt-0">
-        <table id="mealTypeTable" class="table table-bordered">
+        <table id="mealKeywordTable" class="table table-bordered">
             <thead>
                 <tr>
                     <th>Sl</th>
                     <th>Meal Keyword</th>
-                    <th>Menu Type</th>
+                    <th>Meal Types</th>
                     <th>Action</th>
                 </tr>
             </thead>
-            <tbody id="tableList">
-                
-            </tbody>
+            <tbody id="tableList"></tbody>
         </table>
     </div>
 </div>
 
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        getList(); 
+        getList();
     });
 
     async function getList() {
@@ -35,23 +33,26 @@
         try {
             let res = await axios.get("/admin/get/meal-keywords");
             if (res.status === 200 && res.data.status === 'success') {
-                //console.log('--------',res);
                 let tableList = $("#tableList");
                 tableList.empty();
 
                 res.data.data.forEach(function (item, index) {
-                    let mealTypeName = item.meal_type.name ? item.meal_type.name.charAt(0).toUpperCase() + item.meal_type.name.slice(1) : '-';
                     let keywordName = item.name ? item.name.charAt(0).toUpperCase() + item.name.slice(1) : '-';
+
+                    let badges = (item.meal_types && item.meal_types.length)
+                        ? item.meal_types.map(mt => {
+                            let n = mt.name.charAt(0).toUpperCase() + mt.name.slice(1);
+                            return `<span class="badge bg-label-primary me-1">${n}</span>`;
+                          }).join('')
+                        : '<span class="text-muted">-</span>';
 
                     let row = `
                         <tr>
                             <td>${index + 1}</td>
                             <td>${keywordName}</td>
-                            <td>${mealTypeName}</td>
+                            <td>${badges}</td>
                             <td>
-                                <a href="/admin/edit/meal-keyword/${item['id']}" class="btn btn-sm btn-outline-success" title="Edit Product"><span class="mdi mdi-pencil-outline"></span>
-                                </a>
-
+                                <a href="/admin/edit/meal-keyword/${item['id']}" class="btn btn-sm btn-outline-success" title="Edit"><span class="mdi mdi-pencil-outline"></span></a>
                                 <button data-id="${item['id']}" class="btn deleteBtn btn-sm btn-outline-danger" title="Delete"><span class="mdi mdi-trash-can-outline"></span></button>
                             </td>
                         </tr>`;
@@ -61,9 +62,8 @@
                 initializeDataTable();
                 attachEventListeners();
             } else {
-                errorToast(res.data.message || "Failed to fetch orders.");
+                errorToast(res.data.message || "Failed to fetch meal keywords.");
             }
-
         } catch (error) {
             handleError(error);
         } finally {
@@ -72,18 +72,12 @@
     }
 
     function initializeDataTable() {
-        if ($.fn.DataTable.isDataTable('#mealTypeTable')) {
-            $('#mealTypeTable').DataTable().destroy();
+        if ($.fn.DataTable.isDataTable('#mealKeywordTable')) {
+            $('#mealKeywordTable').DataTable().destroy();
         }
-
-        $('#mealTypeTable').DataTable({
-            "paging": true,
-            "serverSide": false,
-            "autoWidth": false,
-            "ordering": true,
-            "searching": true,
-            "lengthMenu": [10, 25, 50, 100],
-            "pageLength": 10,
+        $('#mealKeywordTable').DataTable({
+            paging: true, ordering: true, searching: true, autoWidth: false,
+            lengthMenu: [10, 25, 50, 100], pageLength: 10,
         });
     }
 
@@ -93,28 +87,5 @@
             $("#deleteID").val(id);
             $("#delete-modal").modal('show');
         });
-    }
-
-    function handleError(error) {
-        let message = "An unexpected error occurred.";
-        if (error.response) {
-            const { status, data } = error.response;
-            switch (status) {
-            case 500:
-                message = data?.error || "Internal server error. Please try again later.";
-                break;
-            case 404:
-                message = data?.message || "Data not found.";
-                break;
-            default:
-                message = data?.message || "Something went wrong.";
-            }
-        } else if (error.request) {
-            message = "No response from the server. Please check your internet connection.";
-        } else {
-            message = error.message;
-        }
-
-        errorToast(message);
     }
 </script>

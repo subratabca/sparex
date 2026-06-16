@@ -155,7 +155,7 @@ async function loadAllReports() {
 // ===== KPI Summary =====
 async function loadSummary() {
     try {
-        const res = await axios.get('/user/get/meal-report/summary', { params: buildParams() });
+        const res = await axios.get('/get/meal-report/summary', { params: buildParams() });
         if (res.data.status !== 'success') return;
         const d = res.data.data;
 
@@ -175,7 +175,7 @@ async function loadSummary() {
 // ===== Order Bar Chart + Table =====
 async function loadOrderReport() {
     try {
-        const res = await axios.get('/user/get/meal-report/orders', { params: buildParams() });
+        const res = await axios.get('/get/meal-report/orders', { params: buildParams() });
         if (res.data.status !== 'success') return;
 
         const d       = res.data.data;
@@ -269,7 +269,7 @@ function renderOrderTable(rows) {
             <tr>
                 <td>${i + 1}</td>
                 <td>
-                    <a href="/user/meal-order/details/${row.id}"
+                    <a href="/meal-order/details/${row.id}"
                        class="text-primary text-decoration-underline"
                        target="_blank">
                        ${row.order_number}
@@ -317,7 +317,7 @@ function renderOrderTable(rows) {
 // ===== Payment Status Pie =====
 async function loadPaymentStatusReport() {
     try {
-        const res = await axios.get('/user/get/meal-report/payment-status', { params: buildParams() });
+        const res = await axios.get('/get/meal-report/payment-status', { params: buildParams() });
         if (res.data.status !== 'success') return;
 
         const d       = res.data.data;
@@ -360,7 +360,7 @@ async function loadPaymentStatusReport() {
 // ===== Order Status Pie =====
 async function loadOrderStatusReport() {
     try {
-        const res = await axios.get('/user/get/meal-report/order-status', { params: buildParams() });
+        const res = await axios.get('/get/meal-report/order-status', { params: buildParams() });
         if (res.data.status !== 'success') return;
 
         const d       = res.data.data;
@@ -404,7 +404,7 @@ async function loadOrderStatusReport() {
 // ===== Meal Type Chart + Table =====
 async function loadMealTypeReport() {
     try {
-        const res = await axios.get('/user/get/meal-report/meal-type', { params: buildParams() });
+        const res = await axios.get('/get/meal-report/meal-type', { params: buildParams() });
         if (res.data.status !== 'success') return;
 
         const d       = res.data.data;
@@ -497,7 +497,7 @@ function renderMealTypeTable(rows) {
 // ===== Spending Line Chart =====
 async function loadSpendingReport() {
     try {
-        const res = await axios.get('/user/get/meal-report/daily-spending', { params: buildParams() });
+        const res = await axios.get('/get/meal-report/daily-spending', { params: buildParams() });
         if (res.data.status !== 'success') return;
 
         const d       = res.data.data;

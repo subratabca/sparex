@@ -71,7 +71,7 @@ async function complaintDetailsInfo() {
         let id = segments[segments.length - 1];
         document.getElementById('complaintID').value = id;
 
-        let res = await axios.get("/client/get/complaint/details/" + id);
+        let res = await axios.get("/restaurant/get/complaint/details/" + id);
         if (res.status === 200 && res.data.status === 'success') {
             let data = res.data.data;
             //console.log('-----------',data);
@@ -108,7 +108,7 @@ async function complaintDetailsInfo() {
                                         ${variant.size ? `<span>Size: ${variant.size}</span>` : ''}
                                     </div>` : ''}
                                     <div class="mb-2">Sold by: ${client.firstName || ''} ${client.lastName || ''}</div>
-                                    <div class="mb-2">Order No: <a href="/client/order/details/${order.id}" target="_blank">${order.order_number || 'N/A'}</a></div>
+                                    <div class="mb-2">Order No: <a href="/restaurant/order/details/${order.id}" target="_blank">${order.order_number || 'N/A'}</a></div>
                                 </div>
                                 <div class="col-md-4 text-md-end">
                                     <div class="my-2">
@@ -125,7 +125,7 @@ async function complaintDetailsInfo() {
 
             // Complaint status & order no
             document.getElementById('complaint-status').innerHTML = data.status;
-            document.getElementById('order-no').innerHTML = `Order No: <a href="/client/order/details/${order.id}" target="_blank">${order.order_number || 'N/A'}</a>`;
+            document.getElementById('order-no').innerHTML = `Order No: <a href="/restaurant/order/details/${order.id}" target="_blank">${order.order_number || 'N/A'}</a>`;
 
             // Complaint conversations
             let tableList = $("#tableList");

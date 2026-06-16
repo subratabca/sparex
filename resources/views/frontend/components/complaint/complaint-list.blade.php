@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", function () {
 async function getList() {
     showLoader();
     try {
-        let res = await axios.get("/user/get/complaints");
+        let res = await axios.get("/get/complaints");
         if (res.status === 200 && res.data.status === 'success') {
             //console.log('------',res);
             let tableList = $("#tableList");
@@ -80,7 +80,7 @@ async function getList() {
                         <td><img src="${imageSrc}" width="50" height="50" style="object-fit:cover;border-radius:4px;"></td>
                         <td>${product?.name || 'N/A'}</td>
                         <td>
-                            <a href="/user/order/details/${order?.id || '#'}" target="_blank">
+                            <a href="/order/details/${order?.id || '#'}" target="_blank">
                                 ${order?.order_number || 'N/A'}
                             </a>
                         </td>
@@ -91,9 +91,9 @@ async function getList() {
                             </span>
                         </td>
                         <td>
-                            <a href="/user/complaint/details/${item.id}" class="btn btn-sm btn-info">Details</a>
+                            <a href="/complaint/details/${item.id}" class="btn btn-sm btn-info">Details</a>
                             ${(item.status === 'under_review') 
-                                ? `<a href="/user/complaint/reply/${item.id}" class="btn btn-sm btn-danger">Reply</a>` 
+                                ? `<a href="/complaint/reply/${item.id}" class="btn btn-sm btn-danger">Reply</a>` 
                                 : ''}
                         </td>
                     </tr>`;

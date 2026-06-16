@@ -42,7 +42,7 @@ function formatDateOnly(value) {
 async function getList() {
     showLoader();
     try {
-        let res = await axios.get("/delivery/get/notification/list");
+        let res = await axios.get("/rider/get/notification/list");
         console.log('Notification list response:', res);
         let tableList = $("#tableList");
         tableList.empty(); 
@@ -55,7 +55,7 @@ async function getList() {
 
         function getNotificationDetailsLink(notification) {
             if (notification.data && notification.data.data) {
-                return `/delivery/view/notification/${notification.id}`;
+                return `/rider/view/notification/${notification.id}`;
             }
             return '#'; 
         }
@@ -123,7 +123,7 @@ async function getList() {
                 try {
                     // Call API to check if delivery is already accepted
                     console.log('Checking availability for notification:', item.id);
-                    const checkResponse = await axios.post('/delivery/check/meal/delivery/availability', {
+                    const checkResponse = await axios.post('/rider/check/meal/rider/availability', {
                         notification_id: item.id
                     });
                     
@@ -246,7 +246,7 @@ function showDeleteConfirmation(notificationId) {
 async function acceptDelivery(notificationId, deliveryChargeLedgerId) {
     try {
         showLoader();
-        let res = await axios.post('/delivery/accept/meal/delivery', {
+        let res = await axios.post('/rider/accept/meal/delivery', {
             delivery_charge_ledger_id: deliveryChargeLedgerId
         });
         
@@ -292,51 +292,20 @@ async function acceptDelivery(notificationId, deliveryChargeLedgerId) {
                 }
             });
         } else {
-            // Show error popup
-            Swal.fire({
-                title: 'Error!',
-                text: res.data.message || "Failed to accept delivery",
-                icon: 'error',
-                confirmButtonColor: '#3085d6',
-                confirmButtonText: 'OK',
-                customClass: {
-                    confirmButton: 'btn btn-danger'
-                },
-                buttonsStyling: false
-            });
+            errorToast(res.data.message || "Failed to accept delivery");
         }
     } catch (error) {
-        let errorMessage = 'An unexpected error occurred';
-        
-        if (error.response) {
-            const status = error.response.status;
-            const message = error.response.data.message || 'An unexpected error occurred';
-
-            if (status === 400) {
-                errorMessage = error.response.data.message || "Delivery is already accepted";
-            } else if (status === 404) {
-                errorMessage = error.response.data.message || "Delivery record not found";
-            } else if (status === 500) {
-                errorMessage = 'Server error: ' + message;
-            } else {
-                errorMessage = message;
-            }
+        // Map 422 validation errors to inline fields, otherwise use the global handler (config.js)
+        if (error.response?.status === 422) {
+            const errors = error.response.data.errors || {};
+            Object.keys(errors).forEach(key => {
+                const el = document.getElementById(`${key}-error`);
+                if (el) el.innerText = errors[key][0];
+                else errorToast(errors[key][0]);
+            });
         } else {
-            errorMessage = 'Error: ' + error.message;
+            handleError(error);
         }
-        
-        // Show error popup
-        Swal.fire({
-            title: 'Error!',
-            text: errorMessage,
-            icon: 'error',
-            confirmButtonColor: '#3085d6',
-            confirmButtonText: 'OK',
-            customClass: {
-                confirmButton: 'btn btn-danger'
-            },
-            buttonsStyling: false
-        });
     } finally {
         hideLoader();
     }
@@ -345,7 +314,7 @@ async function acceptDelivery(notificationId, deliveryChargeLedgerId) {
 async function deleteNotification(notificationId) {
     try {
         showLoader();
-        let res = await axios.delete(`/delivery/delete/notification/${notificationId}`);
+        let res = await axios.delete(`/rider/delete/notification/${notificationId}`);
         
         if (res.status === 200 && res.data.status === 'success') {
             // Show success popup
@@ -369,49 +338,20 @@ async function deleteNotification(notificationId) {
                 }
             });
         } else {
-            // Show error popup
-            Swal.fire({
-                title: 'Error!',
-                text: res.data.message || "Failed to delete notification",
-                icon: 'error',
-                confirmButtonColor: '#3085d6',
-                confirmButtonText: 'OK',
-                customClass: {
-                    confirmButton: 'btn btn-danger'
-                },
-                buttonsStyling: false
-            });
+            errorToast(res.data.message || "Failed to delete notification");
         }
     } catch (error) {
-        let errorMessage = 'An unexpected error occurred';
-        
-        if (error.response) {
-            const status = error.response.status;
-            const message = error.response.data.message || 'An unexpected error occurred';
-
-            if (status === 404) {
-                errorMessage = message || "Notification not found";
-            } else if (status === 500) {
-                errorMessage = 'Server error: ' + message;
-            } else {
-                errorMessage = message; 
-            }
+        // Map 422 validation errors to inline fields, otherwise use the global handler (config.js)
+        if (error.response?.status === 422) {
+            const errors = error.response.data.errors || {};
+            Object.keys(errors).forEach(key => {
+                const el = document.getElementById(`${key}-error`);
+                if (el) el.innerText = errors[key][0];
+                else errorToast(errors[key][0]);
+            });
         } else {
-            errorMessage = 'Error: ' + error.message; 
+            handleError(error);
         }
-        
-        // Show error popup
-        Swal.fire({
-            title: 'Error!',
-            text: errorMessage,
-            icon: 'error',
-            confirmButtonColor: '#3085d6',
-            confirmButtonText: 'OK',
-            customClass: {
-                confirmButton: 'btn btn-danger'
-            },
-            buttonsStyling: false
-        });
     } finally {
         hideLoader();
     }
@@ -458,46 +398,6 @@ function initializeDataTable() {
     });
 }
 
-function handleError(error) {
-    let message = 'An unexpected error occurred';
-    
-    if (error.response) {
-        const status = error.response.status;
-        const serverMessage = error.response.data?.message;
-        
-        switch (status) {
-            case 400:
-                message = serverMessage || "Unauthorized! Need to login.";
-                break;
-            case 401:
-                message = serverMessage || "Unauthorized access.";
-                break;
-            case 404:
-                message = serverMessage || "Resource not found.";
-                break;
-            case 500:
-                message = serverMessage || "An internal server error occurred.";
-                break;
-            default:
-                message = serverMessage || "Request failed!";
-        }
-    } else {
-        message = "Network error. Please check your connection.";
-    }
-    
-    // Show error popup
-    Swal.fire({
-        title: 'Error!',
-        text: message,
-        icon: 'error',
-        confirmButtonColor: '#3085d6',
-        confirmButtonText: 'OK',
-        customClass: {
-            confirmButton: 'btn btn-danger'
-        },
-        buttonsStyling: false
-    });
-}
 </script>
 
 <style>

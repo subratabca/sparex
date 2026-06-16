@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", function() {
     quill.setContents([]); 
     if (uploadedImageUrl) {
       try {
-        await axios.post('/user/delete-editor-image', { image_url: uploadedImageUrl });
+        await axios.post('/delete-editor-image', { image_url: uploadedImageUrl });
         uploadedImageUrl = null;  
         uploadedImageIndex = null;
       } catch (error) {
@@ -80,13 +80,13 @@ function imageHandler() {
 
       try {
         if (uploadedImageUrl) {
-          await axios.post('/user/delete-editor-image', { image_url: uploadedImageUrl });
+          await axios.post('/delete-editor-image', { image_url: uploadedImageUrl });
           if (uploadedImageIndex !== null) {
             quill.deleteText(uploadedImageIndex, 1); 
           }
         }
 
-        const res = await axios.post('/user/upload-editor-image', formData, {
+        const res = await axios.post('/upload-editor-image', formData, {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
@@ -136,12 +136,12 @@ async function sendReply() {
     };
     showLoader();
     try {
-      let res = await axios.post("/user/store/complaint/reply", formData, config);
+      let res = await axios.post("/store/complaint/reply", formData, config);
       if (res.status === 201) {
         successToast(res.data.message || 'Complain feedback given successfully');
         uploadedImageUrl = null;
         uploadedImageIndex = null;
-        window.location.href = '/user/complaints';
+        window.location.href = '/complaints';
         document.getElementById('save-form').reset();
         $('#reply-modal').modal('hide');
       } else {
@@ -207,7 +207,7 @@ function handleError(error) {
 window.addEventListener('beforeunload', async (event) => {
   if (uploadedImageUrl) {
     try {
-      await axios.post('/user/delete-editor-image', { image_url: uploadedImageUrl });
+      await axios.post('/delete-editor-image', { image_url: uploadedImageUrl });
     } catch (error) {
       console.error('Failed to delete image on unload:', error);
     }

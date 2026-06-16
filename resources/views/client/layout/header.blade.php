@@ -237,13 +237,13 @@
             <div class="dropdown-divider"></div>
           </li>
           <li>
-            <a class="dropdown-item" href="{{ url('/client/update/profile') }}">
+            <a class="dropdown-item" href="{{ url('/restaurant/update/profile') }}">
               <i class="mdi mdi-account-outline me-2"></i>
               <span class="align-middle">My Profile</span>
             </a>
           </li>
           <li>
-            <a class="dropdown-item" href="{{ url('/client/update/password') }}">
+            <a class="dropdown-item" href="{{ url('/restaurant/update/password') }}">
               <i class="mdi mdi-cog-outline me-2"></i>
               <span class="align-middle">Update Password</span>
             </a>
@@ -289,7 +289,7 @@
         let res = await axios.get("{{ route('client.logout') }}");
         if (res.status === 200) {
             successToast(res.data.message || 'Successfully logged out');
-            window.location.href = '/client/login';
+            window.location.href = '/restaurant/login';
         } else {
             errorToast(res.data.message || "Request failed");
         }

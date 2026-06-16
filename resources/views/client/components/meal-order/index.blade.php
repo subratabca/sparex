@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", function () {
 async function getList() {
     showLoader();
     try {
-        let res = await axios.get("/client/get/meal-orders");
+        let res = await axios.get("/restaurant/get/meal-orders");
         if (res.status === 200 && res.data.status === 'success') {
             let tableList = $("#tableList");
             tableList.empty();
@@ -63,13 +63,13 @@ async function getList() {
                         <td>${index + 1}</td>
                         <td>${orderDate}</td>
                         <td>
-                            <a href="/client/meal-order/details/${item.order_id}" class="text-primary text-decoration-underline" target="_blank">${invoiceNo}</a>
+                            <a href="/restaurant/meal-order/details/${item.order_id}" class="text-primary text-decoration-underline" target="_blank">${invoiceNo}</a>
                         </td>
                         <td>${customerName}</td>
                         <td>${payableAmount}</td>
                         <td><span class="badge ${badgeClass}">${paymentStatus}</span></td>
                         <td class="text-center">
-                            <a href="/client/meal-order/details/${item.order_id}" 
+                            <a href="/restaurant/meal-order/details/${item.order_id}" 
                                class="btn btn-sm btn-outline-primary" 
                                title="Client Payment Details">
                                 <span class="mdi mdi-eye-circle"></span>
@@ -158,20 +158,5 @@ async function confirmMarkAsPaid(clientId, orderId, button) {
     }
 }
 
-function handleError(error) {
-    let message = "An unexpected error occurred.";
-    if (error.response) {
-        const { status, data } = error.response;
-        switch (status) {
-            case 500: message = data?.error || "Internal server error."; break;
-            case 404: message = data?.message || "Data not found."; break;
-            default: message = data?.message || "Something went wrong.";
-        }
-    } else if (error.request) {
-        message = "No response from the server. Check your internet.";
-    } else {
-        message = error.message;
-    }
-    errorToast(message);
-}
+// showLoader / hideLoader / successToast / errorToast / handleError are provided globally by config.js
 </script>

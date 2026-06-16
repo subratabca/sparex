@@ -76,10 +76,10 @@
     <script src="{{ asset('backend/assets/vendor/js/template-customizer.js') }}"></script>
     <script src="{{ asset('backend/assets/js/config.js') }}"></script>
 
-    <script src="{{ asset('backend/custom-js/axios.min.js') }}"></script>
-    <link href="{{ asset('backend/custom-css/toastify.min.css') }}" rel="stylesheet" />
-    <script src="{{ asset('backend/custom-js/toastify-js.js') }}"></script>
-    <script src="{{ asset('backend/custom-js/config.js') }}"></script>
+    <script src="{{ asset('common/custom-js/axios.min.js') }}"></script>
+    <link href="{{ asset('common/custom-css/toastify.min.css') }}" rel="stylesheet" />
+    <script src="{{ asset('common/custom-js/toastify-js.js') }}"></script>
+    <script src="{{ asset('common/custom-js/config.js') }}"></script>
   </head>
 
   <body>
@@ -246,7 +246,7 @@
 
     async function fetchPendingDeliveries() {
         try {
-            const res = await axios.get('/delivery/get/pending-deliveries');
+            const res = await axios.get('/rider/get/pending-deliveries');
             if (res.status === 200 && res.data.status === 'success') {
                 return res.data.data || [];
             }
@@ -373,7 +373,7 @@
                         </div>
                     </div>
                     <div class="d-flex gap-2">
-                        <a href="${r.notification_id ? `/delivery/view/notification/${r.notification_id}` : `/delivery/meal-order/details/${r.delivery_charge_ledger_id}`}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Details</a>
+                        <a href="${r.notification_id ? `/rider/view/notification/${r.notification_id}` : `/rider/meal-order/details/${r.delivery_charge_ledger_id}`}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Details</a>
                         <button class="btn btn-sm pd-accept-btn rounded-pill px-4"
                                 onclick="acceptPendingDelivery(${r.delivery_charge_ledger_id}, this)">
                             <i class="mdi mdi-check-circle-outline me-1"></i>Accept
@@ -433,7 +433,7 @@
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Accepting...';
         try {
-            const res = await axios.post('/delivery/accept/meal/delivery', {
+            const res = await axios.post('/rider/accept/meal/delivery', {
                 delivery_charge_ledger_id: ledgerId
             });
             if (res.status === 200 && res.data.status === 'success') {
@@ -522,7 +522,7 @@
     async function pollPickupNotifications() {
         let res;
         try {
-            res = await axios.get('/delivery/poll/pickup-notifications');
+            res = await axios.get('/rider/poll/pickup-notifications');
         } catch (e) { return; /* silent — non-blocking */ }
 
         if (res.status !== 200 || res.data.status !== 'success') return;
@@ -612,7 +612,7 @@
             </div>`;
 
         const detailsBtn = document.getElementById('puDetailsBtn');
-        detailsBtn.href = '/delivery/view/notification/' + p.id;
+        detailsBtn.href = '/rider/view/notification/' + p.id;
 
         const elModal = document.getElementById('pickupReadyModal');
         puModalInstance = bootstrap.Modal.getInstance(elModal) || new bootstrap.Modal(elModal);
@@ -633,7 +633,7 @@
 document.addEventListener("DOMContentLoaded", async function () {
   showLoader();
   try {
-      const response = await axios.get('/delivery/limited/notification/list');
+      const response = await axios.get('/rider/limited/notification/list');
 
       if (response.status === 200) {
           const userData = response.data.data;
@@ -668,7 +668,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 // dropdown without a page refresh.
 async function refreshNotificationDropdown() {
     try {
-        const response = await axios.get('/delivery/limited/notification/list');
+        const response = await axios.get('/rider/limited/notification/list');
         if (response.status === 200) {
             displayNotifications(
                 response.data.unreadNotifications || [],
@@ -708,9 +708,9 @@ function displayNotifications(unreadNotifications, readNotifications) {
         
         // For delivery notifications, use the notification ID and delivery_charge_ledger_id
         if (nestedData.delivery_charge_ledger_id) {
-            return `/delivery/view/notification/${notification.id}`;
+            return `/rider/view/notification/${notification.id}`;
         } else if (notificationData.delivery_charge_ledger_id) {
-            return `/delivery/view/notification/${notification.id}?delivery_charge_ledger_id=${notificationData.delivery_charge_ledger_id}`;
+            return `/rider/view/notification/${notification.id}?delivery_charge_ledger_id=${notificationData.delivery_charge_ledger_id}`;
         }
         
         return '#';
@@ -818,7 +818,7 @@ function displayNotifications(unreadNotifications, readNotifications) {
 
 async function deleteNotification(notificationId) {
     try {
-        const response = await axios.delete(`/delivery/delete/notification/${notificationId}`);
+        const response = await axios.delete(`/rider/delete/notification/${notificationId}`);
 
         if (response.status === 200) {
             successToast(response.data.message || 'Request success');
@@ -852,7 +852,7 @@ async function deleteNotification(notificationId) {
 
 async function markAllAsRead() {
       try {
-          const response = await axios.get('/delivery/markAsRead');
+          const response = await axios.get('/rider/markAsRead');
 
           if (response.status === 200 && response.data.status === 'success') {
               document.getElementById('notificationCount').innerText = response.data.unreadCount === 0 ? '0 New' : `${response.data.unreadCount} New`;

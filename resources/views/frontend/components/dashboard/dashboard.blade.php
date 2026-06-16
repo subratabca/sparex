@@ -54,7 +54,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/user/get/dashboard/info");
+            let res = await axios.get("/get/dashboard/info");
             if (res.status === 200 && res.data.status === 'success') {
                 document.getElementById('total-orders').innerText = res.data.totalOrders;
                 document.getElementById('total-complaints').innerText = res.data.totalComplaints;

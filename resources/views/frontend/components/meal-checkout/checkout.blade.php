@@ -286,7 +286,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 async function loadUserAndCheckout() {
     try {
         showLoader();
-        const userResponse = await axios.get('/user/get/profile/info');
+        const userResponse = await axios.get('/get/profile/info');
         const userData     = userResponse.data.data;
         userEmail          = userData.email;
 
@@ -362,7 +362,7 @@ async function initializeAddressForm(userData) {
 // ===== Check Existing Addresses =====
 async function checkExistingAddresses() {
     try {
-        const response = await axios.get('/user/meal/shipping-addresses');
+        const response = await axios.get('/meal/shipping-addresses');
         if (response.data.data && response.data.data.length > 0) {
             setupAddressCheckbox(response.data.data);
         }
@@ -384,7 +384,7 @@ function setupAddressCheckbox(existingAddresses) {
                 await populateAddressForm(latestAddress);
             } else {
                 // Revert to profile address
-                const userResponse = await axios.get('/user/get/profile/info');
+                const userResponse = await axios.get('/get/profile/info');
                 await populateAddressForm(userResponse.data.data, true);
             }
 
@@ -427,7 +427,7 @@ async function populateAddressForm(address, isProfile = false) {
 async function loadMealCart() {
     try {
         showLoader();
-        const response = await axios.get('/user/get/meal-cart');
+        const response = await axios.get('/get/meal-cart');
 
         if (response.status === 200 && response.data.status === 'success') {
             const mealCart = response.data.data.meal_cart;
@@ -590,7 +590,7 @@ async function updateMealItem(id, quantity) {
     if (quantity < 1) return errorToast('Quantity must be at least 1');
     try {
         showLoader();
-        await axios.post('/user/meal-cart/update', { meal_item_id: id, quantity });
+        await axios.post('/meal-cart/update', { meal_item_id: id, quantity });
         await loadMealCart();
         await updateMealCartCount();
     } catch (error) {
@@ -605,7 +605,7 @@ async function removeMealItem(id) {
     if (!confirm('Are you sure you want to remove this item?')) return;
     try {
         showLoader();
-        await axios.post('/user/meal-cart/remove', { meal_item_id: id });
+        await axios.post('/meal-cart/remove', { meal_item_id: id });
         await loadMealCart();
         await updateMealCartCount();
     } catch (error) {
@@ -651,7 +651,7 @@ async function recalcCourierChargeIfNeeded() {
 
     try {
         showLoader();
-        const response = await axios.get('/user/get/meal/courier-charge', {
+        const response = await axios.get('/get/meal/courier-charge', {
             params: { city_id: cityId, address1: address1, zip_code: zipCode }
         });
 
@@ -700,6 +700,7 @@ function updateCheckoutSummary(currentSummary, currentDeliveryCharge = 0) {
     const tax         = parseFloat(currentSummary.tax)         || 0;
     const serviceFee  = parseFloat(currentSummary.service_fee) || 0;
     const feeRate     = currentSummary.service_fee_rate        || 0.05;
+    const taxRate     = currentSummary.tax_rate                || 0.20;
     const delivery    = parseFloat(currentDeliveryCharge)      || 0;
     const total       = subtotal + tax + serviceFee + delivery;
 
@@ -710,7 +711,7 @@ function updateCheckoutSummary(currentSummary, currentDeliveryCharge = 0) {
                 Subtotal <span>$${subtotal.toFixed(2)}</span>
             </li>
             <li class="list-group-item d-flex justify-content-between">
-                Tax <span>$${tax.toFixed(2)}</span>
+                Tax (${(taxRate * 100).toFixed(0)}%) <span>$${tax.toFixed(2)}</span>
             </li>
             <li class="list-group-item d-flex justify-content-between text-info">
                 Service Fee (${(feeRate * 100).toFixed(0)}%)
@@ -737,7 +738,7 @@ function getCurrentTotal() {
 // ===== Check Credit Eligibility =====
 async function checkCreditEligibility(total) {
     try {
-        const creditResponse  = await axios.get('/user/credit-balance');
+        const creditResponse  = await axios.get('/credit-balance');
         userCreditBalance     = parseFloat(creditResponse.data.balance || 0);
     } catch (error) {
         userCreditBalance = 0;
@@ -929,7 +930,7 @@ async function processPayment(event) {
             case 'stripe':
                 if (!stripe || !cardElement) throw new Error('Stripe not initialized. Please refresh.');
 
-                const piResponse = await axios.post('/user/create-payment-intent', {
+                const piResponse = await axios.post('/create-payment-intent', {
                     amount:      Math.round(totalAmount * 100),
                     currency:    'usd',
                     description: `Meal Order - ${cartData.length} items`,
@@ -969,7 +970,7 @@ async function processPayment(event) {
                             }
                         }
                     },
-                    return_url: window.location.origin + '/user/meal-order'
+                    return_url: window.location.origin + '/meal-order'
                 });
 
                 if (error) {
@@ -982,14 +983,14 @@ async function processPayment(event) {
                     requestData.payment_intent_id      = payment_intent_id;
                     requestData.stripe_payment_id      = paymentIntent.id;
                     requestData.stripe_payment_method  = paymentIntent.payment_method;
-                    response = await axios.post('/user/store/meal-order/by/stripe', requestData);
+                    response = await axios.post('/store/meal-order/by/stripe', requestData);
                 } else {
                     throw new Error('Payment not completed. Status: ' + (paymentIntent?.status || 'unknown'));
                 }
                 break;
 
             case 'credit':
-                const creditRes       = await axios.get('/user/credit-balance');
+                const creditRes       = await axios.get('/credit-balance');
                 const currentBalance  = parseFloat(creditRes.data.balance || 0);
 
                 if (totalAmount > currentBalance) {
@@ -998,11 +999,11 @@ async function processPayment(event) {
 
                 requestData.credit_amount_used  = totalAmount;
                 requestData.user_credit_balance = currentBalance;
-                response = await axios.post('/user/store/meal-order/by/credit', requestData);
+                response = await axios.post('/store/meal-order/by/credit', requestData);
                 break;
 
             case 'cash':
-                response = await axios.post('/user/store/meal-order/by/cash', requestData);
+                response = await axios.post('/store/meal-order/by/cash', requestData);
                 break;
 
             default:
@@ -1012,7 +1013,7 @@ async function processPayment(event) {
         // Handle success
         if (response && response.data.status === 'success') {
             try {
-                await axios.post('/user/meal-cart/clear');
+                await axios.post('/meal-cart/clear');
             } catch (clearError) {
                 console.warn('Cart clear failed:', clearError.message);
             }
@@ -1020,7 +1021,7 @@ async function processPayment(event) {
             successToast('Payment successful! Your order has been placed.');
 
             setTimeout(() => {
-                window.location.href = response.data.redirect_url || '/user/meal-order';
+                window.location.href = response.data.redirect_url || '/meal-order';
             }, 2000);
 
         } else if (response) {

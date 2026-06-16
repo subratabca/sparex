@@ -31,7 +31,7 @@ async function mealDetailsInfo() {
         let segments = url.split('/');
         let id = segments[segments.length - 1];
 
-        let res = await axios.get("/user/get/meal/details/" + id);
+        let res = await axios.get("/get/meal/details/" + id);
         if (res.status === 200 && res.data.status === 'success') {
             let product = res.data.data;
             let formattedProductName = product.name.replace(/\b\w/g, c => c.toUpperCase());

@@ -23,8 +23,8 @@
 
   <div class="d-flex col-12 col-lg-5 col-xl-4 align-items-center authentication-bg p-sm-5 p-4">
     <div class="w-px-400 mx-auto">
-      <h4 class="mb-2">Forgot Password? 🔒</h4>
-      <p class="mb-4">Enter your email and we'll send you instructions to reset your password</p>
+      <h4 class="mb-2">Verify OTP 🔢</h4>
+      <p class="mb-4">Enter the 4-digit OTP code we sent to your email</p>
       <form id="formAuthentication" class="mb-3">
         <div class="form-floating form-floating-outline mb-3">
           <input
@@ -33,7 +33,7 @@
             id="otp"
             placeholder="Enter your otp code"
             autofocus />
-          <label for="email">Enter otp code</label>
+          <label for="otp">Enter OTP code</label>
           <span class="error-message text-danger" id="otp-error"></span>
         </div>
         <button type="button" onclick="VerifyOtp()" class="btn btn-primary d-grid w-100">Next</button>
@@ -56,39 +56,33 @@
       if (otp.length !== 4) {
           errorToast('Invalid OTP');
       } else {
+          showLoader();
           try {
-              let res = await axios.post('/user/verify-otp', {
+              let res = await axios.post('/verify-otp', {
                   otp: otp,
                   email: sessionStorage.getItem('email')
               });
 
               if (res.status === 200 && res.data['status'] === 'success') {
                   successToast(res.data['message']);
-                  //sessionStorage.clear();
                   setTimeout(() => {
-                      window.location.href = '/user/resetPassword';
+                      window.location.href = '/resetPassword';
                   }, 1000);
               } else {
                   errorToast(res.data['message']);
               }
           } catch (error) {
-              if (error.response) {
-                  if (error.response.status === 422) {
-                      const errors = error.response.data.errors;
-                      for (const key in errors) {
-                          if (errors.hasOwnProperty(key)) {
-                              const errorMessage = errors[key][0];
-                              document.getElementById(`${key}-error`).innerText = errorMessage;
-                          }
-                      }
-                  } else if (error.response.status === 401) {
-                      errorToast(error.response.data.message || 'Unauthorized');
-                  } else {
-                      errorToast(error.response.data.message || 'An unexpected error occurred.');
-                  }
+              if (error.response?.status === 422) {
+                  Object.entries(error.response.data.errors).forEach(([key, val]) => {
+                      const span = document.getElementById(`${key}-error`);
+                      if (span) span.innerText = val[0];
+                      else errorToast(val[0]);
+                  });
               } else {
-                  errorToast('An unexpected error occurred.');
+                  errorToast(error.response?.data?.message || 'An unexpected error occurred.');
               }
+          } finally {
+              hideLoader();
           }
       }
   }

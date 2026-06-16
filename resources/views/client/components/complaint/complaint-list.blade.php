@@ -32,7 +32,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/client/get/complaints");
+            let res = await axios.get("/restaurant/get/complaints");
             if (res.status === 200 && res.data.status === 'success') {
                 //console.log('---------',res);
                 let tableList = $("#tableList");
@@ -80,11 +80,11 @@
                             <td>${complainDate}</td>
                             <td>${complainTime}</td>
                             <td>
-                                <a href="/client/order/details/${orderId}" target="_blank">${orderNumber}</a>
+                                <a href="/restaurant/order/details/${orderId}" target="_blank">${orderNumber}</a>
                             </td>
                             <td><span class="badge ${statusBadgeClass}">${item.status}</span></td>
                             <td>
-                                <a href="/client/complaint/details/${item.id}" class="btn btn-sm btn-outline-primary">
+                                <a href="/restaurant/complaint/details/${item.id}" class="btn btn-sm btn-outline-primary">
                                     <span class="mdi mdi-eye-circle"></span>
                                 </a>
                                 ${item.status === 'under_review' 

@@ -33,7 +33,7 @@ async function loadDeliveryList() {
     try {
         showLoader();
 
-        const res = await axios.get("/client/get/meal-order/payments");
+        const res = await axios.get("/restaurant/get/meal-order/payments");
 
         const tableList = $("#tableList");
         tableList.empty();
@@ -54,7 +54,7 @@ async function loadDeliveryList() {
                 </span>`;
 
             const viewButton = `
-                <a href="/client/meal-order/payment/details/${item.delivery_charge_ledger_id}"
+                <a href="/restaurant/meal-order/payment/details/${item.delivery_charge_ledger_id}"
                    class="btn btn-sm btn-info">
                     <i class="bx bx-show"></i> View
                 </a>`;

@@ -77,7 +77,7 @@ class ClientListController extends Controller
     {
         try {
             $clients = User::withCount(['clientOrders'])
-                ->where('role', 'client')
+                ->where('role', 'restaurant')
                 ->get()
                 ->map(function ($client) {
                     $productIds = Product::where('client_id', $client->id)
@@ -154,7 +154,7 @@ class ClientListController extends Controller
         try {
             $client = User::withCount(['clientOrders'])
                 ->withLocation() 
-                ->where('role', 'client')
+                ->where('role', 'restaurant')
                 ->where('id', $client_id)
                 ->first();
 
@@ -385,7 +385,7 @@ class ClientListController extends Controller
             DB::beginTransaction();
 
             $client_id = $request->input('client_id');
-            $client = User::where('role', 'client')->findOrFail($client_id);
+            $client = User::where('role', 'restaurant')->findOrFail($client_id);
 
             // Delete client products and related data
             if ($client->products) {

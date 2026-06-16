@@ -21,7 +21,7 @@ class MealKeywordController extends Controller
     public function getList()
     {
         try {
-            $datas = MealKeyword::with('mealType')->latest()->get();
+            $datas = MealKeyword::with('mealTypes')->latest()->get();
 
             return response()->json([
                 'status' => 'success',
@@ -46,10 +46,18 @@ class MealKeywordController extends Controller
         DB::beginTransaction();
 
         try {
-            $request->validate(ValidationHelper::mealKeywordValidationRules());
+            $request->validate(
+                ValidationHelper::mealKeywordValidationRules(),
+                [
+                    'name.unique'           => 'This keyword already exists. Edit it to add more meal types.',
+                    'meal_type_id.required' => 'Please select at least one meal type.',
+                    'meal_type_id.array'    => 'Please select at least one meal type.',
+                ]
+            );
 
             $mealKeywordData = ItemHelper::prepareMealKeywordData($request);
             $mealKeyword = ItemHelper::storeOrUpdateMealKeyword($mealKeywordData);
+            $mealKeyword->mealTypes()->sync($request->input('meal_type_id', []));
 
             DB::commit();
 
@@ -79,7 +87,7 @@ class MealKeywordController extends Controller
     public function show($id)
     {
         try {
-            $mealKeyword = MealKeyword::find($id);
+            $mealKeyword = MealKeyword::with('mealTypes')->find($id);
 
             if (!$mealKeyword) {
                 return response()->json([
@@ -112,11 +120,19 @@ class MealKeywordController extends Controller
 
         try {
             $id = $request->input('id');
-            $request->validate(ValidationHelper::mealKeywordValidationRules(true));
+            $request->validate(
+                ValidationHelper::mealKeywordValidationRules(true),
+                [
+                    'name.unique'           => 'Another keyword with this name already exists.',
+                    'meal_type_id.required' => 'Please select at least one meal type.',
+                    'meal_type_id.array'    => 'Please select at least one meal type.',
+                ]
+            );
 
             $mealKeyword = MealKeyword::findOrFail($id);
             $mealKeywordData = ItemHelper::prepareMealKeywordData($request);
             $updatedMealKeyword = ItemHelper::storeOrUpdateMealKeyword($mealKeywordData, $mealKeyword);
+            $mealKeyword->mealTypes()->sync($request->input('meal_type_id', []));
 
             DB::commit();
 

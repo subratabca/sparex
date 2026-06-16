@@ -29,7 +29,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/client/followers-info");
+            let res = await axios.get("/restaurant/followers-info");
 
             let tableList = $("#tableList");
             tableList.empty();

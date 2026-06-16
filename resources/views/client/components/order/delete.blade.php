@@ -32,7 +32,7 @@
 		try {
 			let order_id = document.getElementById('deleteID').value;
 			$('#delete-modal').modal('hide');
-			let res = await axios.post("/client/order/delete", {order_id: order_id});
+			let res = await axios.post("/restaurant/order/delete", {order_id: order_id});
 			if (res.status === 200 && res.data.status === 'success') {
 				successToast(res.data.message || "Data deleted successfully");
 				window.location.reload();

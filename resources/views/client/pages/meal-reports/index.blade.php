@@ -190,7 +190,7 @@ async function loadAllReports() {
 // ===== KPI Summary =====
 async function loadSummary() {
     try {
-        const res = await axios.get('/client/get/meal-report/summary', { params: buildParams() });
+        const res = await axios.get('/restaurant/get/meal-report/summary', { params: buildParams() });
         if (res.data.status === 'success') {
             const d = res.data.data;
             document.getElementById('kpi-total-orders').textContent  = d.total_orders;
@@ -210,7 +210,7 @@ async function loadSummary() {
 // ===== Order Bar Chart =====
 async function loadOrderReport() {
     try {
-        const res = await axios.get('/client/get/meal-report/orders', { params: buildParams() });
+        const res = await axios.get('/restaurant/get/meal-report/orders', { params: buildParams() });
         if (res.data.status !== 'success') return;
 
         const d       = res.data.data;
@@ -282,7 +282,7 @@ async function loadOrderReport() {
 // ===== Payment Status Pie Chart =====
 async function loadPaymentStatusReport() {
     try {
-        const res = await axios.get('/client/get/meal-report/payment-status', { params: buildParams() });
+        const res = await axios.get('/restaurant/get/meal-report/payment-status', { params: buildParams() });
         if (res.data.status !== 'success') return;
 
         const d       = res.data.data;
@@ -325,7 +325,7 @@ async function loadPaymentStatusReport() {
 // ===== Meal Type Bar Chart =====
 async function loadMealTypeReport() {
     try {
-        const res = await axios.get('/client/get/meal-report/meal-type', { params: buildParams() });
+        const res = await axios.get('/restaurant/get/meal-report/meal-type', { params: buildParams() });
         if (res.data.status !== 'success') return;
 
         const d       = res.data.data;
@@ -406,7 +406,7 @@ async function loadMealTypeReport() {
 // ===== Order Status Doughnut Chart =====
 async function loadOrderStatusReport() {
     try {
-        const res = await axios.get('/client/get/meal-report/order-status', { params: buildParams() });
+        const res = await axios.get('/restaurant/get/meal-report/order-status', { params: buildParams() });
         if (res.data.status !== 'success') return;
 
         const d       = res.data.data;
@@ -450,7 +450,7 @@ async function loadOrderStatusReport() {
 // ===== Revenue Line Chart =====
 async function loadRevenueReport() {
     try {
-        const res = await axios.get('/client/get/meal-report/daily-revenue', { params: buildParams() });
+        const res = await axios.get('/restaurant/get/meal-report/daily-revenue', { params: buildParams() });
         if (res.data.status !== 'success') return;
 
         const d       = res.data.data;

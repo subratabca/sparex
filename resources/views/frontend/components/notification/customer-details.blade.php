@@ -150,7 +150,7 @@
     showLoader();
     try {
       let customerId = getCustomerIdFromUrl();
-      let res = await axios.get("/user/get/customer/details/" + customerId);
+      let res = await axios.get("/get/customer/details/" + customerId);
       if (res.status === 200 && res.data.status === 'success') {
         let imageUrl = res.data.data['image']
           ? `/upload/customer-profile/small/${res.data.data['image']}`
@@ -166,11 +166,11 @@
 
 
         let docImage1Large = res.data.data['doc_image1']
-        ? `/user/download/doc-image1/${res.data.data['id']}`
+        ? `/download/doc-image1/${res.data.data['id']}`
         : null;
 
         let docImage2Large = res.data.data['doc_image2']
-        ? `/user/download/doc-image2/${res.data.data['id']}`
+        ? `/download/doc-image2/${res.data.data['id']}`
         : null;
 
         let firstName = res.data.data['firstName'];

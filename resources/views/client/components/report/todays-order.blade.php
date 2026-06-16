@@ -167,7 +167,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/client/todays/order/information");
+            let res = await axios.get("/restaurant/todays/order/information");
             if (res.status === 200) {
                 document.getElementById('total-sales').innerText =  res.data.total_sales > 0 ? `£${res.data.total_sales}` : res.data.total_sales;
                 document.getElementById('total-orders').innerText = res.data.total_orders;
@@ -235,10 +235,10 @@
                             <td>${paidAmount}</td>
                             <td><span class="badge ${badgeClass}">${status.replace('_', ' ')}</span></td>
                             <td>
-                              <a href="/client/invoice/download/${item.order_id}" class="btn btn-sm btn-outline-primary" title="Invoice Download"><span class="mdi mdi-arrow-down-circle-outline"></span>
+                              <a href="/restaurant/invoice/download/${item.order_id}" class="btn btn-sm btn-outline-primary" title="Invoice Download"><span class="mdi mdi-arrow-down-circle-outline"></span>
                               </a>
 
-                              <a href="/client/order/details/${item.order_id}" class="btn btn-sm btn-outline-primary" title="Order Details"><span class="mdi mdi-eye-circle"></span>
+                              <a href="/restaurant/order/details/${item.order_id}" class="btn btn-sm btn-outline-primary" title="Order Details"><span class="mdi mdi-eye-circle"></span>
                               </a>
                             </td>
                         </tr>

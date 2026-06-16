@@ -256,7 +256,7 @@
             <div class="col-md-12 p-4">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" value="" id="accept_tnc" />
-                <label class="form-check-label" for="defaultCheck3"><a href="/client/terms-conditions/food_upload" target="_blank">Accept T&C For Product Upload</a><span class="text-danger">*</span></label>
+                <label class="form-check-label" for="defaultCheck3"><a href="/restaurant/terms-conditions/food_upload" target="_blank">Accept T&C For Product Upload</a><span class="text-danger">*</span></label>
               </div>
               <span class="error-message text-danger" id="accept_tnc-error"></span>
             </div>
@@ -688,46 +688,18 @@ async function Save() {
       errorToast(res.data.message || "Request failed");
     }
   } catch (error) {
-      handleError(error);
-  } finally {
-      hideLoader(); 
-  }
-}
-
-function handleError(error) {
-  document.querySelectorAll(".error-text").forEach(el => el.innerText = '');
-
-  let message = 'An unexpected error occurred';
-
-  if (error.response) {
-    const status = error.response.status;
-    const serverMessage = error.response.data?.message;
-
-    switch (status) {
-      case 422:
-        if (error.response.data.errors) {
-          Object.entries(error.response.data.errors).forEach(([field, messages]) => {
-            const errorElement = document.getElementById(`${field}-error`);
-            if (errorElement) {
-              errorElement.innerText = messages[0];
-            }
+      if (error.response?.status === 422) {
+          Object.entries(error.response.data.errors).forEach(([key, val]) => {
+              const span = document.getElementById(`${key.split('.')[0]}-error`);
+              if (span) span.innerText = val[0];
+              else errorToast(val[0]);
           });
-        }
-        message = serverMessage || 'Validation failed';
-        break;
-      case 500:
-        message = serverMessage || 'Server error. Please try again later.';
-        break;
-      default:
-        message = serverMessage || message;
-    }
-  } else if (error.request) {
-    message = 'No response received from the server.';
-  } else {
-    message = error.message || message;
+      } else {
+          handleError(error);
+      }
+  } finally {
+      hideLoader();
   }
-
-  errorToast(message);
 }
 
 document.getElementById("hasVariants").addEventListener("change", function() {

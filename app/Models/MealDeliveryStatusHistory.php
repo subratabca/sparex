@@ -18,6 +18,7 @@ class MealDeliveryStatusHistory extends Model
     // Delivery Status Constants
     const STATUS_PENDING = 'pending';
     const STATUS_ACCEPT_ORDER = 'accept_order';
+    const STATUS_ACCEPT_DELIVERY = 'accept_delivery';
     const STATUS_PREPARING = 'preparing';
     const STATUS_READY_FOR_PICKUP = 'ready_for_pickup';
     const STATUS_PICKED_UP = 'picked_up';

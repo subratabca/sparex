@@ -30,7 +30,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/client/get/orders");
+            let res = await axios.get("/restaurant/get/orders");
             if (res.status === 200 && res.data.status === 'success') {
                 
                 let tableList = $("#tableList");
@@ -91,11 +91,11 @@
                                 <span class="badge ${badgeClass}">${status}</span>
                             </td>
                             <td>
-                                <a href="/client/invoice/download/${item.order_id}" class="btn btn-sm btn-outline-primary" title="Invoice Download">
+                                <a href="/restaurant/invoice/download/${item.order_id}" class="btn btn-sm btn-outline-primary" title="Invoice Download">
                                    <span class="mdi mdi-arrow-down-circle-outline"></span>
                                 </a>
 
-                                <a href="/client/order/details/${item.order_id}" class="btn btn-sm btn-outline-primary" title="Order Details">
+                                <a href="/restaurant/order/details/${item.order_id}" class="btn btn-sm btn-outline-primary" title="Order Details">
                                     <span class="mdi mdi-eye-circle"></span>
                                 </a>
 

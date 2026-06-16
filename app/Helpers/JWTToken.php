@@ -8,142 +8,39 @@ use Firebase\JWT\Key;
 
 class JWTToken
 {
-
-    // public static function CreateToken($userEmail,$userID,$userRole):string
-    // {
-    //     $key = env('JWT_KEY');
-    //     $payload = [
-    //         'iss'=>'laravel-token',
-    //         'iat'=>time(),
-    //         'exp'=>time() + 60*60, //for 1 hour = 60 sec * 60 min
-    //         'userEmail'=>$userEmail,
-    //         'userID'=>$userID,
-    //         'userRole'=>$userRole
-    //     ];
-    //     return JWT::encode($payload,$key,'HS256');
-    // }
-
-    public static function CreateToken($userEmail,$userID,$userRole):string
+    // Pick the signing key for a given guard/role
+    private static function keyFor(string $guard): string
     {
-        $key = env('JWT_KEY');
-        $payload = [
-            'iss'=>'laravel-token',
-            'iat'=>time(),
-            'exp'=>time() + 60*60*24*30,
-            'userEmail'=>$userEmail,
-            'userID'=>$userID,
-            'userRole'=>$userRole
-        ];
-        return JWT::encode($payload,$key,'HS256');
+        return match ($guard) {
+            'admin'                => config('jwt.admin_key'),
+            'restaurant', 'client' => config('jwt.client_key'),
+            'rider', 'delivery'    => config('jwt.delivery_key'),
+            default                => config('jwt.customer_key'), // customer
+        };
     }
 
-    public static function VerifyToken($token): string|object
+    public static function CreateToken($userEmail, $userID, $userRole, string $guard = 'customer'): string
+    {
+        $payload = [
+            'iss'       => 'laravel-token',
+            'iat'       => time(),
+            'exp'       => time() + 60 * 60 * 24 * 30,
+            'userEmail' => $userEmail,
+            'userID'    => $userID,
+            'userRole'  => $userRole,
+        ];
+        return JWT::encode($payload, self::keyFor($guard), 'HS256');
+    }
+
+    public static function VerifyToken($token, string $guard = 'customer'): string|object
     {
         try {
             if ($token == null) {
                 return 'unauthorized';
             }
-
-            $key = env('JWT_KEY');
-            $decoded = JWT::decode($token, new Key($key, 'HS256'));
-            return $decoded;
+            return JWT::decode($token, new Key(self::keyFor($guard), 'HS256'));
         } catch (Exception $e) {
             return 'unauthorized';
         }
     }
-
-
-    public static function AdminCreateToken($userEmail,$userID,$userRole):string
-    {
-        $key =env('ADMIN_JWT_KEY');
-        $payload=[
-            'iss'=>'laravel-token',
-            'iat'=>time(),
-            'exp'=>time() + 60*60*24*30,
-            'userEmail'=>$userEmail,
-            'userID'=>$userID,
-            'userRole'=>$userRole
-        ];
-        return JWT::encode($payload,$key,'HS256');
-    }
-
-    public static function AdminVerifyToken($token):string|object
-    {
-        try {
-            if($token==null){
-                return 'unauthorized';
-            }
-            else{
-                $key =env('ADMIN_JWT_KEY');
-                $decode=JWT::decode($token,new Key($key,'HS256'));
-                return $decode;
-            }
-        }
-        catch (Exception $e){
-            return 'unauthorized';
-        }
-    }
-
-    public static function ClientCreateToken($userEmail,$userID,$userRole):string
-    {
-        $key =env('CLIENT_JWT_KEY');
-        $payload=[
-            'iss'=>'laravel-token',
-            'iat'=>time(),
-            'exp'=>time() + 60*60*24*30,
-            'userEmail'=>$userEmail,
-            'userID'=>$userID,
-            'userRole'=>$userRole
-        ];
-        return JWT::encode($payload,$key,'HS256');
-    }
-
-    public static function ClientVerifyToken($token):string|object
-    {
-        try {
-            if($token==null){
-                return 'unauthorized';
-            }
-            else{
-                $key =env('CLIENT_JWT_KEY');
-                $decode=JWT::decode($token,new Key($key,'HS256'));
-                return $decode;
-            }
-        }
-        catch (Exception $e){
-            return 'unauthorized';
-        }
-    }
-
-    public static function DeliveryCreateToken($userEmail,$userID,$userRole):string
-    {
-        $key =env('DELIVERY_JWT_KEY');
-        $payload=[
-            'iss'=>'laravel-token',
-            'iat'=>time(),
-            'exp'=>time() + 60*60*24*30,
-            'userEmail'=>$userEmail,
-            'userID'=>$userID,
-            'userRole'=>$userRole
-        ];
-        return JWT::encode($payload,$key,'HS256');
-    }
-
-    public static function DeliveryVerifyToken($token):string|object
-    {
-        try {
-            if($token==null){
-                return 'unauthorized';
-            }
-            else{
-                $key =env('DELIVERY_JWT_KEY');
-                $decode=JWT::decode($token,new Key($key,'HS256'));
-                return $decode;
-            }
-        }
-        catch (Exception $e){
-            return 'unauthorized';
-        }
-    }
-
 }

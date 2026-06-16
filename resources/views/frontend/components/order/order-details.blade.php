@@ -93,7 +93,7 @@ async function getOrderDetailsInfo() {
     try {
         const urlSegments = window.location.pathname.split('/');
         const orderId = urlSegments[urlSegments.length - 1];
-        const res = await axios.get(`/user/get/order/details/${orderId}`);
+        const res = await axios.get(`/get/order/details/${orderId}`);
         if (res.status === 200 && res.data.status === 'success') {
             orderData = res.data.data;
             orderItems = orderData.order_items;
@@ -174,7 +174,7 @@ async function updateOrderItems() {
                             </div>
 
                             ${(itemStatus === 'delivered' && !hasComplaintForOrderItem(item.id)) ? 
-                                `<a href="/user/product/complaint/${item.id}" 
+                                `<a href="/product/complaint/${item.id}" 
                                    class="btn btn-sm btn-outline-danger mt-1">
                                     Complaint
                                 </a>` : ''}

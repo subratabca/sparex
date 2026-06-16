@@ -56,10 +56,10 @@ rel="stylesheet" />
 <!--? Config:  Mandatory theme config file contain global vars & default theme options, Set your preferred theme option in this file.  -->
 <!-- <script src="{{ asset('frontend/assets/js/config.js') }}"></script> -->
 
-<script src="{{ asset('backend/custom-js/axios.min.js') }}"></script>
-<link href="{{ asset('backend/custom-css/toastify.min.css') }}" rel="stylesheet" />
-<script src="{{asset('backend/custom-js/toastify-js.js')}}"></script>
-<script src="{{asset('backend/custom-js/config.js')}}"></script>
+<script src="{{ asset('common/custom-js/axios.min.js') }}"></script>
+<link href="{{ asset('common/custom-css/toastify.min.css') }}" rel="stylesheet" />
+<script src="{{asset('common/custom-js/toastify-js.js')}}"></script>
+<script src="{{asset('common/custom-js/config.js')}}"></script>
 </head>
 
 <body>

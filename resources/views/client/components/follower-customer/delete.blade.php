@@ -36,10 +36,10 @@
             return;
         }
             $('#delete-modal').modal('hide');
-            let res = await axios.post("/client/delete/follower", {id: id});
+            let res = await axios.post("/restaurant/delete/follower", {id: id});
             if (res.status === 200) {
                 successToast(res.data.message || "Data deleted successfully");
-                window.location.href = '/client/follower/list';
+                window.location.href = '/restaurant/follower/list';
             } else {
                 errorToast("Request failed! Please try again.");
             }

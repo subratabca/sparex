@@ -208,29 +208,4 @@ async function productPublish() {
     }
 }
 
-function handleError(error) {
-    let message = 'An unexpected error occurred';
-
-    if (error.response) {
-        const status = error.response.status;
-        const serverMessage = error.response.data?.message;
-
-        switch (status) {
-            case 404:
-                message = serverMessage || 'Data not found';
-                break;
-            case 500:
-                message = serverMessage || 'Server error. Please try again later.';
-                break;
-            default:
-                message = serverMessage || message;
-        }
-    } else if (error.request) {
-        message = 'No response received from the server.';
-    } else {
-        message = error.message || message;
-    }
-
-    errorToast(message);
-}
 </script>

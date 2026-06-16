@@ -32,7 +32,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/client/customer-complain-info/");
+            let res = await axios.get("/restaurant/customer-complain-info/");
 
             let tableList = $("#tableList");
             tableList.empty(); 
@@ -83,7 +83,7 @@
                                 </span>
                             </td>
                             <td>
-                                <a href="/client/customer-complain/details/${item['id']}" class="btn btn-sm btn-outline-primary">
+                                <a href="/restaurant/customer-complain/details/${item['id']}" class="btn btn-sm btn-outline-primary">
                                     <span class="mdi mdi-eye-circle"></span>
                                 </a>
                                 <button data-id="${item['id']}" class="btn deleteBtn btn-sm btn-outline-danger">

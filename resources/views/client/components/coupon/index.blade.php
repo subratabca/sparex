@@ -2,7 +2,7 @@
     <div class="card-header header-elements">
         <span class="me-2"><h5>Coupon  List</h5></span>
         <div id="addNewButtonContainer" class="card-header-elements ms-auto">
-            <a href="/client/create/coupon" type="button" class="btn btn-primary waves-effect waves-light">
+            <a href="/restaurant/create/coupon" type="button" class="btn btn-primary waves-effect waves-light">
                 <span class="tf-icon mdi mdi-plus me-1"></span>Add New
             </a>
         </div>
@@ -36,7 +36,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/client/coupon/list");
+            let res = await axios.get("/restaurant/coupon/list");
             let tableList = $("#tableList");
             tableList.empty(); 
 
@@ -65,7 +65,7 @@
                         <td>${item.expire_date}</td>
                         <td>${statusBadge}</td>
                         <td>
-                            <a href="/client/edit/coupon/${item['id']}" class="btn btn-sm btn-outline-success"><span class="mdi mdi-pencil-outline"></span></a>
+                            <a href="/restaurant/edit/coupon/${item['id']}" class="btn btn-sm btn-outline-success"><span class="mdi mdi-pencil-outline"></span></a>
 
                             <button data-id="${item['id']}" class="btn deleteBtn btn-sm btn-outline-danger"><span class="mdi mdi-trash-can-outline"></span></button>
                         </td>

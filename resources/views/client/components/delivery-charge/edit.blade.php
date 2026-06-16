@@ -102,7 +102,7 @@ async function loadDeliveryChargeInfo() {
   showLoader();
   try {
     let id = new URL(window.location.href).pathname.split('/').pop();
-    const res = await axios.get("/client/show/delivery-charge/info/" + id);
+    const res = await axios.get("/restaurant/show/delivery-charge/info/" + id);
 
     document.getElementById('updateID').value = id;
     const fields = [
@@ -156,13 +156,13 @@ async function updateDeliveryCharge() {
   formData.id = document.getElementById('updateID').value;
 
   try {
-    const res = await axios.post('/client/update/delivery-charge', formData, {
+    const res = await axios.post('/restaurant/update/delivery-charge', formData, {
       headers: { 'Content-Type': 'application/json' }
     });
 
     if (res.status === 200 && res.data.status === 'success') {
       successToast(res.data.message || 'Delivery charge updated successfully!');
-      window.location.href = '/client/delivery-charge/page';
+      window.location.href = '/restaurant/delivery-charge/page';
       resetCreateForm();
     } else {
       errorToast(res.data.message || "Update failed!");

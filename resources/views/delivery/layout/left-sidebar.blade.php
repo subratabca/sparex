@@ -1,6 +1,6 @@
 <aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
   <div class="app-brand demo">
-    <a href="{{ url('/delivery/dashboard') }}" class="app-brand-link">
+    <a href="{{ url('/rider/dashboard') }}" class="app-brand-link">
       <span class="app-brand-logo demo">
           <img id="logo" src="/upload/no_image.jpg" width="100" height="50" alt="App Logo">
       </span>
@@ -25,7 +25,7 @@
   <ul class="menu-inner py-1">
     <!-- Dashboards -->
     <li class="menu-item {{ request()->routeIs('delivery.dashboard') ? 'active' : '' }}">
-      <a href="{{ url('/delivery/dashboard') }}" class="menu-link">
+      <a href="{{ url('/rider/dashboard') }}" class="menu-link">
         <i class="menu-icon tf-icons mdi mdi-home-outline"></i>
         <div data-i18n="Dashboards">Dashboards</div>
       </a>

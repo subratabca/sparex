@@ -94,7 +94,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/client/total/information");
+            let res = await axios.get("/restaurant/total/information");
             if (res.status === 200 && res.data.status === 'success') {
                 document.getElementById('total-products').innerText = res.data.totalProducts;
                 document.getElementById('total-orders').innerText = res.data.totalOrders;

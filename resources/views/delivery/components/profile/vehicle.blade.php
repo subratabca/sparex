@@ -251,7 +251,7 @@
     async function loadDeliveryPersonInfo() {
         showLoader();
         try {
-            const response = await axios.get('/delivery/get/profile/info');
+            const response = await axios.get('/rider/get/profile/info');
             
             if (response.status === 200 && response.data.status === 'success') {
                 const data = response.data.data;
@@ -283,7 +283,7 @@
     async function loadVehicleInfo() {
         showLoader();
         try {
-            const response = await axios.get(`/delivery/get/vehicle/info`);
+            const response = await axios.get(`/rider/get/vehicle/info`);
             
             if (response.status === 200 && response.data.status === 'success') {
                 existingVehicle = response.data.data;
@@ -412,9 +412,9 @@
             // Determine endpoint (update or create)
             let endpoint;
             if (existingVehicle) {
-                endpoint = `/delivery/update/vehicle/info`;
+                endpoint = `/rider/update/vehicle/info`;
             } else {
-                endpoint = `/delivery/store/vehicle/info`;
+                endpoint = `/rider/store/vehicle/info`;
             }
             
             const response = await axios.post(endpoint, formData, {
@@ -479,35 +479,7 @@
         return isValid;
     }
 
-    function handleError(error) {
-        let message = "An unexpected error occurred.";
-
-        if (error.response) {
-            const { status, data } = error.response;
-            switch (status) {
-                case 500:
-                    message = data?.message || data?.error || "Internal server error. Please try again later.";
-                    break;
-                case 404:
-                    message = data?.message || "Data not found.";
-                    break;
-                case 422:
-                    message = data?.message || "Validation failed.";
-                    break;
-                case 400:
-                    message = data?.message || "Bad request.";
-                    break;
-                default:
-                    message = data?.message || "Something went wrong.";
-            }
-        } else if (error.request) {
-            message = "No response from the server. Please check your internet connection.";
-        } else {
-            message = error.message;
-        }
-
-        errorToast(message);
-    }
+    // handleError(error) is provided globally by config.js (422 errors are mapped to inline fields above)
 
     function resetForm() {
         document.getElementById('vehicleForm').reset();

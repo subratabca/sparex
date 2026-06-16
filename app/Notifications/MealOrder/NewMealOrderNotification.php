@@ -108,7 +108,8 @@ class NewMealOrderNotification extends Notification
 
     public function via(object $notifiable): array
     {
-        return ['mail', 'database'];
+        // Database only — no email to admin, client or customer.
+        return ['database'];
     }
 
     public function toMail(object $notifiable): MailMessage

@@ -31,7 +31,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/user/followed-clients");
+            let res = await axios.get("/followed-clients");
 
             let tableList = $("#tableList");
             tableList.empty(); 

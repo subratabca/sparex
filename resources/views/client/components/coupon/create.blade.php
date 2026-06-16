@@ -107,13 +107,13 @@ async function Save() {
   formData.append('expire_date', expireDate);
 
   try {
-    const res = await axios.post('/client/store/coupon', formData, {
+    const res = await axios.post('/restaurant/store/coupon', formData, {
       headers: { 'content-type': 'multipart/form-data' }
     });
 
     if (res.status === 201) {
       successToast(res.data.message || 'Coupon created successfully!');
-      window.location.href = '/client/coupon/page';
+      window.location.href = '/restaurant/coupon/page';
       resetCreateForm();
     } else {
       errorToast(res.data.message || "Failed to create coupon");

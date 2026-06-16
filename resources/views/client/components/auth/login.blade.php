@@ -61,7 +61,7 @@
           <input class="form-check-input" type="checkbox" id="remember-me" />
           <label class="form-check-label" for="remember-me"> Remember Me </label>
         </div>
-        <a href="{{ url('/client/sendOtp') }}" class="float-end mb-1">
+        <a href="{{ url('/restaurant/sendOtp') }}" class="float-end mb-1">
           <span>Forgot Password?</span>
         </a>
       </div>
@@ -109,36 +109,30 @@
     } else if (password.length === 0) {
       errorToast("Password is required");
     } else {
+      showLoader();
       try {
-        let res = await axios.post("/client/login", { email: email, password: password });
+        let res = await axios.post("/restaurant/login", { email: email, password: password });
         if (res.status === 200 && res.data['status'] === 'success') {
-          window.location.href="/client/dashboard";
+          window.location.href="/restaurant/dashboard";
         } else {
           errorToast(res.data['message']);
         }
       } catch (error) {
-        if (error.response) {
-          if (error.response.status === 403) {
-            document.getElementById('account-not-active-message').innerText = error.response.data.message;
-            document.getElementById('account-not-active-message').classList.remove('d-none'); 
-          } else if (error.response.status === 401) {
-            errorToast(error.response.data.message);
-          } else if (error.response.status === 422) {
-            const errors = error.response.data.errors;
-            for (const key in errors) {
-              if (errors.hasOwnProperty(key)) {
-                const errorMessage = errors[key][0];
-                document.getElementById(`${key}-error`).innerText = errorMessage;
-              }
-            }
-          } else if (error.response.status === 500) {
-            errorToast(error.response.data.message || "An unexpected error occurred. Please try again later.");
-          } else {
-            errorToast(error.response.data.message || 'Login failed');
-          }
+        if (error.response?.status === 422) {
+          Object.entries(error.response.data.errors).forEach(([key, val]) => {
+            const span = document.getElementById(`${key}-error`);
+            if (span) span.innerText = val[0];
+            else errorToast(val[0]);
+          });
+        } else if (error.response?.status === 403) {
+          const box = document.getElementById('account-not-active-message');
+          box.innerText = error.response.data.message;
+          box.classList.remove('d-none');
         } else {
-          errorToast('Login failed. Please check your network connection.');
+          errorToast(error.response?.data?.message || 'Login failed. Please check your connection.');
         }
+      } finally {
+        hideLoader();
       }
     }
   }

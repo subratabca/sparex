@@ -15,7 +15,7 @@ class MealType extends BaseModel
 
     public function mealKeywords()
     {
-        return $this->hasMany(MealKeyword::class);
+        return $this->belongsToMany(MealKeyword::class, 'meal_keyword_meal_type');
     }
 
     public function mealCarts()

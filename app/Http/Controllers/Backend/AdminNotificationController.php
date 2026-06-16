@@ -50,6 +50,93 @@ class AdminNotificationController extends Controller
       }
   }
 
+    /**
+     * Poll endpoint for the admin layout: returns the admin's total unread
+     * count (so the bell badge updates live, no page refresh) plus unread
+     * "new meal order" notifications enriched with ALL clients' food items
+     * (grouped per client, minimum required info) for the popup.
+     */
+    public function getNewMealOrders(Request $request)
+    {
+        try {
+            $email = $request->header('email');
+            if (!$email) {
+                return response()->json(['status' => 'failed', 'message' => 'Unauthorized! Need to login.'], 401);
+            }
+
+            $user = User::where('email', $email)->first();
+            if (!$user) {
+                return response()->json(['status' => 'failed', 'message' => 'User not found.'], 404);
+            }
+
+            $unreadCount = $user->unreadNotifications()->count();
+
+            $orders = $user->unreadNotifications()
+                ->where('type', \App\Notifications\MealOrder\NewMealOrderNotification::class)
+                ->latest()
+                ->take(5)
+                ->get()
+                ->map(function ($n) {
+                    $d = is_string($n->data) ? json_decode($n->data, true) : $n->data;
+                    $mealOrderId = $d['meal_order_id'] ?? null;
+                    if (!$mealOrderId) return null;
+
+                    $order = \App\Models\MealOrder::with('customer:id,firstName,lastName')->find($mealOrderId);
+                    if (!$order) return null;
+
+                    $items = \App\Models\MealOrderItem::with([
+                            'client:id,firstName,lastName',
+                            'mealType:id,name',
+                            'product:id,name',
+                        ])
+                        ->where('meal_order_id', $mealOrderId)
+                        ->get();
+                    if ($items->isEmpty()) return null;
+
+                    // Group all items by client — admin sees every client's items (minimum info)
+                    $clients = $items->groupBy('client_id')->map(function ($clientItems) {
+                        $first = $clientItems->first();
+                        return [
+                            'client_name' => $first->client
+                                ? trim($first->client->firstName . ' ' . $first->client->lastName) : 'Client',
+                            'item_count'  => (int) $clientItems->sum('quantity'),
+                            'items'       => $clientItems->map(function ($it) {
+                                return [
+                                    'product_name' => $it->product->name ?? 'N/A',
+                                    'meal_type'    => $it->mealType->name ?? null,
+                                    'meal_date'    => $it->meal_date ? \Carbon\Carbon::parse($it->meal_date)->format('d M Y') : null,
+                                    'quantity'     => (int) $it->quantity,
+                                ];
+                            })->values(),
+                        ];
+                    })->values();
+
+                    return [
+                        'notification_id' => $n->id,
+                        'meal_order_id'   => $mealOrderId,
+                        'order_number'    => $order->order_number,
+                        'customer_name'   => $order->customer
+                            ? trim($order->customer->firstName . ' ' . $order->customer->lastName) : 'Customer',
+                        'client_count'    => $clients->count(),
+                        'item_count'      => (int) $items->sum('quantity'),
+                        'total_amount'    => (float) $order->payable_amount,
+                        'clients'         => $clients,
+                        'created_at'      => optional($n->created_at)->toDateTimeString(),
+                    ];
+                })
+                ->filter()
+                ->values();
+
+            return response()->json([
+                'status'       => 'success',
+                'unread_count' => $unreadCount,
+                'data'         => $orders,
+            ], 200);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'failed', 'message' => $e->getMessage()], 500);
+        }
+    }
+
     public function NotificationList(Request $request)
     {
         try {

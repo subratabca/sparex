@@ -42,7 +42,7 @@ function resetCreateForm() {
     document.getElementById('name-error').innerText = '';
 
     if (name.length === 0) {
-      errorToast("Meal type required !");
+      document.getElementById('name-error').innerText = "Meal type is required!";
     } else {
       let formData = new FormData();
           formData.append('name', name);
@@ -62,17 +62,14 @@ function resetCreateForm() {
           errorToast(res.data.message || "Request failed");
         }
       } catch (error) {
-          if (error.response && error.response.status === 422) {
-            let errorMessages = error.response.data.errors;
-            for (let field in errorMessages) {
-              if (errorMessages.hasOwnProperty(field)) {
-                document.getElementById(`${field}-error`).innerText = errorMessages[field][0];
-              }
-            }
-          } else if (error.response && error.response.status === 500) {
-            errorToast(error.response.data.error);
+          if (error.response?.status === 422) {
+            Object.entries(error.response.data.errors).forEach(([key, val]) => {
+              const span = document.getElementById(`${key}-error`);
+              if (span) span.innerText = val[0];
+              else errorToast(val[0]);
+            });
           } else {
-            errorToast("Request failed!");
+            handleError(error);
           }
       }
     }

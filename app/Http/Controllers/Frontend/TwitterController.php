@@ -36,7 +36,7 @@ class TwitterController extends Controller
          
             if($finduser){
                 $token = JWTToken::CreateToken($user->email, $user->id, $user->role);
-                return redirect()->to('/user/dashboard')->cookie('token', $token, 60, null, null, false, false);
+                return redirect()->to('/dashboard')->cookie('token', $token, 60, null, null, config('jwt.cookie_secure'), true, false, 'Lax');
          
             }else{
                 $newUser = User::updateOrCreate(['email' => $user->email],[
@@ -46,7 +46,7 @@ class TwitterController extends Controller
                     ]);
         
                 $token = JWTToken::CreateToken($user->email, $user->id, $user->role);
-                return redirect()->to('/user/dashboard')->cookie('token', $token, 60, null, null, false, false);
+                return redirect()->to('/dashboard')->cookie('token', $token, 60, null, null, config('jwt.cookie_secure'), true, false, 'Lax');
             }
         
         } catch (Exception $e) {

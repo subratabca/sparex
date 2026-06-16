@@ -81,10 +81,7 @@ class AdminProductController extends Controller
                     $request, 
                     'products'
                 );
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'Unable to fetch coordinates for the provided address.',
-                ], 422);
+                return null;
             }
 
             ActivityLogger::log(
@@ -102,11 +99,7 @@ class AdminProductController extends Controller
                 'products'
             );
 
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'An error occurred while fetching coordinates.',
-                'error' => $e->getMessage(),
-            ], 500);
+            return null;
         }
     }
 
@@ -114,8 +107,16 @@ class AdminProductController extends Controller
     {
         DB::beginTransaction();
         try {
-            $request->validate(ValidationHelper::itemValidationRules(false, $client_id));
+            $request->validate(ValidationHelper::itemValidationRules(false, false));
             $geoData = $this->formatAndFetchCoordinates($request);
+            if (!$geoData) {
+                DB::rollBack();
+                return response()->json([
+                    'status'  => 'failed',
+                    'message' => 'Validation Failed',
+                    'errors'  => ['address1' => ['Unable to fetch location for this address. Please check the address and postcode.']],
+                ], 422);
+            }
 
             $imagePath = $request->hasFile('image')
             ? ImageHelper::processAndSaveImage($request->file('image'), 'item')
@@ -294,6 +295,14 @@ class AdminProductController extends Controller
 
             $request->validate(ValidationHelper::itemValidationRules(true, false, $product_id));
             $geoData = $this->formatAndFetchCoordinates($request);
+            if (!$geoData) {
+                DB::rollBack();
+                return response()->json([
+                    'status'  => 'failed',
+                    'message' => 'Validation Failed',
+                    'errors'  => ['address1' => ['Unable to fetch location for this address. Please check the address and postcode.']],
+                ], 422);
+            }
 
             $imagePath = $request->hasFile('image')
             ? ImageHelper::processAndSaveImage($request->file('image'), 'item', false, $product->image)
@@ -524,7 +533,7 @@ class AdminProductController extends Controller
             ]);
 
             $publishDate = now();
-            if ($product->client->role === 'client') {
+            if ($product->client->role === 'restaurant') {
                 $product->client->notify(new ProductPublishNotification($product, $publishDate));
             }
 

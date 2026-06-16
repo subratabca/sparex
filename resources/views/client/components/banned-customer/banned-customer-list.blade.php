@@ -29,7 +29,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/client/get/banned/customers");
+            let res = await axios.get("/restaurant/get/banned/customers");
             if (res.status === 200 && res.data.status === 'success') {
                 let tableList = $("#tableList");
                 tableList.empty(); 
@@ -55,14 +55,14 @@
                         <tr>
                             <td>${index + 1}</td>
                             <td>
-                                <a href="/client/customer/details/${item.customer.id}" target="_blank" title="Customer details">
+                                <a href="/restaurant/customer/details/${item.customer.id}" target="_blank" title="Customer details">
                                    ${customerName}
                                 </a>
                             </td>
                             <td>${complainDate}</td>
                             <td>${complainTime}</td>
                             <td>
-                                <a  href="/client/banned/customer/details/${item.id}" class="btn btn-sm btn-outline-primary" title="Banned customer details"><span class="mdi mdi-eye-circle"></span>
+                                <a  href="/restaurant/banned/customer/details/${item.id}" class="btn btn-sm btn-outline-primary" title="Banned customer details"><span class="mdi mdi-eye-circle"></span>
                                 </a>
 
                                 <button data-id="${item['id']}" class="btn deleteBtn btn-sm btn-outline-danger" title="Delete Banned customer">

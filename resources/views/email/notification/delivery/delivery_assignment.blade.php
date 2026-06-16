@@ -20,7 +20,7 @@
     @endif
     
     <p>
-        <a href="{{ url('/delivery/accept/' . ($data['delivery_ledger_id'] ?? '')) }}" 
+        <a href="{{ url('/rider/accept/' . ($data['delivery_ledger_id'] ?? '')) }}" 
            style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
             Accept Delivery Assignment
         </a>

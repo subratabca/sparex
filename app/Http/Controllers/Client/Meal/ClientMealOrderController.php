@@ -614,7 +614,7 @@ class ClientMealOrderController extends Controller
     private function sendBroadcastNotificationToDeliveryPersons(DeliveryChargeLedger $ledger, $mealOrderItems)
     {
         try {
-            $deliveryPersons = User::where('role', 'delivery')
+            $deliveryPersons = User::where('role', 'rider')
                 ->get();
 
             if ($deliveryPersons->isEmpty()) {

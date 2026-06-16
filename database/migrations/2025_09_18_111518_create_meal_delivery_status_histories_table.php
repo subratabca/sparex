@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('meal_delivery_status_histories', function (Blueprint $table) {
             $table->id();
             $table->foreignId('delivery_charge_ledger_id')->nullable()->constrained('delivery_charge_ledgers')->onDelete('cascade');
-            $table->enum('delivery_status', ['pending','accept_order','preparing','ready_for_pickup','picked_up','on_the_way','arrived','delivered','cancelled'
+            $table->enum('delivery_status', ['pending','accept_order','accept_delivery','preparing','ready_for_pickup','picked_up','on_the_way','arrived','delivered','cancelled'
             ]);
             $table->timestamp('pick_up_at')->nullable();
             $table->text('notes')->nullable();

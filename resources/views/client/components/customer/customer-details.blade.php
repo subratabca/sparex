@@ -75,7 +75,7 @@
             </li>
           </ul>
           <div class="d-flex justify-content-center">
-            <a href="/client/customers" class="btn btn-outline-primary">Back to customer list</a>
+            <a href="/restaurant/customers" class="btn btn-outline-primary">Back to customer list</a>
           </div>
         </div>
       </div>
@@ -148,7 +148,7 @@
     showLoader();
     try {
       let customerId = getCustomerIdFromUrl();
-      let res = await axios.get("/client/get/customer/details/" + customerId);
+      let res = await axios.get("/restaurant/get/customer/details/" + customerId);
       if (res.status === 200 && res.data.status === 'success') {
         let imageUrl = res.data.data['image']
           ? `/upload/customer-profile/small/${res.data.data['image']}`
@@ -164,11 +164,11 @@
 
 
         let docImage1Large = res.data.data['doc_image1']
-        ? `/client/download/doc-image1/${res.data.data['id']}`
+        ? `/restaurant/download/doc-image1/${res.data.data['id']}`
         : null;
 
         let docImage2Large = res.data.data['doc_image2']
-        ? `/client/download/doc-image2/${res.data.data['id']}`
+        ? `/restaurant/download/doc-image2/${res.data.data['id']}`
         : null;
 
         let firstName = res.data.data['firstName'];

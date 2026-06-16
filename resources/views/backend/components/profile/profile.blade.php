@@ -177,23 +177,16 @@
           errorToast(res.data['message'] || 'An unexpected error occurred');
         }
       }catch (error) {
-        if (error.response) {
-          const status = error.response.status;
-          if (status === 404) {
-            errorToast(error.response.data.message || 'User not found');
-          } else if (status === 422) {
-            const errors = error.response.data.errors || {};
-            for (const key in errors) {
-              if (errors.hasOwnProperty(key)) {
-                const errorMessage = errors[key][0]; 
-                document.getElementById(`${key}-error`).innerText = errorMessage; 
-              }
-            }
-          } else {
-            errorToast(error.response.data.message || 'An unexpected error occurred');
-          }
+        // Map 422 validation errors to inline fields, otherwise use the global handler (config.js)
+        if (error.response?.status === 422) {
+          const errors = error.response.data.errors || {};
+          Object.keys(errors).forEach(key => {
+            const el = document.getElementById(`${key}-error`);
+            if (el) el.innerText = errors[key][0];
+            else errorToast(errors[key][0]);
+          });
         } else {
-          errorToast('Network error: ' + error.message);
+          handleError(error);
         }
       }
     }

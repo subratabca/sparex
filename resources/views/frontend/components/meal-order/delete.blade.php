@@ -27,7 +27,7 @@
         	showLoader();
             let orderId = document.getElementById('deleteID').value;
             $('#delete-modal').modal('hide');
-            const res = await axios.get(`/user/delete/meal-order/${orderId}`);
+            const res = await axios.get(`/delete/meal-order/${orderId}`);
 	            if (res.status === 200 && res.data.status === 'success') {
 	                successToast(res.data.message || "Data deleted successfully");
 	                window.location.reload();

@@ -13,7 +13,6 @@ return new class extends Migration
     {
         Schema::create('meal_delivery_charges', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('client_id')->constrained('users')->onDelete('cascade');
             $table->foreignId('meal_type_id')->constrained('meal_types')->onDelete('cascade');
             // Inside city delivery charges
             $table->decimal('inside_city_2km', 10, 2)->default(0);

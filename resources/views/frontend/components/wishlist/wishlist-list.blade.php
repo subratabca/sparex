@@ -34,7 +34,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/user/get/wishlist/info");
+            let res = await axios.get("/get/wishlist/info");
 
             let tableList = $("#tableList");
             tableList.empty(); 

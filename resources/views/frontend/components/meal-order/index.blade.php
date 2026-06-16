@@ -61,7 +61,7 @@ async function getList() {
     try {
         await getAllMealTypes();
 
-        let res = await axios.get("/user/get/meal-order");
+        let res = await axios.get("/get/meal-order");
         //console.log('API Response:', res.data); 
         
         if (res.status === 200 && res.data.status === 'success') {
@@ -141,14 +141,14 @@ async function getList() {
                             <td>${isFirstRow ? slNo : ''}</td>
                             <td class="order-number-cell">
                                 ${isFirstRow ? 
-                                    `<a href="/user/meal-order/details/${item.order_id}" class="order-number-link" title="View Order Details">
+                                    `<a href="/meal-order/details/${item.order_id}" class="order-number-link" title="View Order Details">
                                         ${orderNumber}
                                     </a>` 
                                     : ''
                                 }
                             </td>
                             <td>
-                                <a href="/user/meal-order/${item.order_id}/date/${item.meal_date}" class="date-link" title="View Order Details By Date">
+                                <a href="/meal-order/${item.order_id}/date/${item.meal_date}" class="date-link" title="View Order Details By Date">
                                     ${formattedDate}
                                 </a>
                             </td>
@@ -156,7 +156,7 @@ async function getList() {
                             <td>${item.calories ?? 0} kcal</td>
                             <td>${suggestedHTML}</td> 
                             <td>
-                                <a href="/user/meal-order/details/${item.order_id}" class="btn btn-sm btn-outline-primary" title="Order Details">
+                                <a href="/meal-order/details/${item.order_id}" class="btn btn-sm btn-outline-primary" title="Order Details">
                                     <span class="mdi mdi-eye-circle"></span>
                                 </a>
                                 <button data-id="${item.order_id}" class="btn deleteBtn btn-sm btn-outline-danger" title="Delete">

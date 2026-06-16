@@ -73,7 +73,7 @@ async function complainDetailsInfo() {
 
             document.getElementById('complainID').value = id;
 
-            let res = await axios.get("/client/get/complaint/details/" + id);
+            let res = await axios.get("/restaurant/get/complaint/details/" + id);
             if (res.status === 200 && res.data.status === 'success') {
             let data = res.data.data;
             //console.log('----------', data);
@@ -117,7 +117,7 @@ async function complainDetailsInfo() {
                                     </div>
                                   <div class="d-flex flex-wrap mb-2">
                                         <span class="me-1">Order No:</span>
-                                        <a href="/user/order/details/${data.order.id}" target="_blank">${data.order.order_number}</a>
+                                        <a href="/order/details/${data.order.id}" target="_blank">${data.order.order_number}</a>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
@@ -141,7 +141,7 @@ async function complainDetailsInfo() {
 
             document.getElementById('complaint-status').innerHTML = data.status;
 
-            document.getElementById('order-no').innerHTML = `Order NO: <a href="/client/order/details/${data.order.id}" target="_blank">${data.order.order_number}</a>`;
+            document.getElementById('order-no').innerHTML = `Order NO: <a href="/restaurant/order/details/${data.order.id}" target="_blank">${data.order.order_number}</a>`;
 
             const mainComplain = data.message;
             const cmpDate = data.cmp_date;

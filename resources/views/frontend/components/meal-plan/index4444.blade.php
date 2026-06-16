@@ -327,7 +327,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 /* ===================== Profile check on load ===================== */
 async function checkHealthProfile() {
     try {
-        const res = await axios.get('/user/get/health-profile');
+        const res = await axios.get('/get/health-profile');
         if (res.data.status === 'success' && res.data.data.has_profile) {
             if (res.data.data.profile) prefillPlannerForm(res.data.data.profile);
             document.getElementById('planner-btn-label').textContent = 'Update My Plan';
@@ -438,7 +438,7 @@ async function loadMealKeywords(mealTypeId) {
 
     try {
         showLoader();
-        const res = await axios.get(`/user/get/meal-keywords/${mealTypeId}`);
+        const res = await axios.get(`/get/meal-keywords/${mealTypeId}`);
         if (res.status === 200 && res.data.status === 'success' && res.data.data.length > 0) {
             container.innerHTML = '';
             res.data.data.forEach(kw => {
@@ -527,7 +527,7 @@ async function searchProducts(keywords, page = 1) {
     list.innerHTML = `<div class="text-muted text-center py-3">Searching products...</div>`;
     try {
         showLoader();
-        const res = await axios.post(`/user/search/products?page=${page}`, {
+        const res = await axios.post(`/search/products?page=${page}`, {
             keywords,
             meal_type_id: selectedMealTypeId,
             latitude:     userLatitude,
@@ -581,14 +581,14 @@ function renderProducts(products, total) {
             <div class="col-xl-3 col-lg-4 col-md-6">
                 <div class="card border-0 shadow-sm h-100 rounded-4 overflow-hidden product-result-card">
                     <div class="position-relative">
-                        <a href="/user/meal/details/${p.id}">
+                        <a href="/meal/details/${p.id}">
                             <img src="${img}" class="result-img" alt="${p.name}">
                         </a>
                         ${calPill}
                         ${hasNutrient ? `<button class="nutrient-fab" title="View nutrients" onclick="openNutrientModal(${index})"><i class="mdi mdi-nutrition"></i></button>` : ''}
                     </div>
                     <div class="card-body d-flex flex-column p-3">
-                        <a href="/user/meal/details/${p.id}" class="text-decoration-none">
+                        <a href="/meal/details/${p.id}" class="text-decoration-none">
                             <h6 class="fw-bold mb-1 result-title">${productName}</h6>
                         </a>
                         ${providedBy}
@@ -687,7 +687,7 @@ document.getElementById('confirm-add-meal').addEventListener('click', async () =
 
     try {
         showLoader();
-        const res = await axios.post('/user/store/meal-cart', {
+        const res = await axios.post('/store/meal-cart', {
             product_id:   selectedProduct.id,
             meal_type_id: mealTypeId,
             meal_date:    selectedDate,
@@ -759,7 +759,7 @@ async function generateAiPlan() {
     document.getElementById('ai-loading-section').style.display = 'block';
 
     try {
-        const res = await axios.post('/user/generate/meal-suggestion', { gender, age, weight, height, period, description });
+        const res = await axios.post('/generate/meal-suggestion', { gender, age, weight, height, period, description });
         if (res.data.status === 'success') {
             bootstrap.Modal.getInstance(document.getElementById('aiPlannerModal'))?.hide();
             document.getElementById('planner-btn-label').textContent = 'Update My Plan';
@@ -839,7 +839,7 @@ function renderSuggestions(data) {
                 const img = p.image ? `/upload/product/small/${p.image}` : '/upload/no_image.jpg';
                 const name = (p.name || '').replace(/\b\w/g, l => l.toUpperCase());
                 body = `
-                    <a href="/user/meal/details/${p.id}" class="text-decoration-none text-dark">
+                    <a href="/meal/details/${p.id}" class="text-decoration-none text-dark">
                         <div class="d-flex align-items-center gap-2 mb-2">
                             <img src="${img}" class="rounded" style="width:54px;height:54px;object-fit:cover;">
                             <div class="flex-grow-1">

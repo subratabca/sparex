@@ -36,7 +36,7 @@ document.addEventListener("DOMContentLoaded", function () {
 async function getList() {
     showLoader();
     try {
-        let res = await axios.get("/user/get/credit/info");
+        let res = await axios.get("/get/credit/info");
 
         if (res.status === 200 && res.data.status === "success") {
             let tableList = $("#tableList");

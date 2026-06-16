@@ -26,7 +26,7 @@ return new class extends Migration
 
             $table->string('order_tracking')->unique()->nullable();
 
-            $table->enum('delivery_status', ['pending','accept_order','preparing','ready_for_pickup','picked_up','on_the_way','arrived','delivered','cancelled'])->default('pending');
+            $table->enum('delivery_status', ['pending','accept_order','accept_delivery','preparing','ready_for_pickup','picked_up','on_the_way','arrived','delivered','cancelled'])->default('pending');
             
             $table->decimal('delivery_charge', 10, 2)->default(0);
             $table->decimal('rider_platform_fee', 10, 2)->default(0);

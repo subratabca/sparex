@@ -90,7 +90,7 @@
 
             document.getElementById('complainID').value = id;
 
-            const res = await axios.get("/user/customer-complain-details-info/" + id);
+            const res = await axios.get("/customer-complain-details-info/" + id);
             const data = res.data.data;
 
             // Set customer details

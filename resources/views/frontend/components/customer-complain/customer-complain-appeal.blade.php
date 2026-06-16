@@ -60,14 +60,14 @@
 
                 try {
                     if (uploadedImageUrl) {
-                        await axios.post('/user/delete-customer-complain-editor-image', { image_url: uploadedImageUrl });
+                        await axios.post('/delete-customer-complain-editor-image', { image_url: uploadedImageUrl });
 
                         if (uploadedImageIndex !== null) {
                             quill.deleteText(uploadedImageIndex, 1); 
                         }
                     }
 
-                    const res = await axios.post('/user/upload-customer-complain-editor-image', formData, {
+                    const res = await axios.post('/upload-customer-complain-editor-image', formData, {
                         headers: {
                             'Content-Type': 'multipart/form-data',
                         },
@@ -124,13 +124,13 @@
 
             try {
                 showLoader();
-                let res = await axios.post("/user/store-customer-complain-appeal-info", formData, config);
+                let res = await axios.post("/store-customer-complain-appeal-info", formData, config);
                 if (res.status === 201 && res.data.status === "success") {
                     successToast(res.data.message || 'Request success');
                     uploadedImageUrl = null;
                     uploadedImageIndex = null;
                     quill.root.innerHTML = ''; 
-                    window.location.href = '/user/customer-complain-list'
+                    window.location.href = '/customer-complain-list'
                 } else {
                     errorToast("Request failed with status: " + res.status);
                 }
@@ -173,7 +173,7 @@
     window.addEventListener('beforeunload', async (event) => {
         if (uploadedImageUrl) {
             try {
-                await axios.post('/user/delete-customer-complain-editor-image', { image_url: uploadedImageUrl });
+                await axios.post('/delete-customer-complain-editor-image', { image_url: uploadedImageUrl });
             } catch (error) {
                 console.error('Failed to delete image on unload:', error);
             }

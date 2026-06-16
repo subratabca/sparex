@@ -73,7 +73,7 @@ function openCancelModal(itemId) {
 async function confirmCancel(itemId, reason) {
     try {
         showLoader();
-        let res = await axios.post('/client/order/cancel-item', {
+        let res = await axios.post('/restaurant/order/cancel-item', {
             item_id: itemId,
             action_reason: reason
         });

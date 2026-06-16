@@ -46,19 +46,7 @@ async function mealTypeInfo() {
         document.getElementById('updateID').value = id;
         document.getElementById('name').value = res.data.data['name'];
     } catch (error) {
-        if (error.response) {
-            if (error.response.status === 404) {
-                errorToast(error.response.data.message || "Data not found.");
-            } 
-            else if (error.response.status === 500) {
-                errorToast(error.response.data.error || "An internal server error occurred."); 
-            } 
-            else {
-                errorToast("Request failed!");
-            }
-        } else {
-            errorToast("Request failed! Please check your internet connection or try again later.");
-        }
+        handleError(error);
     } finally{
         hideLoader();
     }
@@ -77,7 +65,7 @@ async function updateMealType() {
   document.getElementById('name-error').innerText = '';
 
   if (name.length === 0) {
-    errorToast("name required !");
+    document.getElementById('name-error').innerText = "Meal type is required!";
   } else {
     let formData = new FormData();
         formData.append('name', name);
@@ -99,19 +87,14 @@ async function updateMealType() {
             errorToast(res.data.message || "Request failed");
           }
         } catch (error) {
-          if (error.response) {
-            if (error.response.status === 422) {
-              let errorMessages = error.response.data.errors;
-              for (let field in errorMessages) {
-                if (errorMessages.hasOwnProperty(field)) {
-                  document.getElementById(`${field}-error`).innerText = errorMessages[field][0];
-                }
-              }
-            } else if (error.response.status === 500) {
-              errorToast(error.response.data.error || "An internal server error occurred.");
-            } else {
-              errorToast("Request failed!");
-            }
+          if (error.response?.status === 422) {
+            Object.entries(error.response.data.errors).forEach(([key, val]) => {
+              const span = document.getElementById(`${key}-error`);
+              if (span) span.innerText = val[0];
+              else errorToast(val[0]);
+            });
+          } else {
+            handleError(error);
           }
         }
   }

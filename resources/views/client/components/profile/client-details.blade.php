@@ -151,7 +151,7 @@
     showLoader();
     try {
       let clientId = getClientIdFromUrl();
-      let res = await axios.get("/client/account/details/info/" + clientId);
+      let res = await axios.get("/restaurant/account/details/info/" + clientId);
       if (res.status === 200 && res.data.status === 'success') {
         let imageUrl = res.data.data['image']
         ? `/upload/client-profile/small/${res.data.data['image']}`
@@ -166,11 +166,11 @@
         : `/upload/no_image.jpg`;
 
         let docImage1Large = res.data.data['doc_image1']
-        ? `/client/download/doc-image1/${res.data.data['id']}`
+        ? `/restaurant/download/doc-image1/${res.data.data['id']}`
         : null;
 
         let docImage2Large = res.data.data['doc_image2']
-        ? `/client/download/doc-image2/${res.data.data['id']}`
+        ? `/restaurant/download/doc-image2/${res.data.data['id']}`
         : null;
 
         let firstName = res.data.data['firstName'];
@@ -263,28 +263,5 @@
     return segments[segments.length - 1];
   }
 
-  function handleError(error) {
-      let message = "An unexpected error occurred.";
-
-      if (error.response) {
-          const { status, data } = error.response;
-          switch (status) {
-              case 500:
-                  message = data?.message || "Internal server error. Please try again later.";
-                  break;
-              case 404:
-                  message = data?.message || "Data not found.";
-                  break;
-              default:
-                  message = data?.message || "Something went wrong.";
-          }
-
-      } else if (error.request) {
-          message = "No response from the server. Please check your internet connection.";
-      } else {
-          message = error.message;
-      }
-
-      errorToast(message);
-  }
+  // handleError(error) is provided globally by config.js
 </script>

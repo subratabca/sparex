@@ -68,10 +68,10 @@
     <script src="{{ asset('backend/assets/vendor/js/template-customizer.js') }}"></script>
     <script src="{{ asset('backend/assets/js/config.js') }}"></script>
 
-    <script src="{{ asset('backend/custom-js/axios.min.js') }}"></script>
-    <link href="{{ asset('backend/custom-css/toastify.min.css') }}" rel="stylesheet" />
-    <script src="{{ asset('backend/custom-js/toastify-js.js') }}"></script>
-    <script src="{{ asset('backend/custom-js/config.js') }}"></script>
+    <script src="{{ asset('common/custom-js/axios.min.js') }}"></script>
+    <link href="{{ asset('common/custom-css/toastify.min.css') }}" rel="stylesheet" />
+    <script src="{{ asset('common/custom-js/toastify-js.js') }}"></script>
+    <script src="{{ asset('common/custom-js/config.js') }}"></script>
     <script src="https://js.stripe.com/v3/"></script>
   </head>
 
@@ -158,6 +158,167 @@
     <script src="{{ asset('backend/assets/js/form-basic-inputs.js') }}"></script>
     <script src="{{ asset('backend/assets/js/maps-leaflet.js') }}"></script>
     <script src="{{ asset('backend/assets/js/charts-chartjs.js') }}"></script>
+
+    <!-- New meal-order popup (auto-shows when a customer places an order) -->
+    <div class="modal fade" id="adminNewOrderModal" tabindex="-1" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content border-0 overflow-hidden ano-modal">
+          <div class="modal-header ano-header text-white border-0">
+            <div class="d-flex align-items-center gap-3">
+              <span class="ano-bell"><i class="mdi mdi-cart-plus"></i></span>
+              <div>
+                <h5 class="modal-title fw-bold mb-0">New Meal Order Placed</h5>
+                <small class="opacity-75">A customer placed a new order</small>
+              </div>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body p-3 p-md-4 bg-light">
+            <div id="anoBody" class="d-flex flex-column gap-3"></div>
+          </div>
+          <div class="modal-footer border-0 bg-light">
+            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+            <a href="#" id="anoDetailsBtn" class="btn ano-accept-btn rounded-pill px-4"><i class="mdi mdi-eye-outline me-1"></i>View Details</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+    (function () {
+        const ANO_POLL_MS  = 12000;
+        const ANO_SEEN_KEY = 'anoSeenOrderIds';
+        let   anoModal = null;
+        let   anoQueue = [];
+        let   anoLastCount = null;
+
+        function anoLoadSeen() {
+            try { return new Set(JSON.parse(localStorage.getItem(ANO_SEEN_KEY) || '[]')); }
+            catch (e) { return new Set(); }
+        }
+        function anoSaveSeen(set) {
+            try { localStorage.setItem(ANO_SEEN_KEY, JSON.stringify(Array.from(set).slice(-50))); } catch (e) {}
+        }
+        let anoSeen = anoLoadSeen();
+
+        async function anoFetch() {
+            try {
+                const res = await axios.get('/admin/get/new-meal-orders');
+                if (res.status === 200 && res.data.status === 'success') return res.data;
+            } catch (e) { /* silent */ }
+            return null;
+        }
+
+        function fmtCurrency(v) {
+            return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(parseFloat(v) || 0);
+        }
+
+        // Live-update the bell badge (no page refresh).
+        function anoUpdateBadge(count) {
+            const c = (count === undefined || count === null) ? 0 : count;
+            const badge  = document.getElementById('notificationCount');
+            const badge1 = document.getElementById('notificationCount1');
+            if (badge)  badge.innerText  = c;
+            if (badge1) badge1.innerText = c;
+            if (anoLastCount !== null && c !== anoLastCount &&
+                typeof refreshNotificationDropdown === 'function') {
+                refreshNotificationDropdown();
+            }
+            anoLastCount = c;
+        }
+
+        function anoShowNext() {
+            const el = document.getElementById('adminNewOrderModal');
+            if (!el || typeof bootstrap === 'undefined') return;
+            if (el.classList.contains('show')) return;
+            const o = anoQueue.shift();
+            if (!o) return;
+
+            const clientsHtml = (o.clients || []).map(c => {
+                const items = (c.items || []).map(i => `
+                    <li>${i.product_name} <span class="text-muted">× ${i.quantity}</span>
+                        <span class="ano-meta">${[i.meal_type, i.meal_date].filter(Boolean).join(' • ')}</span>
+                    </li>`).join('');
+                return `
+                    <div class="ano-client">
+                        <div class="ano-client-head">
+                            <i class="mdi mdi-storefront-outline me-1"></i>${c.client_name}
+                            <span class="badge bg-label-primary ms-2">${c.item_count} item(s)</span>
+                        </div>
+                        <ul class="ano-client-items">${items}</ul>
+                    </div>`;
+            }).join('');
+
+            document.getElementById('anoBody').innerHTML = `
+                <div class="ano-summary">
+                    <div class="d-flex flex-wrap gap-2 align-items-center">
+                        <span class="badge ano-track"><i class="mdi mdi-pound"></i>${o.order_number || 'N/A'}</span>
+                        <span class="text-muted small"><i class="mdi mdi-account-outline me-1"></i>${o.customer_name || 'Customer'}</span>
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mt-2">
+                        <span class="ano-chip"><i class="mdi mdi-storefront"></i> ${o.client_count} client(s)</span>
+                        <span class="ano-chip"><i class="mdi mdi-food-fork-drink"></i> ${o.item_count} item(s)</span>
+                        <span class="ano-chip ano-chip-amt"><i class="mdi mdi-cash"></i> ${fmtCurrency(o.total_amount)}</span>
+                    </div>
+                </div>
+                <div class="ano-clients">${clientsHtml || '<div class="text-muted">No items.</div>'}</div>`;
+
+            document.getElementById('anoDetailsBtn').href =
+                `/admin/meal-order/details/${o.meal_order_id}?notification_id=${o.notification_id}`;
+
+            const elModal = document.getElementById('adminNewOrderModal');
+            anoModal = bootstrap.Modal.getInstance(elModal) || new bootstrap.Modal(elModal);
+            if (!elModal.dataset.anoHiddenBound) {
+                elModal.dataset.anoHiddenBound = '1';
+                elModal.addEventListener('hidden.bs.modal', () => setTimeout(anoShowNext, 300));
+            }
+            anoModal.show();
+        }
+
+        async function anoPoll() {
+            const payload = await anoFetch();
+            if (!payload) return;
+
+            // 1) Live bell count
+            anoUpdateBadge(payload.unread_count);
+
+            // 2) Pop new orders
+            const orders = payload.data || [];
+            const fresh = orders.filter(o => !anoSeen.has(o.notification_id));
+            if (!fresh.length) return;
+            fresh.forEach(o => anoSeen.add(o.notification_id));
+            anoSaveSeen(anoSeen);
+            anoQueue.push(...fresh);
+            anoShowNext();
+        }
+
+        document.addEventListener('DOMContentLoaded', function () {
+            anoPoll();
+            setInterval(anoPoll, ANO_POLL_MS);
+        });
+    })();
+    </script>
+
+    <style>
+    .ano-modal { border-radius: 18px; }
+    .ano-header { background: linear-gradient(135deg,#0ea5e9 0%,#6366f1 60%,#8b5cf6 100%); padding: 1.1rem 1.5rem; }
+    .ano-bell {
+      width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,.2);
+      display:flex; align-items:center; justify-content:center; font-size: 1.5rem;
+    }
+    .ano-summary { background:#fff; border:1px solid #eef0f4; border-radius:14px; padding:1rem 1.1rem; box-shadow:0 2px 10px rgba(0,0,0,.04); }
+    .ano-track { background:#eef2ff; color:#6366f1; }
+    .ano-chip { background:#f1f5f9; border-radius:20px; padding:.3rem .8rem; font-size:.8rem; font-weight:600; color:#0f172a; }
+    .ano-chip-amt { background:#ecfdf5; color:#047857; }
+    .ano-clients { display:flex; flex-direction:column; gap:.6rem; }
+    .ano-client { background:#fff; border:1px solid #eef0f4; border-radius:12px; padding:.7rem .9rem; }
+    .ano-client-head { font-weight:700; color:#0f172a; }
+    .ano-client-items { margin:.4rem 0 0; padding-left:1.1rem; }
+    .ano-client-items li { margin-bottom:.2rem; }
+    .ano-meta { display:block; font-size:.75rem; color:#94a3b8; }
+    .ano-accept-btn { background:linear-gradient(135deg,#0ea5e9,#6366f1); color:#fff; border:none; font-weight:600; }
+    .ano-accept-btn:hover { filter:brightness(.95); color:#fff; }
+    </style>
   </body>
 </html>
 
@@ -190,6 +351,20 @@ document.addEventListener("DOMContentLoaded", async function () {
 })
 
 
+// Re-fetch the limited notification list and re-render the bell dropdown,
+// so new notifications appear without a page refresh.
+async function refreshNotificationDropdown() {
+    try {
+        const response = await axios.get('/admin/limited/notification/list');
+        if (response.status === 200) {
+            displayNotifications(
+                response.data.unreadNotifications || [],
+                response.data.readNotifications || []
+            );
+        }
+    } catch (error) { /* silent — non-blocking */ }
+}
+
 function displayNotifications(unreadNotifications, readNotifications) {
     const notificationsContainer = document.querySelector('.dropdown-notifications-list ul');
     let notificationsHTML = '';
@@ -199,7 +374,7 @@ function displayNotifications(unreadNotifications, readNotifications) {
         notificationsContainer.innerHTML = '<li class="list-group-item">No notifications</li>';
         return;
     }
-    
+
 
     function getNotificationLink(notification) {
         if (!notification || !notification.data) return '#';

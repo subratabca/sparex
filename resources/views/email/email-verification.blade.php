@@ -88,7 +88,7 @@
             
             <p>Thank you for registering as a {{ $userType }} with us. To complete your registration, please verify your email address by clicking the button below:</p>
             
-            <a href="{{ $userType === 'client' ? route('verify.new.client', ['email' => $user->email]) : ($userType === 'delivery' ? route('verify.new.delivery', ['email' => $user->email]) : route('verify.new.customer', ['email' => $user->email])) }}" class="button">
+            <a href="{{ $userType === 'restaurant' ? route('verify.new.client', ['email' => $user->email]) : ($userType === 'rider' ? route('verify.new.delivery', ['email' => $user->email]) : route('verify.new.customer', ['email' => $user->email])) }}" class="button">
                 Verify Email Address
             </a>
             

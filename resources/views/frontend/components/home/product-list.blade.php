@@ -237,7 +237,7 @@
     async function toggleFollow(clientId) {
         hideLoader();
         try {
-            const res = await axios.post('/user/store/follower', {
+            const res = await axios.post('/store/follower', {
                 client_id: clientId
             });
 
@@ -272,7 +272,7 @@
     async function addToWishlist(productId) {
         hideLoader();
         try {
-            const res = await axios.post('/user/store/wishlist', { id: productId });
+            const res = await axios.post('/store/wishlist', { id: productId });
             if (res.status === 201  && res.data.status === 'success') {
                 successToast(res.data.message || 'Request success');
                 await getProductList();
@@ -294,7 +294,7 @@
             switch (status) {
             case 401:
                 message = data?.message || "Unauthorized. Need login.";
-                //window.location.href = '/user/login';
+                //window.location.href = '/login';
                 break;
             case 403:
                 message = data?.message || "Data not found.";

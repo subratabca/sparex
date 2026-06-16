@@ -264,8 +264,8 @@ document.addEventListener("DOMContentLoaded", async function () {
     try {
       showLoader();
       const [userResponse, cartResponse] = await Promise.all([
-        axios.get('/user/get/profile/info'),
-        axios.get('/user/get-cart-product', {
+        axios.get('/get/profile/info'),
+        axios.get('/get-cart-product', {
           params: {
             page: checkoutCurrentPage,
             per_page: 3
@@ -319,7 +319,7 @@ document.addEventListener("DOMContentLoaded", async function () {
 
         try {
           showLoader();
-          const response = await axios.get('/user/get-courier-charge', { params: { city_id: cityId } });
+          const response = await axios.get('/get-courier-charge', { params: { city_id: cityId } });
           if (response.data.status === 'success') {
             deliveryCharge = parseFloat(response.data.charge);
             courierSpan.textContent = `$${deliveryCharge.toFixed(2)}`;
@@ -406,14 +406,14 @@ async function processPayment(event) {
     const submitBtn = document.querySelector('#checkout-form button[type="submit"]');
     submitBtn.disabled = true;
 
-    let endpoint = '/user/cash/order';
+    let endpoint = '/cash/order';
     const requestData = { ...formData };
 
     if (formData.payment_method === 'stripe') {
-      endpoint = '/user/stripe/order';
+      endpoint = '/stripe/order';
       
       // 1. Create Payment Intent (Fixed headers)
-      const { data: intentData } = await axios.post('/user/create-payment-intent');
+      const { data: intentData } = await axios.post('/create-payment-intent');
       
       // 2. Confirm Card Payment (Fixed client_secret access)
       const { paymentIntent, error } = await stripe.confirmCardPayment(
@@ -454,7 +454,7 @@ async function processPayment(event) {
     
     if (response.data.status === 'success') {
       successToast('Order placed successfully!');
-      window.location.href = response.data.redirect_url || '/user/order-confirmation';
+      window.location.href = response.data.redirect_url || '/order-confirmation';
     }
 
  } catch (error) {
@@ -510,7 +510,7 @@ async function initializeAddressForm(userData) {
 
       try {
         showLoader();
-        const response = await axios.get('/user/get-courier-charge', {
+        const response = await axios.get('/get-courier-charge', {
           params: { city_id: cityId }
         });
 
@@ -579,7 +579,7 @@ async function loadCities(countyId, selectedId = '') {
 
 async function checkExistingAddresses(email) {
   try {
-    const response = await axios.get('/user/shipping-addresses', {
+    const response = await axios.get('/shipping-addresses', {
       headers: { 'email': email }
     });
     
@@ -597,7 +597,7 @@ function setupAddressCheckbox() {
   checkbox.addEventListener('change', async function() {
     try {
       if (this.checked) {
-        const response = await axios.get('/user/shipping-addresses', {
+        const response = await axios.get('/shipping-addresses', {
           headers: { 'email': userEmail }
         });
         if (response.data.data.length > 0) {
@@ -609,7 +609,7 @@ function setupAddressCheckbox() {
           }
         }
       } else {
-        const response = await axios.get('/user/get/profile/info');
+        const response = await axios.get('/get/profile/info');
         populateAddressForm(response.data.data);
 
         if (document.getElementById('courier').checked) {
@@ -636,7 +636,7 @@ async function recalcDeliveryCharge(cityId) {
 
   try {
     showLoader();
-    const response = await axios.get('/user/get-courier-charge', {
+    const response = await axios.get('/get-courier-charge', {
       params: { city_id: cityId }
     });
 
@@ -733,7 +733,7 @@ async function loadMoreCheckoutItems() {
     try {
         showLoader();
         checkoutCurrentPage++;
-        const response = await axios.get('/user/get-cart-product', {
+        const response = await axios.get('/get-cart-product', {
             params: {
                 page: checkoutCurrentPage,
                 per_page: 3
@@ -812,7 +812,7 @@ function updateCheckoutSummary(summary, deliveryCharge = 0) {
         <div class="form-check mt-4 pt-2">
             <input class="form-check-input" type="checkbox" value="" id="accept_tnc" />
             <label class="form-check-label" for="accept_tnc">
-                <a href="/user/order/terms-conditions/customer_order" target="_blank">
+                <a href="/order/terms-conditions/customer_order" target="_blank">
                     Accept Terms of Conditions and Privacy Policy
                 </a>
                 <span class="text-danger">*</span>

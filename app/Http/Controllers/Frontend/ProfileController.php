@@ -195,7 +195,6 @@ class ProfileController extends Controller
     public function storeDocumentInfo(Request $request)
     {
         try {
-            $request->validate(ValidationHelper::documentValidationRules());
             $id = $request->header('id');
             $user = User::find($id);
 
@@ -206,6 +205,12 @@ class ProfileController extends Controller
                     'message' => 'User not found.',
                 ], 404);
             }
+
+            // Images are required only on first upload; on update the existing files are kept
+            $request->validate(ValidationHelper::documentValidationRules(
+                empty($user->doc_image1),
+                empty($user->doc_image2)
+            ));
 
             $geoData = $this->formatAndFetchCoordinates($request);
 

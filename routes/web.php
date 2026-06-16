@@ -1,9 +1,5 @@
 <?php
 use Illuminate\Support\Facades\Route;
-use App\Http\Middleware\TokenVerificationMiddleware;
-use App\Http\Middleware\AdminTokenVerificationMiddleware;
-use App\Http\Middleware\ClientTokenVerificationMiddleware;
-use App\Http\Middleware\DeliveryTokenVerificationMiddleware;
 
 //Common Controller
 use App\Http\Controllers\Common\CommonController;
@@ -149,7 +145,7 @@ Route::controller(PagesController::class)->group(function () {
 
 
 
-Route::prefix('user')->group(function () {
+Route::group([], function () {
     Route::controller(AuthController::class)->group(function () {
         Route::get('/registration/terms-conditions/{name}','registrationTermsConditionsPage');
         Route::get('/registration/terms-conditions/info/{name}','registrationTermsConditionsInfo');
@@ -172,7 +168,7 @@ Route::prefix('user')->group(function () {
     });
 });
 
-Route::prefix('user')->middleware([TokenVerificationMiddleware::class])->group(function () {
+Route::middleware('jwt.auth')->group(function () {
     Route::controller(MealPlanController::class)->group(function () {
         Route::get('/meal-plans', 'mealPlanPage')->name('meal.plan');
         Route::get('/get/meal-keywords/{mealTypeId}', 'getMealKeywordByType');
@@ -391,7 +387,7 @@ Route::prefix('admin')->group(function () {
     });
 });
 
-Route::prefix('admin')->middleware([AdminTokenVerificationMiddleware::class])->group(function () {
+Route::prefix('admin')->middleware('jwt.auth:admin')->group(function () {
 
     Route::controller(MealKeywordController::class)->group(function () {
         Route::get('/meal-keywords','index')->name('meal.keywords');
@@ -700,6 +696,7 @@ Route::prefix('admin')->middleware([AdminTokenVerificationMiddleware::class])->g
         Route::get('/notification/list', 'NotificationPage')->name('admin.notifications');
         Route::get('/limited/notification/list', 'LimitedNotificationList');
         Route::get('/notification/list/info', 'NotificationList');
+        Route::get('/get/new-meal-orders', 'getNewMealOrders');
         Route::get('/markAsRead', 'MarkAsRead')->name('admin.markRead');
         Route::delete('/delete/notification/{notificationId}', 'deleteNotification');
     });
@@ -727,8 +724,8 @@ Route::prefix('admin')->middleware([AdminTokenVerificationMiddleware::class])->g
 
 
 
-// Client API Routes
-Route::prefix('client')->group(function () {
+// Restaurant (client) API Routes
+Route::prefix('restaurant')->group(function () {
     Route::controller(ClientAuthController::class)->group(function () {
         Route::get('/registration/terms-conditions/{name}','registrationTermsConditionsPage');
         Route::get('/registration/terms-conditions/info/{name}','registrationTermsConditionsInfo');
@@ -751,7 +748,7 @@ Route::prefix('client')->group(function () {
     });
 });
 
-Route::prefix('client')->middleware([ClientTokenVerificationMiddleware::class])->group(function () {
+Route::prefix('restaurant')->middleware('jwt.auth:restaurant')->group(function () {
     Route::controller(ClientMealOrderController::class)->group(function () {
         Route::get('/meal-order','index')->name('client.meal.orders');
         Route::get('/get/meal-orders','getMealOrders');
@@ -781,15 +778,15 @@ Route::prefix('client')->middleware([ClientTokenVerificationMiddleware::class])-
 
     Route::controller(ClientProfileController::class)->group(function () {
         Route::get('/update/profile','profilePage');
-        Route::get('/profile/info','profile');
-        Route::post('/profile/update','UpdateProfile');
-        Route::get('/update/password','PasswordPage');
-        Route::post('/password/update','UpdatePassword');
+        Route::get('/profile/info','getProfileInfo');
+        Route::post('/profile/update','updateProfile');
+        Route::get('/update/password','passwordPage');
+        Route::post('/password/update','updatePassword');
         Route::get('/account/details/{client_id}','clientDetailsPage');
-        Route::get('/account/details/info/{client_id}','getClientDetails');
+        Route::get('/account/details/info/{client_id}','getClientDetailsInfo');
 
-        Route::get('/document','DocumentPage')->name('client.update.document');
-        Route::post('/store/document/info','StoreDocumentInfo');
+        Route::get('/document','documentPage')->name('client.update.document');
+        Route::post('/store/document/info','storeDocumentInfo');
 
         Route::get('/download/doc-image1/{client_id}', 'downloadDocImage1')->name('client.download.doc1');
         Route::get('/download/doc-image2/{client_id}', 'downloadDocImage2')->name('client.download.doc2');
@@ -929,6 +926,8 @@ Route::prefix('client')->middleware([ClientTokenVerificationMiddleware::class])-
         Route::get('/notification/list', 'NotificationPage')->name('client.notifications');
         Route::get('/limited/notification/list', 'LimitedNotificationList');
         Route::get('/notification/list/info', 'NotificationList');
+        Route::get('/get/delivery-acceptances', 'getDeliveryAcceptances');
+        Route::get('/get/new-meal-orders', 'getNewMealOrders');
         Route::get('/markAsRead', 'MarkAsRead')->name('client.markRead');
         Route::delete('/delete/notification/{notificationId}', 'deleteNotification');
     });
@@ -957,8 +956,8 @@ Route::prefix('client')->middleware([ClientTokenVerificationMiddleware::class])-
 
 
 
-// Delivery API Routes
-Route::prefix('delivery')->group(function () {
+// Rider (delivery) API Routes
+Route::prefix('rider')->group(function () {
     Route::controller(DeliveryAuthController::class)->group(function () {
         Route::get('/registration/terms-conditions/{name}','registrationTermsConditionsPage');
         Route::get('/registration/terms-conditions/info/{name}','registrationTermsConditionsInfo');
@@ -981,7 +980,7 @@ Route::prefix('delivery')->group(function () {
     });
 });
 
-Route::prefix('delivery')->middleware([DeliveryTokenVerificationMiddleware::class])->group(function () {
+Route::prefix('rider')->middleware('jwt.auth:rider')->group(function () {
     Route::controller(DeliveryDashboardController::class)->group(function () {
         Route::get('/dashboard', 'index')->name('delivery.dashboard');
         Route::get('/get/meal-report/summary',         'getSummary');
@@ -998,9 +997,6 @@ Route::prefix('delivery')->middleware([DeliveryTokenVerificationMiddleware::clas
         Route::get('/password','passwordPage');
         Route::post('/password/update','updatePassword');
         Route::get('/logout','Logout')->name('delivery.logout');
-
-        Route::get('/account/details/{delivery_id}','deliveryDetailsPage');
-        Route::get('/account/details/info/{delivery_id}','getDeliveryDetails');
 
         Route::get('/document','documentPage')->name('delivery.update.document');
         Route::post('/store/document/info','storeDocumentInfo');
@@ -1023,6 +1019,7 @@ Route::prefix('delivery')->middleware([DeliveryTokenVerificationMiddleware::clas
         Route::delete('/delete/notification/{notificationId}', 'deleteNotification');
 
         Route::get('/get/pending-deliveries', 'getPendingDeliveryRequests');
+        Route::get('/poll/pickup-notifications', 'pollPickupNotifications');
     });
 
     Route::controller(DeliveryMealOrderController::class)->group(function () {

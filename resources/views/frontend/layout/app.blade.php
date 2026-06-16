@@ -99,7 +99,7 @@
           href="{{ asset('frontend/assets/vendor/css/pages/page-profile.css') }}" />
 
     <!-- Toastify CSS -->
-    <link href="{{ asset('backend/custom-css/toastify.min.css') }}" rel="stylesheet" />
+    <link href="{{ asset('common/custom-css/toastify.min.css') }}" rel="stylesheet" />
 
     <!-- ===== Page-specific CSS ===== -->
     @stack('styles')
@@ -199,9 +199,9 @@
     <script src="{{ asset('frontend/assets/js/maps-leaflet.js') }}"></script>
 
     <!-- ===== Global Config — AFTER jQuery & AFTER bouncing-loader is in DOM ===== -->
-    <script src="{{ asset('backend/custom-js/axios.min.js') }}"></script>
-    <script src="{{ asset('backend/custom-js/toastify-js.js') }}"></script>
-    <script src="{{ asset('backend/custom-js/config.js') }}"></script>
+    <script src="{{ asset('common/custom-js/axios.min.js') }}"></script>
+    <script src="{{ asset('common/custom-js/toastify-js.js') }}"></script>
+    <script src="{{ asset('common/custom-js/config.js') }}"></script>
 
     <!-- ===== Stripe ===== -->
     <script src="https://js.stripe.com/v3/"></script>

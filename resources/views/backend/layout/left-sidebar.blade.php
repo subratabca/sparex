@@ -27,6 +27,56 @@
       </a>
     </li>
 
+    <li class="menu-item {{ in_array($currentRoute, ['site.settings', 'categories', 'heros', 'abouts', 'terms.conditions','meal.types','meal.keywords']) ? 'active open' : '' }}">
+      <a href="javascript:void(0);" class="menu-link menu-toggle">
+        <i class="menu-icon tf-icons mdi mdi-view-grid-outline"></i>
+        <div data-i18n="Front Settings">Settings</div>
+      </a>
+      <ul class="menu-sub">
+        <li class="menu-item {{ $currentRoute == 'site.settings' ? 'active' : '' }}">
+          <a href="{{ route('site.settings') }}" class="menu-link">
+            <div data-i18n="Site Settings">Site Settings</div>
+          </a>
+        </li>
+        <li class="menu-item {{ $currentRoute == 'categories' ? 'active' : '' }}">
+          <a href="{{ route('categories') }}" class="menu-link">
+            <div data-i18n="Category">Category</div>
+          </a>
+        </li>
+        <li class="menu-item {{ $currentRoute == 'meal.types' ? 'active' : '' }}">
+          <a href="{{ route('meal.types') }}" class="menu-link">
+            <div data-i18n="Meal Type">Meal Type</div>
+          </a>
+        </li>
+        <li class="menu-item {{ $currentRoute == 'meal.keywords' ? 'active' : '' }}">
+          <a href="{{ route('meal.keywords') }}" class="menu-link">
+            <div data-i18n="Meal Keyword">Meal Keyword</div>
+          </a>
+        </li>
+        <li class="menu-item {{ $currentRoute == 'meal.delivery.charges' ? 'active' : '' }}">
+          <a href="{{ route('meal.delivery.charges') }}" class="menu-link">
+            <div data-i18n="Meal Delivery Charge">Meal Delivery Charge</div>
+          </a>
+        </li>
+
+        <li class="menu-item {{ $currentRoute == 'heros' ? 'active' : '' }}">
+          <a href="{{ route('heros') }}" class="menu-link">
+            <div data-i18n="Hero">Hero</div>
+          </a>
+        </li>
+        <li class="menu-item {{ $currentRoute == 'abouts' ? 'active' : '' }}">
+          <a href="{{ route('abouts') }}" class="menu-link">
+            <div data-i18n="About">About</div>
+          </a>
+        </li>
+        <li class="menu-item {{ $currentRoute == 'terms.conditions' ? 'active' : '' }}">
+          <a href="{{ route('terms.conditions') }}" class="menu-link">
+            <div data-i18n="Terms & Conditions">Terms & Conditions</div>
+          </a>
+        </li>
+      </ul>
+    </li>
+
     <li class="menu-item {{ str_starts_with($currentRoute, 'bar.chart') ? 'active open' : '' }}">
       <a href="javascript:void(0);" class="menu-link menu-toggle">
         <i class="menu-icon tf-icons mdi mdi-chart-box"></i>

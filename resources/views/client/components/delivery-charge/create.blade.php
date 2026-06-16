@@ -118,14 +118,14 @@ async function Save() {
   if (!isValid) return;
 
   try {
-    const res = await axios.post('/client/store/delivery-charge', formData, {
+    const res = await axios.post('/restaurant/store/delivery-charge', formData, {
       headers: { 'content-type': 'multipart/form-data' }
     });
 
     if (res.status === 201) {
       successToast(res.data.message || 'Delivery charge created successfully!');
       resetCreateForm();
-      window.location.href = '/client/delivery-charge/page';
+      window.location.href = '/restaurant/delivery-charge/page';
     } else {
       errorToast(res.data.message || "Failed to create delivery charge");
     }

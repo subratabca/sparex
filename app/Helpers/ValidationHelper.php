@@ -198,7 +198,7 @@ class ValidationHelper
         ];
     }
 
-    public static function documentValidationRules()
+    public static function documentValidationRules($requireImage1 = true, $requireImage2 = true)
     {
         $docValidationRules = [
             'firstName' => 'required|string|max:50',
@@ -211,8 +211,10 @@ class ValidationHelper
             'county_id' => 'required|integer|exists:counties,id',
             'city_id' => 'required|integer|exists:cities,id',
 
-            'doc_image1' => 'required|image|mimes:jpeg,png,jpg,pdf,webp|max:2048',
-            'doc_image2' => 'required|image|mimes:jpeg,png,jpg,pdf,webp|max:2048',
+            // Required only on first upload (no existing file). On a later update the
+            // image may be omitted to keep the current document.
+            'doc_image1' => ($requireImage1 ? 'required' : 'nullable') . '|file|mimes:jpeg,png,jpg,pdf,webp|max:2048',
+            'doc_image2' => ($requireImage2 ? 'required' : 'nullable') . '|file|mimes:jpeg,png,jpg,pdf,webp|max:2048',
         ];
 
         return $docValidationRules;
@@ -297,31 +299,26 @@ class ValidationHelper
     public static function mealKeywordValidationRules($isUpdate = false)
     {
         return [
-            'meal_type_id' => 'required|exists:meal_types,id',
             'name' => [
                 'required',
                 'string',
-                'max:255',
+                'max:50',
                 $isUpdate
-                    ? Rule::unique('meal_keywords', 'name')
-                        ->ignore(request()->id)
-                        ->where(fn($query) => $query->where('meal_type_id', request()->meal_type_id))
-                    : Rule::unique('meal_keywords', 'name')
-                        ->where(fn($query) => $query->where('meal_type_id', request()->meal_type_id)),
+                    ? Rule::unique('meal_keywords', 'name')->ignore(request()->id)
+                    : 'unique:meal_keywords,name',
             ],
+            'meal_type_id'   => ['required', 'array', 'min:1'],
+            'meal_type_id.*' => ['exists:meal_types,id'],
         ];
     }
 
     public static function mealDeliveryChargeValidationRules($id = null)
     {
         return [
-            'client_id' => ['required', 'exists:users,id'],
             'meal_type_id' => [
                 'required',
                 'exists:meal_types,id',
-                Rule::unique('meal_delivery_charges')
-                    ->where(fn($q) => $q->where('client_id', request()->client_id))
-                    ->ignore($id),
+                Rule::unique('meal_delivery_charges')->ignore($id),
             ],
 
             'inside_city_2km' => ['required', 'numeric', 'min:0'],

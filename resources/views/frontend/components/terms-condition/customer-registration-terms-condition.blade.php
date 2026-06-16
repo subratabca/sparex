@@ -17,7 +17,7 @@
             let segments = url.split('/');
             let name = decodeURIComponent(segments[segments.length - 1]);
 
-            let res = await axios.get("/user/registration/terms-conditions/info/" + name);
+            let res = await axios.get("/registration/terms-conditions/info/" + name);
             let data = res.data.data;
 
             document.getElementById('name').innerHTML = data.name + ' <span>Terms & Condition</span>';

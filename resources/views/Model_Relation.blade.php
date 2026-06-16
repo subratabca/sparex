@@ -18,7 +18,7 @@ class User extends BaseUserModel
 
     public function isClient()
     {
-        return $this->role === 'client';
+        return $this->role === 'restaurant';
     }
 
     public function isCustomer()

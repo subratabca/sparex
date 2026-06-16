@@ -39,7 +39,7 @@
 <script>
   async function getProfile(){
     try {
-      let res=await axios.get("/client/profile/info")
+      let res=await axios.get("/restaurant/profile/info")
       if(res.status === 200 && res.data['status']==='success'){
         let data = res.data['data'];
 
@@ -60,17 +60,16 @@
         errorToast(res.data['message'] || 'An unexpected error occurred');
       }
     }catch (error) {
-      if (error.response) {
-        const status = error.response.status;
-        if (status === 404) {
-          errorToast(error.response.data.message || 'User not found'); 
-        } else if (status === 500) {
-          errorToast(error.response.data.message || 'An error occurred on the server');
-        } else {
-          errorToast(error.response.data.message || 'An unexpected error occurred');
-        }
+      // Map 422 validation errors to inline fields, otherwise use the global handler (config.js)
+      if (error.response?.status === 422) {
+        const errors = error.response.data.errors || {};
+        Object.keys(errors).forEach(key => {
+          const el = document.getElementById(`${key}-error`);
+          if (el) el.innerText = errors[key][0];
+          else errorToast(errors[key][0]);
+        });
       } else {
-        errorToast('Network error: ' + error.message);
+        handleError(error);
       }
     }
   }

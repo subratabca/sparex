@@ -79,7 +79,7 @@ async function BrandInfo() {
         let segments = url.split('/');
         let id = segments[segments.length - 1];
 
-        let res = await axios.get("/client/show/brand/info/" + id);
+        let res = await axios.get("/restaurant/show/brand/info/" + id);
         document.getElementById('updateID').value = id;
         document.getElementById('name').value = res.data.data['name'];
 
@@ -146,10 +146,10 @@ async function updateBrandInfo() {
         };
 
         try {
-          const res = await axios.post('/client/update/brand', formData, config);
+          const res = await axios.post('/restaurant/update/brand', formData, config);
           if (res.status === 200 && res.data.status === 'success') {
             successToast(res.data.message || 'Request success');
-            window.location.href = '/client/brand/page';
+            window.location.href = '/restaurant/brand/page';
             resetCreateForm();
           } else {
             errorToast(res.data.message || "Request failed");

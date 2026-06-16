@@ -140,7 +140,7 @@ class AdminCustomerComplainController extends Controller
                     $customer->notify(new ReviewComplainAgainstCustomer($complain));
                 }
 
-                if ($client && $client->role === 'client') {
+                if ($client && $client->role === 'restaurant') {
                     $client->notify(new ReviewComplainAgainstCustomer($complain));
                 }
 
@@ -301,7 +301,7 @@ class AdminCustomerComplainController extends Controller
                     $customer->notify(new SolvedCustomerComplain($customerComplain));
                 }
 
-                if ($client && $client->role === 'client') {
+                if ($client && $client->role === 'restaurant') {
                     $client->notify(new SolvedCustomerComplain($customerComplain));
                 }
 

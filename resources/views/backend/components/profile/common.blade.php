@@ -49,7 +49,7 @@
         document.getElementById('user-mobile').innerText = data['mobile'];
         document.getElementById('user-email').innerText = data['email'];
 
-        if (window.location.href === "http://127.0.0.1:8000/admin/update/profile") {
+        if (window.location.pathname === '/admin/update/profile') {
           document.getElementById('email').value = data['email'];
           document.getElementById('firstName').value = data['firstName'];
           document.getElementById('lastName').value = data['lastName'];
@@ -61,30 +61,17 @@
 
           document.getElementById('mainImg').src = data['image'] ? "/upload/admin-profile/small/" + data['image'] : "/upload/no_image.jpg";
 
-          const countriesResponse = await axios.get('/countries');
-          const countrySelect = document.getElementById('countrySelect');
-          countrySelect.innerHTML = '<option value="">Select Country</option>';
-          countriesResponse.data.data.forEach(country => {
-              const option = document.createElement('option');
-              option.value = country.id;
-              option.textContent = country.name;
-              if (data.country_id === country.id) {
-                  option.selected = true;
-              }
-              countrySelect.appendChild(option);
+          // Country → County → City using the global loaders in config.js (with pre-selection)
+          await loadCountries(data.country_id || '', 'countrySelect');
+          await loadCounties(data.country_id || '', data.county_id || '', 'countySelect');
+          await loadCities(data.county_id || '', data.city_id || '', 'citySelect');
+
+          document.getElementById('countrySelect').addEventListener('change', async function () {
+              await loadCounties(this.value, '', 'countySelect');
+              document.getElementById('citySelect').innerHTML = '<option value="">Select City</option>';
           });
-
-
-          await loadCounties(data.country_id || '', data.county_id || '');
-          countrySelect.addEventListener('change', async function () {
-              await loadCounties(this.value);
-          });
-
-
-          await loadCities(data.county_id || '', data.city_id || '');
-          const countySelect = document.getElementById('countySelect');
-          countySelect.addEventListener('change', async function () {
-              await loadCities(this.value);
+          document.getElementById('countySelect').addEventListener('change', async function () {
+              await loadCities(this.value, '', 'citySelect');
           });
         }
       
@@ -93,54 +80,21 @@
         errorToast(res.data['message'] || 'An unexpected error occurred');
       }
     }catch (error) {
-      if (error.response) {
-        const status = error.response.status;
-        if (status === 404) {
-          errorToast(error.response.data.message || 'User not found'); 
-        } else if (status === 500) {
-          errorToast(error.response.data.message || 'An error occurred on the server');
-        } else {
-          errorToast(error.response.data.message || 'An unexpected error occurred');
-        }
+      // Map 422 validation errors to inline fields, otherwise use the global handler (config.js)
+      if (error.response?.status === 422) {
+        const errors = error.response.data.errors || {};
+        Object.keys(errors).forEach(key => {
+          const el = document.getElementById(`${key}-error`);
+          if (el) el.innerText = errors[key][0];
+          else errorToast(errors[key][0]);
+        });
       } else {
-        errorToast('Network error: ' + error.message);
+        handleError(error);
       }
     }
   }
 
 
-  async function loadCounties(countryId, selectedCountyId = '') {
-  const countySelect = document.getElementById('countySelect');
-  countySelect.innerHTML = '<option value="">Select County</option>';
-  if (countryId) {
-    const countiesResponse = await axios.get(`/counties/${countryId}`);
-    countiesResponse.data.data.forEach(county => {
-      const option = document.createElement('option');
-      option.value = county.id;
-      option.textContent = county.name;
-      if (selectedCountyId === county.id) {
-        option.selected = true;
-      }
-      countySelect.appendChild(option);
-    });
-  }
-}
-
-async function loadCities(countyId, selectedCityId = '') {
-  const citySelect = document.getElementById('citySelect');
-  citySelect.innerHTML = '<option value="">Select City</option>';
-  if (countyId) {
-    const citiesResponse = await axios.get(`/cities/${countyId}`);
-    citiesResponse.data.data.forEach(city => {
-      const option = document.createElement('option');
-      option.value = city.id;
-      option.textContent = city.name;
-      if (selectedCityId === city.id) {
-        option.selected = true;
-      }
-      citySelect.appendChild(option);
-    });
-  }
-}
+  // loadCountries / loadCounties / loadCities are provided globally by config.js
 </script>
 

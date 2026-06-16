@@ -227,7 +227,7 @@ async function loadClientPaymentDetails() {
     try {
         showLoader();
         const orderId  = window.location.pathname.split('/').pop();
-        const response = await axios.get(`/client/get/meal-order/details/${orderId}`);
+        const response = await axios.get(`/restaurant/get/meal-order/details/${orderId}`);
 
         if (response.status === 200 && response.data.status === 'success') {
             const data = response.data.data;
@@ -529,7 +529,7 @@ function populateStatusOptions(currentStatus) {
 // ===== Check & Open Modal =====
 async function checkAndOpenDeliveryModal(itemIds, orderId, groupName, mealDate, mealTypeId, currentStatus, currentStatusLabel, mealTime) {
     try {
-        const response = await axios.post(`/client/check/delivery-acceptance/${orderId}`, {
+        const response = await axios.post(`/restaurant/check/delivery-acceptance/${orderId}`, {
             meal_date:    mealDate,
             meal_type_id: mealTypeId,
         });
@@ -677,7 +677,7 @@ async function updateDeliveryStatus() {
         };
         if (pickupTime) requestData.pickup_time = pickupTime;
 
-        const response = await axios.post(`/client/update/delivery-status/${orderId}`, requestData);
+        const response = await axios.post(`/restaurant/update/delivery-status/${orderId}`, requestData);
 
         if (response.data.status === 'success') {
             bootstrap.Modal.getInstance(document.getElementById('deliveryStatusModal')).hide();

@@ -13,6 +13,8 @@ use App\Helpers\JWTToken;
 use App\Mail\OTPMail;
 use App\Models\User;
 use App\Models\TermCondition;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Exception;
 
 class AuthController extends Controller
@@ -199,7 +201,7 @@ class AuthController extends Controller
 
             $token = JWTToken::CreateToken($request->input('email'), $customer->id, $customer->role);
             session()->forget('url.intended');
-            $intendedUrl = session('url.intended', '/user/dashboard');
+            $intendedUrl = session('url.intended', '/dashboard');
 
             ActivityLogger::beforeAuthLog('login_success', 'Customer login successful.', $request, 'users');
             return response()->json([
@@ -207,7 +209,7 @@ class AuthController extends Controller
                 'message' => 'User Login Successful',
                 'token' => $token,
                 'redirect' => $intendedUrl,
-            ], 200)->cookie('token', $token, 60 * 24 * 30, null, null, false, false);
+            ], 200)->cookie('token', $token, 60 * 24 * 30, null, null, config('jwt.cookie_secure'), true, false, 'Lax');
 
             //cookie('token', $token, 60, null, null, false, false);
 
@@ -244,11 +246,12 @@ class AuthController extends Controller
             $email = $request->input('email');
             $otp = rand(1000, 9999);
 
-            $customer = User::where('email', '=', $email)->first();
+            $customer = User::where('role', 'customer')->where('email', '=', $email)->first();
 
             if ($customer) {
                 Mail::to($email)->send(new OTPMail($otp));
                 User::where('email', '=', $email)->update(['otp' => $otp]);
+                DB::table('password_reset_tokens')->where('email', $email)->delete();
                 ActivityLogger::beforeAuthLog(
                     'send_otp_success',
                     "OTP sent to email $email",
@@ -311,10 +314,14 @@ class AuthController extends Controller
 
             $email = $request->input('email');
             $otp = $request->input('otp');
-            $customer = User::where('email', '=', $email)->where('otp', '=', $otp)->first();
+            $customer = User::where('role', 'customer')->where('email', '=', $email)->where('otp', '=', $otp)->first();
 
             if ($customer !== null) {
                 User::where('email', '=', $email)->update(['otp' => '0']);
+                DB::table('password_reset_tokens')->updateOrInsert(
+                    ['email' => $email],
+                    ['token' => Str::random(64), 'created_at' => now()]
+                );
 
                 ActivityLogger::beforeAuthLog(
                     'otp_verified_success', 
@@ -379,10 +386,19 @@ class AuthController extends Controller
             $email = $request->input('email');
             $password = Hash::make($request->input('password'));
 
-            $customer = User::where('email', '=', $email)->first();
+            $customer = User::where('role', 'customer')->where('email', '=', $email)->first();
 
             if ($customer) {
+                $resetRow = DB::table('password_reset_tokens')->where('email', $email)->first();
+                if (!$resetRow || \Carbon\Carbon::parse($resetRow->created_at)->addMinutes(15)->isPast()) {
+                    return response()->json([
+                        'status' => 'fail',
+                        'message' => 'OTP verification required. Please verify the OTP before resetting your password.',
+                    ], 403);
+                }
+
                 User::where('email', '=', $email)->update(['password' => $password]);
+                DB::table('password_reset_tokens')->where('email', $email)->delete();
                 ActivityLogger::beforeAuthLog('forgot_password_success', 'Password reset successful', $request, 'users');
                 return response()->json([
                     'status' => 'success',

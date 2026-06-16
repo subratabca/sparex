@@ -214,7 +214,7 @@ class MealStoreController extends Controller
                     'details_per_date' => $breakdown['charges_per_date'],
                 ],
             ], $extraData),
-            'redirect_url' => '/user/meal-order'
+            'redirect_url' => '/meal-order'
         ], 201);
     }
 

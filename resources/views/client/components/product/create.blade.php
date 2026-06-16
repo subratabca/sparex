@@ -4,7 +4,7 @@
       <div class="card-header"><h5>Create New Product</h5>
         @if(isset($client) && $client->status == 0)
         <p><span class="text-danger">To upload an product, you must submit the necessary documents.</span> 
-          <a href="/client/document" style="color: green; text-decoration: none;">Upload Your Document Here</a>
+          <a href="/restaurant/document" style="color: green; text-decoration: none;">Upload Your Document Here</a>
         </p>
         @endif
       </div>
@@ -349,7 +349,7 @@
             <div class="col-md-12 p-4">
               <div class="form-check">
                 <input class="form-check-input" type="checkbox" value="" id="accept_tnc" />
-                <label class="form-check-label" for="defaultCheck3"><a href="/client/product/upload/terms-conditions/product_upload" target="_blank">Accept T&C For Product Upload</a><span class="text-danger">*</span></label>
+                <label class="form-check-label" for="defaultCheck3"><a href="/restaurant/product/upload/terms-conditions/product_upload" target="_blank">Accept T&C For Product Upload</a><span class="text-danger">*</span></label>
               </div>
               <span class="error-message text-danger" id="accept_tnc-error"></span>
             </div>
@@ -570,7 +570,7 @@ document.addEventListener("DOMContentLoaded", async function() {
 
   // 🔹 Load profile data and prefill form
   try {
-    const profileRes = await axios.get('/client/profile/info');
+    const profileRes = await axios.get('/restaurant/profile/info');
     if (profileRes.data.status === 'success') {
       const user = profileRes.data.data;
       //console.log('-----',user);
@@ -891,59 +891,32 @@ if (categoryText === 'food') {
 
   //console.log('---------------',formData);
 
+  showLoader();
   try {
-    let res = await axios.post("/client/store/product", formData, {
+    let res = await axios.post("/restaurant/store/product", formData, {
       headers: { 'content-type': 'multipart/form-data' },
     });
 
     if (res.status === 201 && res.data.status === 'success') {
       successToast(res.data.message || 'Request successful');
-      window.location.href = '/client/product-list';
+      window.location.href = '/restaurant/product-list';
       resetCreateForm();
     } else {
       errorToast(res.data.message || "Request failed");
     }
   } catch (error) {
-      handleError(error);
-  } finally {
-      hideLoader(); 
-  }
-}
-
-function handleError(error) {
-  document.querySelectorAll(".error-text").forEach(el => el.innerText = '');
-
-  let message = 'An unexpected error occurred';
-
-  if (error.response) {
-    const status = error.response.status;
-    const serverMessage = error.response.data?.message;
-
-    switch (status) {
-      case 422:
-        if (error.response.data.errors) {
-          Object.entries(error.response.data.errors).forEach(([field, messages]) => {
-            const errorElement = document.getElementById(`${field}-error`);
-            if (errorElement) {
-              errorElement.innerText = messages[0];
-            }
+      if (error.response?.status === 422) {
+          Object.entries(error.response.data.errors).forEach(([key, val]) => {
+              const span = document.getElementById(`${key.split('.')[0]}-error`);
+              if (span) span.innerText = val[0];
+              else errorToast(val[0]);
           });
-        }
-        message = serverMessage || 'Validation failed';
-        break;
-      case 500:
-        message = serverMessage || 'Server error. Please try again later.';
-        break;
-      default:
-        message = serverMessage || message;
-    }
-  } else if (error.request) {
-    message = 'No response received from the server.';
-  } else {
-    message = error.message || message;
+      } else {
+          handleError(error);
+      }
+  } finally {
+      hideLoader();
   }
-
-  errorToast(message);
 }
 
 document.getElementById("hasVariants").addEventListener("change", function() {

@@ -55,7 +55,7 @@
                         <tr>
                             <td>${index + 1}</td>
                             <td>
-                                <a href="/client/customer/details/${item.customer.id}" target="_blank" title="Customer details">
+                                <a href="/restaurant/customer/details/${item.customer.id}" target="_blank" title="Customer details">
                                    ${customerName}
                                 </a>
                             </td>

@@ -25,7 +25,9 @@ class MealPlanController extends Controller
     public function getMealKeywordByType($mealTypeId)
     {
         try {
-            $datas = MealKeyword::where('meal_type_id', $mealTypeId)->get();
+            $datas = MealKeyword::whereHas('mealTypes', function ($q) use ($mealTypeId) {
+                $q->where('meal_types.id', $mealTypeId);
+            })->get();
             return response()->json(['status' => 'success', 'data' => $datas], 200);
         } catch (Exception $e) {
             return response()->json(['status' => 'error', 'message' => $e->getMessage()], 500);

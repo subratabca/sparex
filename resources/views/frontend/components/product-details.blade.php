@@ -96,7 +96,7 @@
 
                     <div class="text-center my-2">OR</div>
                     
-                    <a href="http://127.0.0.1:8000/user/my-cart" class="btn btn-outline-success mt-2 w-100">
+                    <a href="http://127.0.0.1:8000/my-cart" class="btn btn-outline-success mt-2 w-100">
                         <span class="mdi mdi-cart-arrow-right"></span> CONTINUE SHOPPING
                     </a>
                 </div>
@@ -309,7 +309,7 @@ async function addToCart() {
     showLoader();
     try {
         // Get fresh profile data
-        const profileRes = await axios.get("/user/profile/info");
+        const profileRes = await axios.get("/profile/info");
         if (profileRes.status === 200 && profileRes.data.status === 'success') {
             const customerData = profileRes.data.data;
             const customerStatus = customerData.status;
@@ -317,7 +317,7 @@ async function addToCart() {
             // Check document submission status
             if (customerStatus === 0) {
                 statusMessage.innerHTML = `
-                  <div class="text-danger d-flex justify-content-center"><span class="text-danger me-2">To order an item, you must submit the necessary documents. <a href="/user/document" style="color: green; text-decoration: none;">Upload Your Document Here</a></span></div>
+                  <div class="text-danger d-flex justify-content-center"><span class="text-danger me-2">To order an item, you must submit the necessary documents. <a href="/document" style="color: green; text-decoration: none;">Upload Your Document Here</a></span></div>
                 `;
                 hideLoader();
                 return;
@@ -350,7 +350,7 @@ async function addToCart() {
                 formData.append('variant_id', variantId);
             }
 
-            const res = await axios.post('/user/cart/add', formData);
+            const res = await axios.post('/cart/add', formData);
             if (res.status === 200 && res.data.status === 'success') {
                 successToast(res.data.message || 'Item added to cart');
                 updateCartCount();
@@ -381,7 +381,7 @@ function updateMainImage(imageSrc) {
 async function getProfile() {
   showLoader();
   try {
-    let res = await axios.get("/user/profile/info");
+    let res = await axios.get("/profile/info");
 
     if (res.status === 200 && res.data.status === 'success') {
       let customerData = res.data.data;
@@ -407,7 +407,7 @@ async function getProfile() {
           <span class="text-danger">
           To order an item, you must submit the necessary documents.
           </span> 
-          <a href="/user/document" style="color: green; text-decoration: none;">
+          <a href="/document" style="color: green; text-decoration: none;">
           Upload Your Document Here
           </a>
           </h5>
@@ -421,7 +421,7 @@ async function getProfile() {
         //   <span class="text-danger">
         //   To order an item, you must submit the necessary documents.
 
-        //   <a href="/user/document" style="color: green; text-decoration: none;">
+        //   <a href="/document" style="color: green; text-decoration: none;">
         //   Upload Your Document Here
         //   </a>
         //   </p>
@@ -448,7 +448,7 @@ async function getProfile() {
 async function shareToFacebook(event) {
   event.preventDefault();
   try {
-    let res = await axios.post(`/user/facebook/share/${id}`);
+    let res = await axios.post(`/facebook/share/${id}`);
 
     if (res.status === 200) {
       successToast(res.data.message || 'Shared successfully to Facebook.');
@@ -458,7 +458,7 @@ async function shareToFacebook(event) {
   } catch (error) {
     if (error.response) {
       if (error.response.status === 401) {
-        window.location.href = '/user/login';
+        window.location.href = '/login';
       } else if (error.response.status === 500) {
         errorToast(error.response.data.error || "An internal server error occurred while sharing to Facebook.");
       } else if (error.response.status === 400) {
@@ -476,7 +476,7 @@ async function shareToFacebook(event) {
 async function shareFacebookURL(event) {
   event.preventDefault();
   try {
-    const response = await axios.post(`/user/facebook/url/share/${id}`);
+    const response = await axios.post(`/facebook/url/share/${id}`);
 
     if (response.status === 200) {
       const shareUrl = response.data.facebook_share_url;
@@ -488,7 +488,7 @@ async function shareFacebookURL(event) {
   } catch (error) {
     if (error.response) {
       if (error.response.status === 401) {
-        window.location.href = '/user/login';
+        window.location.href = '/login';
       } else if (error.response.status === 500) {
         errorToast(error.response.data.error || "An internal server error occurred while sharing to Facebook.");
       } else if (error.response.status === 400) {

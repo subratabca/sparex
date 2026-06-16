@@ -10,19 +10,8 @@
 
           <div class="row">
 
-            <!-- Client Dropdown -->
-            <div class="col-md-4">
-              <div class="form-floating form-floating-outline">
-                <select id="client_id" class="form-select w-100">
-                  <option value="" disabled>Select Client</option>
-                </select>
-                <label for="client_id">Select Client<span class="text-danger">*</span></label>
-              </div>
-              <span class="error-message text-danger" id="client_id-error"></span>
-            </div>
-
             <!-- Meal Type Dropdown -->
-            <div class="col-md-4">
+            <div class="col-md-6">
               <div class="form-floating form-floating-outline">
                 <select id="meal_type_id" class="form-select w-100">
                   <option value="" disabled>Select Meal Type</option>
@@ -89,7 +78,6 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", async function () {
-    await loadClients();
     await loadMealTypes();
     await loadExistingData();
 });
@@ -98,25 +86,6 @@ function toTitleCase(str) {
     return str.replace(/\w\S*/g, (txt) => {
         return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
     });
-}
-
-async function loadClients() {
-    try {
-        const res = await axios.get("/clients");
-        const dropdown = document.getElementById("client_id");
-
-        res.data.data.forEach(client => {
-            let option = document.createElement("option");
-            option.value = client.id;
-            //option.text = client.firstName + " " + client.lastName;
-            let fullName = `${client.firstName} ${client.lastName}`;
-            option.text = toTitleCase(fullName); 
-            dropdown.appendChild(option);
-        });
-
-    } catch (error) {
-        errorToast("Failed to load clients");
-    }
 }
 
 async function loadMealTypes() {
@@ -148,7 +117,6 @@ async function loadExistingData() {
         let res = await axios.get("/admin/get/meal-delivery/charge/details/" + id);
         let data = res.data.data;
 
-        document.getElementById("client_id").value = data.client_id;
         document.getElementById("meal_type_id").value = data.meal_type_id;
 
         document.getElementById("inside_city_2km").value = data.inside_city_2km;
@@ -171,7 +139,6 @@ async function updateInfo() {
 
     const formData = new FormData();
     formData.append("id", id);
-    formData.append("client_id", document.getElementById("client_id").value);
     formData.append("meal_type_id", document.getElementById("meal_type_id").value);
     formData.append("inside_city_2km", document.getElementById("inside_city_2km").value);
     formData.append("inside_city_5km", document.getElementById("inside_city_5km").value);
@@ -191,13 +158,13 @@ async function updateInfo() {
     } catch (error) {
         if (error.response?.status === 422) {
             Object.entries(error.response.data.errors).forEach(([key, val]) => {
-                let span = document.getElementById(`${key}-error`);
+                const span = document.getElementById(`${key}-error`);
                 if (span) span.innerText = val[0];
+                else errorToast(val[0]);
             });
-            return;
+        } else {
+            handleError(error);
         }
-
-        errorToast("Update failed");
     }
     finally {
         hideLoader();

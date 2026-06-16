@@ -140,7 +140,7 @@ class PagesController extends Controller
     public function getClients(Request $request)
     {
         try {
-            $clients = User::where('role','client')->where('is_email_verified',1)->latest()->get();
+            $clients = User::where('role','restaurant')->where('is_email_verified',1)->latest()->get();
 
             return response()->json([
                 'status' => 'success',

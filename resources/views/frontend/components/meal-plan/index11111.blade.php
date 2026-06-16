@@ -420,7 +420,7 @@ async function loadMealKeywords(mealTypeId) {
     container.innerHTML   = `<div class="text-muted">Loading keywords...</div>`;
     try {
         showLoader();
-        const res = await axios.get(`/user/get/meal-keywords/${mealTypeId}`);
+        const res = await axios.get(`/get/meal-keywords/${mealTypeId}`);
         if (res.status === 200 && res.data.status === 'success' && res.data.data.length > 0) {
             container.innerHTML = '';
             res.data.data.forEach(kw => {
@@ -472,7 +472,7 @@ async function searchProducts(keywords, page = 1) {
     list.innerHTML = `<div class="text-muted text-center py-3">Searching products...</div>`;
     try {
         showLoader();
-        const res = await axios.post(`/user/search/products?page=${page}`, {
+        const res = await axios.post(`/search/products?page=${page}`, {
             keywords,
             meal_type_id: selectedMealTypeId,
             latitude:     userLatitude,
@@ -514,7 +514,7 @@ function renderProducts(products) {
         list.insertAdjacentHTML('beforeend', `
             <div class="col-md-4 col-sm-6">
                 <div class="card h-100 shadow-sm border-0 rounded-3">
-                    <a href="/user/meal/details/${p.id}">
+                    <a href="/meal/details/${p.id}">
                         <img src="{{ asset('upload/product/medium') }}/${p.image}"
                              class="card-img-top rounded-top-3"
                              alt="${p.name}"
@@ -623,7 +623,7 @@ document.getElementById('confirm-add-meal').addEventListener('click', async () =
 
     try {
         showLoader();
-        const res = await axios.post('/user/store/meal-cart', {
+        const res = await axios.post('/store/meal-cart', {
             product_id:   selectedProduct.id,
             meal_type_id: mealTypeId,
             meal_date:    selectedDate,
@@ -706,7 +706,7 @@ async function generateAiPlan() {
     document.getElementById('ai-result-section').style.display  = 'none';
 
     try {
-        const res = await axios.post('/user/generate/meal-suggestion', {
+        const res = await axios.post('/generate/meal-suggestion', {
             gender, age, weight, height, description
         });
 
@@ -796,7 +796,7 @@ function renderAiPlan(data) {
                                 ${p.client_name ? `<small class="text-muted"> • ${p.client_name}</small>` : ''}
                             </div>
                         </div>
-                        <a href="/user/meal/details/${p.id}" class="btn btn-sm btn-outline-primary rounded-pill">View</a>
+                        <a href="/meal/details/${p.id}" class="btn btn-sm btn-outline-primary rounded-pill">View</a>
                     </li>`;
             }).join('');
         } else {

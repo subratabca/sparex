@@ -35,7 +35,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/user/get/orders");
+            let res = await axios.get("/get/orders");
             if (res.status === 200 && res.data.status === 'success') {
                 //console.log('--------',res);
                 let tableList = $("#tableList");
@@ -92,7 +92,7 @@
                                 <span class="badge ${badgeClass}">${status}</span>
                             </td>
                             <td>
-                                <a href="/user/order/details/${item.id}" class="btn btn-sm btn-outline-primary">
+                                <a href="/order/details/${item.id}" class="btn btn-sm btn-outline-primary">
                                     <span class="mdi mdi-eye-circle"></span>
                                 </a>
                             </td>

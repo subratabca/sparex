@@ -51,7 +51,7 @@ async function loadMealCart() {
     try {
         showLoader();
 
-        const response = await axios.get('/user/get/meal-cart');
+        const response = await axios.get('/get/meal-cart');
 
         if (response.status === 200 && response.data.status === 'success') {
             const mealCart = response.data.data.meal_cart;
@@ -201,7 +201,8 @@ function renderMealSummary(summary) {
                 Subtotal: <span>$${parseFloat(summary.subtotal).toFixed(2)}</span>
             </li>
             <li class="list-group-item d-flex justify-content-between">
-                Tax: <span>$${parseFloat(summary.tax).toFixed(2)}</span>
+                Tax (${(summary.tax_rate * 100).toFixed(0)}%):
+                <span>$${parseFloat(summary.tax).toFixed(2)}</span>
             </li>
             <li class="list-group-item d-flex justify-content-between text-info">
                 Service Fee (${(summary.service_fee_rate * 100).toFixed(0)}%):
@@ -234,7 +235,7 @@ async function updateMealItem(id, quantity) {
     }
     try {
         showLoader();
-        const response = await axios.post('/user/meal-cart/update', { 
+        const response = await axios.post('/meal-cart/update', { 
             meal_item_id: id, 
             quantity 
         });
@@ -257,7 +258,7 @@ async function removeMealItem(id) {
 
     try {
         showLoader();
-        const response = await axios.post('/user/meal-cart/remove', { meal_item_id: id });
+        const response = await axios.post('/meal-cart/remove', { meal_item_id: id });
         if (response.data.status === 'success') {
             await loadMealCart();
             await updateMealCartCount();

@@ -63,7 +63,7 @@
 
       if (uploadedImageUrl) {
         try {
-          await axios.post('/user/delete-customer-complain-editor-image', { image_url: uploadedImageUrl });
+          await axios.post('/delete-customer-complain-editor-image', { image_url: uploadedImageUrl });
           uploadedImageUrl = null;  
           uploadedImageIndex = null;
         } catch (error) {
@@ -91,14 +91,14 @@
 
         try {
           if (uploadedImageUrl) {
-            await axios.post('/user/delete-customer-complain-editor-image', { image_url: uploadedImageUrl });
+            await axios.post('/delete-customer-complain-editor-image', { image_url: uploadedImageUrl });
 
             if (uploadedImageIndex !== null) {
               quill.deleteText(uploadedImageIndex, 1); 
             }
           }
 
-          const res = await axios.post('/user/upload-customer-complain-editor-image', formData, {
+          const res = await axios.post('/upload-customer-complain-editor-image', formData, {
             headers: {
               'Content-Type': 'multipart/form-data',
             },
@@ -154,12 +154,12 @@
       showLoader();
 
       try {
-        let res = await axios.post("/user/store-customer-complain-appeal-info", formData, config);
+        let res = await axios.post("/store-customer-complain-appeal-info", formData, config);
         if (res.status === 201) {
           successToast(res.data.message || 'Complain feedback given successfully');
           uploadedImageUrl = null;
           uploadedImageIndex = null;
-          window.location.href = '/user/customer-complain-list';
+          window.location.href = '/customer-complain-list';
           document.getElementById('save-form').reset();
           $('#reply-modal').modal('hide');
         } else {
@@ -196,7 +196,7 @@
   window.addEventListener('beforeunload', async (event) => {
     if (uploadedImageUrl) {
       try {
-        await axios.post('/user/delete-customer-complain-editor-image', { image_url: uploadedImageUrl });
+        await axios.post('/delete-customer-complain-editor-image', { image_url: uploadedImageUrl });
       } catch (error) {
         console.error('Failed to delete image on unload:', error);
       }

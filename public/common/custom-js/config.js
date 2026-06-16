@@ -31,7 +31,7 @@ function errorToast(msg) {
 
 async function updateMealCartCount() {
     try {
-        const res = await axios.get('/user/meal-cart/count');
+        const res = await axios.get('/meal-cart/count');
         if (res.status === 200) {
             const count = res.data.count;
             const cartCountElem = document.getElementById('mealCartCount');
@@ -54,15 +54,18 @@ async function updateMealCartCount() {
 }
 
 // ===== Global Location Loaders =====
-async function loadCountries(selectedId = '') {
+// String() comparison keeps pre-selection working whether the API returns
+// ids as numbers or strings. dropdownId lets any view reuse these (default
+// ids: country / county / city).
+async function loadCountries(selectedId = '', dropdownId = 'country') {
     try {
-        const response = await axios.get('/countries');
-        const dropdown = document.getElementById('country');
+        const dropdown = document.getElementById(dropdownId);
         if (!dropdown) return;
         dropdown.innerHTML = '<option value="">Select Country</option>';
+        const response = await axios.get('/countries');
         response.data.data.forEach(country => {
             const option = new Option(country.name, country.id);
-            option.selected = parseInt(country.id) === parseInt(selectedId);
+            option.selected = String(country.id) === String(selectedId);
             dropdown.add(option);
         });
     } catch (error) {
@@ -70,16 +73,16 @@ async function loadCountries(selectedId = '') {
     }
 }
 
-async function loadCounties(countryId, selectedId = '') {
+async function loadCounties(countryId, selectedId = '', dropdownId = 'county') {
     try {
-        const dropdown = document.getElementById('county');
+        const dropdown = document.getElementById(dropdownId);
         if (!dropdown) return;
         dropdown.innerHTML = '<option value="">Select County</option>';
         if (!countryId) return;
         const response = await axios.get(`/counties/${countryId}`);
         response.data.data.forEach(county => {
             const option = new Option(county.name, county.id);
-            option.selected = parseInt(county.id) === parseInt(selectedId);
+            option.selected = String(county.id) === String(selectedId);
             dropdown.add(option);
         });
     } catch (error) {
@@ -87,20 +90,58 @@ async function loadCounties(countryId, selectedId = '') {
     }
 }
 
-async function loadCities(countyId, selectedId = '') {
+async function loadCities(countyId, selectedId = '', dropdownId = 'city') {
     try {
-        const dropdown = document.getElementById('city');
+        const dropdown = document.getElementById(dropdownId);
         if (!dropdown) return;
         dropdown.innerHTML = '<option value="">Select City</option>';
         if (!countyId) return;
         const response = await axios.get(`/cities/${countyId}`);
         response.data.data.forEach(city => {
             const option = new Option(city.name, city.id);
-            option.selected = parseInt(city.id) === parseInt(selectedId);
+            option.selected = String(city.id) === String(selectedId);
             dropdown.add(option);
         });
     } catch (error) {
         handleError(error);
+    }
+}
+
+/**
+ * Wire up a country → county → city cascade (with optional pre-selected values)
+ * in one call. Reusable across any form.
+ *
+ * await initLocationCascade({
+ *     countryId: 'countrySelect', countyId: 'countySelect', cityId: 'citySelect',
+ *     country: userData.country_id, county: userData.county_id, city: userData.city_id
+ * });
+ */
+async function initLocationCascade(opts = {}) {
+    const cfg = {
+        countryId: 'country', countyId: 'county', cityId: 'city',
+        country: '', county: '', city: '',
+        ...opts,
+    };
+
+    const countryEl = document.getElementById(cfg.countryId);
+    if (!countryEl) return;
+    const countyEl = document.getElementById(cfg.countyId);
+    const cityEl   = document.getElementById(cfg.cityId);
+
+    // Initial load + pre-selection
+    await loadCountries(cfg.country, cfg.countryId);
+    await loadCounties(cfg.country, cfg.county, cfg.countyId);
+    await loadCities(cfg.county, cfg.city, cfg.cityId);
+
+    // Reset downstream selects when a parent changes
+    countryEl.addEventListener('change', async function () {
+        await loadCounties(this.value, '', cfg.countyId);
+        if (cityEl) cityEl.innerHTML = '<option value="">Select City</option>';
+    });
+    if (countyEl) {
+        countyEl.addEventListener('change', async function () {
+            await loadCities(this.value, '', cfg.cityId);
+        });
     }
 }
 
@@ -119,7 +160,7 @@ function handleError(error) {
                 break;
             case 401:
                 errorToast(message || 'Unauthorized. Please login.');
-                setTimeout(() => window.location.href = '/user/login', 2000);
+                setTimeout(() => window.location.href = (data?.redirect || '/login'), 2000);
                 break;
             case 403:
                 errorToast(message || 'Forbidden. You do not have permission.');

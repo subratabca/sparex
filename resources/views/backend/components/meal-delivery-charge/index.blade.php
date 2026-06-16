@@ -15,7 +15,6 @@
             <thead>
                 <tr>
                     <th>Sl</th>
-                    <th>Client</th>
                     <th>Meal Type</th>
                     <th>2 km</th>
                     <th>5 km</th>
@@ -48,18 +47,13 @@ async function getList() {
 
             res.data.data.forEach(function (item, index) {
 
-                let clientName = item.client?.firstName 
-                                ? (item.client.firstName + " " + item.client.lastName)
-                                : "-";
-
-                let mealTypeName = item.meal_type?.name 
+                let mealTypeName = item.meal_type?.name
                                 ? item.meal_type.name.charAt(0).toUpperCase() + item.meal_type.name.slice(1)
                                 : "-";
 
                 let row = `
                     <tr>
                         <td>${index + 1}</td>
-                        <td>${clientName}</td>
                         <td>${mealTypeName}</td>
                         <td>${item.inside_city_2km}</td>
                         <td>${item.inside_city_5km}</td>
@@ -121,36 +115,5 @@ function attachEventListeners() {
         $("#deleteID").val(id);
         $("#delete-modal").modal('show');
     });
-}
-
-
-function handleError(error) {
-
-    let message = "An unexpected error occurred.";
-
-    if (error.response) {
-        const { status, data } = error.response;
-
-        switch (status) {
-            case 404:
-                message = data?.message || "Data not found.";
-                break;
-
-            case 500:
-                message = data?.error || "Internal server error.";
-                break;
-
-            default:
-                message = data?.message || message;
-        }
-    } 
-    else if (error.request) {
-        message = "No response from server.";
-    } 
-    else {
-        message = error.message;
-    }
-
-    errorToast(message);
 }
 </script>

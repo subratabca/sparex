@@ -156,7 +156,7 @@ document.addEventListener("DOMContentLoaded", async function () {
         await settingInfo();
 
         // ✅ Secure verification: ask server who the user is
-        const response = await axios.get('/user/get/profile/info');
+        const response = await axios.get('/get/profile/info');
 
         if (response.status === 200 && response.data) {
             const userData = response.data.data ?? response.data;
@@ -174,7 +174,7 @@ document.addEventListener("DOMContentLoaded", async function () {
             await updateMealCartCount();
 
             // Load notifications
-            const notifResponse = await axios.get('/user/limited/notification/list');
+            const notifResponse = await axios.get('/limited/notification/list');
             if (notifResponse.status === 200) {
                 const unread = notifResponse.data.unreadNotifications || [];
                 const read = notifResponse.data.readNotifications || [];
@@ -263,15 +263,15 @@ function getNotificationLink(notification) {
     const data = notification.data;
     
     if (data.customer_id) {
-        return `/user/details/${data.customer_id}?notification_id=${notification.id}`;
+        return `/details/${data.customer_id}?notification_id=${notification.id}`;
     } else if (data.meal_order_id) {
-        return `/user/meal-order/details/${data.meal_order_id}?notification_id=${notification.id}`; // Fixed: notification.id not notificationId
+        return `/meal-order/details/${data.meal_order_id}?notification_id=${notification.id}`; // Fixed: notification.id not notificationId
     } else if (data.order_id) {
-        return `/user/order/details/${data.order_id}?notification_id=${notification.id}`;
+        return `/order/details/${data.order_id}?notification_id=${notification.id}`;
     } else if (data.complaint_id) {
-        return `/user/complaint/details/${data.complaint_id}?notification_id=${notification.id}`;
+        return `/complaint/details/${data.complaint_id}?notification_id=${notification.id}`;
     } else if (data.customer_complain_id) {
-        return `/user/customer-complain-details/${data.customer_complain_id}?notification_id=${notification.id}`;
+        return `/customer-complain-details/${data.customer_complain_id}?notification_id=${notification.id}`;
     } else {
         return '#';
     }
@@ -351,28 +351,28 @@ async function displayNotifications222(unreadNotifications, readNotifications) {
         
         // Check for different notification types
         if (notificationData.meal_order_id) {
-            return `/user/meal-order/details/${notificationData.meal_order_id}?notification_id=${notification.id}`;
+            return `/meal-order/details/${notificationData.meal_order_id}?notification_id=${notification.id}`;
         } else if (notificationData.order_id) {
-            return `/user/order/details/${notificationData.order_id}?notification_id=${notification.id}`;
+            return `/order/details/${notificationData.order_id}?notification_id=${notification.id}`;
         } else if (notificationData.customer_id) {
-            return `/user/details/${notificationData.customer_id}?notification_id=${notification.id}`;
+            return `/details/${notificationData.customer_id}?notification_id=${notification.id}`;
         } else if (notificationData.complaint_id) {
-            return `/user/complaint/details/${notificationData.complaint_id}?notification_id=${notification.id}`;
+            return `/complaint/details/${notificationData.complaint_id}?notification_id=${notification.id}`;
         } else if (notificationData.customer_complain_id) {
-            return `/user/customer-complain-details/${notificationData.customer_complain_id}?notification_id=${notification.id}`;
+            return `/customer-complain-details/${notificationData.customer_complain_id}?notification_id=${notification.id}`;
         }
         
         // Fallback: try direct properties if nested structure doesn't exist
         if (data.meal_order_id) {
-            return `/user/meal-order/details/${data.meal_order_id}?notification_id=${notification.id}`;
+            return `/meal-order/details/${data.meal_order_id}?notification_id=${notification.id}`;
         } else if (data.order_id) {
-            return `/user/order/details/${data.order_id}?notification_id=${notification.id}`;
+            return `/order/details/${data.order_id}?notification_id=${notification.id}`;
         } else if (data.customer_id) {
-            return `/user/details/${data.customer_id}?notification_id=${notification.id}`;
+            return `/details/${data.customer_id}?notification_id=${notification.id}`;
         } else if (data.complaint_id) {
-            return `/user/complaint/details/${data.complaint_id}?notification_id=${notification.id}`;
+            return `/complaint/details/${data.complaint_id}?notification_id=${notification.id}`;
         } else if (data.customer_complain_id) {
-            return `/user/customer-complain-details/${data.customer_complain_id}?notification_id=${notification.id}`;
+            return `/customer-complain-details/${data.customer_complain_id}?notification_id=${notification.id}`;
         }
         
         return '#';
@@ -477,7 +477,7 @@ async function displayNotifications222(unreadNotifications, readNotifications) {
 
 async function deleteNotification(notificationId) {
     try {
-        const response = await axios.delete(`/user/delete/notification/${notificationId}`);
+        const response = await axios.delete(`/delete/notification/${notificationId}`);
 
         if (response.status === 200) {
             successToast(response.data.message || 'Request success');
@@ -492,7 +492,7 @@ async function deleteNotification(notificationId) {
 
 async function markAllAsRead() {
     try {
-        const response = await axios.get('/user/markAsRead');
+        const response = await axios.get('/markAsRead');
 
         if (response.status === 200 && response.data.status === 'success') {
             document.getElementById('notificationCount').innerText = response.data.unreadCount === 0 ? '0 New' : `${response.data.unreadCount} New`;
@@ -518,7 +518,7 @@ async function handleLogout() {
         let res = await axios.get("{{ route('logout') }}");
         if (res.status === 200) {
             successToast(res.data.message || 'Successfully logged out');
-            window.location.href = '/user/login';
+            window.location.href = '/login';
         } else {
             errorToast(res.data.message || "Request failed");
         }
@@ -531,7 +531,7 @@ async function handleLogout() {
 
 async function updateCartCount() {
     try {
-        const res = await axios.get('/user/cart/count');
+        const res = await axios.get('/cart/count');
         if (res.status === 200) {
             const count = res.data.count;
             const cartCountElem = document.getElementById('cartCount');
@@ -555,7 +555,7 @@ async function updateCartCount() {
 
 async function updateWishlistCount() {
     try {
-        const response = await axios.get('/user/wishlist/count');
+        const response = await axios.get('/wishlist/count');
         if (response.data.status === 'success') {
             const count = response.data.count;
             const wishlistCountElem = document.getElementById('wishlistCount');

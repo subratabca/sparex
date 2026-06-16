@@ -56,36 +56,31 @@
       if (email.length === 0) {
           errorToast('Please enter your email address');
       } else {
+          showLoader();
           try {
-              let res = await axios.post('/client/send-otp', { email: email });
+              let res = await axios.post('/restaurant/send-otp', { email: email });
 
               if (res.status === 200 && res.data['status'] === 'success') {
                   successToast(res.data['message']);
                   sessionStorage.setItem('email', email);
                   setTimeout(function () {
-                      window.location.href = '/client/verifyOtp';
+                      window.location.href = '/restaurant/verifyOtp';
                   }, 1000);
               } else {
                   errorToast(res.data['message']);
               }
           } catch (error) {
-              if (error.response) {
-                  if (error.response.status === 422) {
-                      const errors = error.response.data.errors; 
-                      for (const key in errors) {
-                          if (errors.hasOwnProperty(key)) {
-                              const errorMessage = errors[key][0];
-                              document.getElementById(`${key}-error`).innerText = errorMessage;
-                          }
-                      }
-                  } else if (error.response.status === 401) {
-                      errorToast(error.response.data.message || 'User not found');
-                  } else {
-                      errorToast(error.response.data.message || 'An unexpected error occurred.');
-                  }
+              if (error.response?.status === 422) {
+                  Object.entries(error.response.data.errors).forEach(([key, val]) => {
+                      const span = document.getElementById(`${key}-error`);
+                      if (span) span.innerText = val[0];
+                      else errorToast(val[0]);
+                  });
               } else {
-                  errorToast('An unexpected error occurred.');
+                  errorToast(error.response?.data?.message || 'An unexpected error occurred.');
               }
+          } finally {
+              hideLoader();
           }
       }
   }

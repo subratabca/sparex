@@ -108,6 +108,7 @@
       errorToast('Password is required')
     }
     else{
+      showLoader();
       try {
         let res = await axios.post("/admin/registration", {
           email: email,
@@ -125,17 +126,17 @@
           errorToast(res.data['message']);
         }
       } catch (error) {
-        if (error.response && error.response.status === 422) {
-          const errors = error.response.data.errors;
-          for (const key in errors) {
-            if (errors.hasOwnProperty(key)) {
-              const errorMessage = errors[key][0]; 
-              document.getElementById(`${key}-error`).innerText = errorMessage; 
-            }
-          }
+        if (error.response?.status === 422) {
+          Object.entries(error.response.data.errors).forEach(([key, val]) => {
+            const span = document.getElementById(`${key}-error`);
+            if (span) span.innerText = val[0];
+            else errorToast(val[0]);
+          });
         } else {
-          errorToast(error.response ? error.response.data.message : 'Registration failed');
+          errorToast(error.response?.data?.message || 'Registration failed');
         }
+      } finally {
+        hideLoader();
       }
     }
   }

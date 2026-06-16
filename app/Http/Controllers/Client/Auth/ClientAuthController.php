@@ -13,6 +13,8 @@ use App\Helpers\JWTToken;
 use App\Mail\OTPMail;
 use App\Models\User;
 use App\Models\TermCondition;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Exception;
 
 class ClientAuthController extends Controller
@@ -87,7 +89,7 @@ class ClientAuthController extends Controller
                 'email' => $request->input('email'),
                 'password' => Hash::make($request->input('password')),
                 'accept_registration_tnc' => $request->input('accept_registration_tnc'),
-                'role' => 'client'
+                'role' => 'restaurant'
             ]);
 
             if ($client) {
@@ -95,7 +97,7 @@ class ClientAuthController extends Controller
                 $admin = User::where('role', 'admin')->first();
                 $admin->notify(new ClientRegistrationNotification($client));
 
-                Mail::to($client->email)->send(new EmailVerificationMail($client, 'client'));
+                Mail::to($client->email)->send(new EmailVerificationMail($client, 'restaurant'));
             }
 
             return response()->json([
@@ -126,12 +128,14 @@ class ClientAuthController extends Controller
         $user = User::where('email', $request->input('email'))->first();
 
         if ($user) {
-            if ($user->role === 'client' && $user->is_email_verified == 0) {
+            if ($user->role === 'restaurant' && $user->is_email_verified == 0) {
                 $user->is_email_verified = 1;
                 $user->save();
                 ActivityLogger::beforeAuthLog('email_verified_success', 'Email verification successful.', $request, 'users');
                 return view('client.pages.auth.login-page')->with('message', 'Your account is activated. You can login now.');
             }
+            ActivityLogger::beforeAuthLog('email_verified_failed', 'Account already activated.', $request, 'users');
+            return view('client.pages.auth.login-page')->with('message', 'Your account is already activated. Please login.');
         } else {
             ActivityLogger::beforeAuthLog('email_verified_failed', 'Email already verified.', $request, 'users');
             return view('client.pages.auth.login-page')->with('message', 'Client not found.');
@@ -152,7 +156,7 @@ class ClientAuthController extends Controller
                 'password' => 'required|string|min:6'
             ]);
 
-            $user = User::where('role', 'client')
+            $user = User::where('role', 'restaurant')
             ->where('email', $request->input('email'))
             ->select('firstName', 'id', 'password', 'role', 'is_email_verified')
             ->first();
@@ -172,7 +176,7 @@ class ClientAuthController extends Controller
                 }
 
                 if (Hash::check($request->input('password'), $user->password)) {
-                    $token = JWTToken::ClientCreateToken($request->input('email'), $user->id, $user->role);
+                    $token = JWTToken::CreateToken($request->input('email'), $user->id, $user->role, 'restaurant');
                     ActivityLogger::beforeAuthLog(
                         'login_success',
                         'Client logged in successfully.',
@@ -183,7 +187,7 @@ class ClientAuthController extends Controller
                         'status' => 'success',
                         'message' => 'User Login Successful',
                         'token' => $token
-                    ], 200)->cookie('token', $token, 60 * 24 * 30, null, null, false, false);
+                    ], 200)->cookie('token', $token, 60 * 24 * 30, null, null, config('jwt.cookie_secure'), true, false, 'Lax');
                 } else {
                     ActivityLogger::beforeAuthLog(
                         'login_failed',
@@ -252,11 +256,12 @@ class ClientAuthController extends Controller
             $email = $request->input('email');
             $otp = rand(1000, 9999);
 
-            $user = User::where('email', '=', $email)->first();
+            $user = User::where('role', 'restaurant')->where('email', '=', $email)->first();
 
             if ($user) {
                 Mail::to($email)->send(new OTPMail($otp));
                 User::where('email', '=', $email)->update(['otp' => $otp]);
+                DB::table('password_reset_tokens')->where('email', $email)->delete();
                 ActivityLogger::beforeAuthLog(
                     'send_otp_success',
                     "OTP sent to email $email",
@@ -321,10 +326,14 @@ class ClientAuthController extends Controller
 
             $email = $request->input('email');
             $otp = $request->input('otp');
-            $user = User::where('email', '=', $email)->where('otp', '=', $otp)->first();
+            $user = User::where('role', 'restaurant')->where('email', '=', $email)->where('otp', '=', $otp)->first();
 
             if ($user !== null) {
                 User::where('email', '=', $email)->update(['otp' => '0']);
+                DB::table('password_reset_tokens')->updateOrInsert(
+                    ['email' => $email],
+                    ['token' => Str::random(64), 'created_at' => now()]
+                );
                 ActivityLogger::beforeAuthLog(
                     'otp_verified_success', 
                     'Success, OTP verified successfully.', 
@@ -390,10 +399,19 @@ class ClientAuthController extends Controller
             $email = $request->input('email');
             $password = Hash::make($request->input('password'));
 
-            $user = User::where('email', '=', $email)->first();
+            $user = User::where('role', 'restaurant')->where('email', '=', $email)->first();
 
             if ($user) {
+                $resetRow = DB::table('password_reset_tokens')->where('email', $email)->first();
+                if (!$resetRow || \Carbon\Carbon::parse($resetRow->created_at)->addMinutes(15)->isPast()) {
+                    return response()->json([
+                        'status' => 'fail',
+                        'message' => 'OTP verification required. Please verify the OTP before resetting your password.',
+                    ], 403);
+                }
+
                 User::where('email', '=', $email)->update(['password' => $password]);
+                DB::table('password_reset_tokens')->where('email', $email)->delete();
                 ActivityLogger::beforeAuthLog('forgot_password_success', 'Password reset successful', $request, 'users');
                 return response()->json([
                     'status' => 'success',

@@ -19,7 +19,7 @@ class DeliveryActivationController extends Controller
     public function getList(Request $request)
     {
         try {
-            $listData = User::where('role', 'delivery')
+            $listData = User::where('role', 'rider')
                 ->with(['deliveryVehicle', 'city'])
                 ->latest()
                 ->get()
@@ -113,7 +113,7 @@ class DeliveryActivationController extends Controller
                 'county',
                 'city',
                 'deliveryVehicle',
-            ])->where('role', 'delivery')->findOrFail($delivery_person_id);
+            ])->where('role', 'rider')->findOrFail($delivery_person_id);
 
             $deliveredOrders = DeliveryChargeLedger::where('delivery_person_id', $delivery_person_id)
                 ->where('delivery_status', DeliveryChargeLedger::STATUS_DELIVERED)
@@ -224,7 +224,7 @@ class DeliveryActivationController extends Controller
                 'status' => 'required|in:0,1'
             ]);
 
-            $user = User::where('role', 'delivery')->find($id);
+            $user = User::where('role', 'rider')->find($id);
             
             if (!$user) {
                 return response()->json([

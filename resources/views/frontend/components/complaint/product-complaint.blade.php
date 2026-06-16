@@ -60,14 +60,14 @@
 
                 try {
                     if (uploadedImageUrl) {
-                        await axios.post('/user/delete/editor/image', { image_url: uploadedImageUrl });
+                        await axios.post('/delete/editor/image', { image_url: uploadedImageUrl });
 
                         if (uploadedImageIndex !== null) {
                             quill.deleteText(uploadedImageIndex, 1); 
                         }
                     }
 
-                    const res = await axios.post('/user/upload/editor/image', formData, {
+                    const res = await axios.post('/upload/editor/image', formData, {
                         headers: {
                             'Content-Type': 'multipart/form-data',
                         },
@@ -123,7 +123,7 @@
 
             showLoader();
             try {
-                let res = await axios.post("/user/store/product/complaint", formData, config);
+                let res = await axios.post("/store/product/complaint", formData, config);
 
                 if (res.status === 201 && res.data.status === "success") {
                     let data = res.data.data;
@@ -131,7 +131,7 @@
                     successToast(res.data.message);
                     quill.root.innerHTML = ''; 
                     uploadedImageUrl = null; 
-                    window.location.href = '/user/complaints';
+                    window.location.href = '/complaints';
                 } else {
                     errorToast("Request failed with status: " + res.status);
                 }
@@ -145,7 +145,7 @@
                         errorToast(message);
                     } else if (status === 401) {
                         errorToast(message);
-                        window.location.href = '/user/login';
+                        window.location.href = '/login';
                     } else if (status === 422) {
                         const errors = error.response.data.errors;
                         if (errors) {
@@ -175,7 +175,7 @@
     window.addEventListener('beforeunload', async (event) => {
         if (uploadedImageUrl) {
             try {
-                await axios.post('/user/delete/editor/image', { image_url: uploadedImageUrl });
+                await axios.post('/delete/editor/image', { image_url: uploadedImageUrl });
             } catch (error) {
                 console.error('Failed to delete image on unload:', error);
             }

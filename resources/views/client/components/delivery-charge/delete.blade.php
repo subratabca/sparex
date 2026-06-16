@@ -32,10 +32,10 @@
         try {
             let id = document.getElementById('deleteID').value;
             $('#delete-modal').modal('hide');
-            let res = await axios.post("/client/delete/delivery-charge", {id: id});
+            let res = await axios.post("/restaurant/delete/delivery-charge", {id: id});
             if (res.status === 200) {
                 successToast(res.data.message || "Data deleted successfully");
-                window.location.href = '/client/delivery-charge/page';
+                window.location.href = '/restaurant/delivery-charge/page';
             } else {
                 errorToast("Request failed! Please try again.");
             }

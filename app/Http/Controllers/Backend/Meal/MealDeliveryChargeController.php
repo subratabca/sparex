@@ -22,7 +22,7 @@ class MealDeliveryChargeController extends Controller
     public function getList()
     {
         try {
-            $data = MealDeliveryCharge::with(['client', 'mealType'])
+            $data = MealDeliveryCharge::with(['mealType'])
                         ->latest()
                         ->get();
 
@@ -49,7 +49,10 @@ class MealDeliveryChargeController extends Controller
         DB::beginTransaction();
 
         try {
-            $request->validate(ValidationHelper::mealDeliveryChargeValidationRules());
+            $request->validate(
+                ValidationHelper::mealDeliveryChargeValidationRules(),
+                ['meal_type_id.unique' => 'A delivery charge for this meal type already exists. You can edit it instead.']
+            );
 
             $data = ItemHelper::prepareMealDeliveryChargeData($request);
             $record = ItemHelper::storeOrUpdateMealDeliveryCharge($data);
@@ -84,7 +87,7 @@ class MealDeliveryChargeController extends Controller
     public function show($id)
     {
         try {
-            $record = MealDeliveryCharge::with(['client', 'mealType'])->find($id);
+            $record = MealDeliveryCharge::with(['mealType'])->find($id);
 
             if (!$record) {
                 return response()->json([
@@ -126,7 +129,8 @@ class MealDeliveryChargeController extends Controller
 
             $record = MealDeliveryCharge::findOrFail($request->id);
             $request->validate(
-                ValidationHelper::mealDeliveryChargeValidationRules($record->id)
+                ValidationHelper::mealDeliveryChargeValidationRules($record->id),
+                ['meal_type_id.unique' => 'A delivery charge for this meal type already exists. You can edit it instead.']
             );
 
             $data = ItemHelper::prepareMealDeliveryChargeData($request);

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Delivery;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Notifications\Delivery\NewDeliveryAvailableNotification;
+use App\Notifications\Client\DeliveryAcceptedNotification;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use App\Models\DeliveryChargeLedger;
@@ -381,13 +382,13 @@ class DeliveryMealOrderController extends Controller
 
             // Update delivery charge ledger
             $deliveryLedger->delivery_person_id = $user->id;
-            $deliveryLedger->delivery_status = 'accept_order';
+            $deliveryLedger->delivery_status = 'accept_delivery';
             $deliveryLedger->save();
 
             // Create status history
             MealDeliveryStatusHistory::create([
                 'delivery_charge_ledger_id' => $deliveryLedger->id,
-                'delivery_status' => 'accept_order',
+                'delivery_status' => 'accept_delivery',
                 'notes' => 'Delivery accepted by ' . $user->firstName . ' ' . $user->lastName,
                 'updated_by_id' => $user->id,
                 'updated_by_type' => 'delivery_person'
@@ -400,13 +401,32 @@ class DeliveryMealOrderController extends Controller
                 ->get()
                 ->each->markAsRead();
 
+            // Notify the client (restaurant/seller) that a rider accepted their
+            // delivery. Sent synchronously so the client dashboard popup can pick
+            // it up on its next poll without waiting on a queue worker.
+            $client = User::find($deliveryLedger->client_id);
+            if ($client) {
+                $mealOrder = MealOrder::find($deliveryLedger->meal_order_id);
+                $client->notify(new DeliveryAcceptedNotification([
+                    'meal_order_id'             => $deliveryLedger->meal_order_id,
+                    'delivery_charge_ledger_id' => $deliveryLedger->id,
+                    'order_tracking'            => $deliveryLedger->order_tracking,
+                    'order_number'              => $mealOrder->order_number ?? null,
+                    'rider' => [
+                        'name'   => trim($user->firstName . ' ' . $user->lastName),
+                        'mobile' => $user->mobile,
+                        'image'  => $user->image,
+                    ],
+                ]));
+            }
+
             return response()->json([
                 'status' => 'success',
                 'message' => 'Delivery accepted successfully!',
                 'data' => [
                     'delivery_charge_ledger_id' => $deliveryLedger->id,
                     'delivery_person_id' => $user->id,
-                    'status' => 'accept_order'
+                    'status' => 'accept_delivery'
                 ]
             ], 200);
 
@@ -428,7 +448,7 @@ class DeliveryMealOrderController extends Controller
     private function deleteOtherNotifications($deliveryChargeLedgerId, $currentUserId)
     {
         try {
-            $deliveryUsers = User::where('role', 'delivery')->get();
+            $deliveryUsers = User::where('role', 'rider')->get();
             
             foreach ($deliveryUsers as $deliveryUser) {
                 // Skip the current user (who accepted the delivery)

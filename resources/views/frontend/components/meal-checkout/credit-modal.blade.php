@@ -255,7 +255,7 @@ document.querySelectorAll('input[name="credit_payment"]').forEach(radio => {
 async function loadUserProfileForCredit() {
     try {
         showLoader();
-        const userResponse = await axios.get('/user/get/profile/info');
+        const userResponse = await axios.get('/get/profile/info');
         
         if (userResponse.data && userResponse.data.data) {
             userProfileData = userResponse.data.data;
@@ -534,7 +534,7 @@ async function processCashPayment() {
 
     errorText.style.display = "none";
 
-    const response = await axios.post("/user/store/credit/by/cash", {
+    const response = await axios.post("/store/credit/by/cash", {
         payment_method: 'cash',
         amount: parseFloat(amount).toFixed(2)
     });
@@ -621,7 +621,7 @@ async function processStripePayment() {
         customer_phone: billingData.phone
     };
 
-    const paymentIntentResponse = await axios.post('/user/create-payment-intent', {
+    const paymentIntentResponse = await axios.post('/create-payment-intent', {
         amount: paymentAmount,
         currency: 'usd',
         description: `Credit Top-up - $${parseFloat(amount).toFixed(2)}`,
@@ -682,7 +682,7 @@ async function processStripePayment() {
 
     if (paymentIntent && paymentIntent.status === 'succeeded') {
         // Store the credit with Stripe payment details
-        const response = await axios.post("/user/store/credit/by/stripe", {
+        const response = await axios.post("/store/credit/by/stripe", {
             payment_method: 'stripe',
             amount: parseFloat(amount).toFixed(2),
             stripe_payment_id: paymentIntent.id,

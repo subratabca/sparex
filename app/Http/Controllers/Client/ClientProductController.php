@@ -84,10 +84,7 @@ class ClientProductController extends Controller
                     $request, 
                     'products'
                 );
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'Unable to fetch coordinates for the provided address.',
-                ], 422);
+                return null;
             }
 
             ActivityLogger::log(
@@ -106,11 +103,7 @@ class ClientProductController extends Controller
                 'products'
             );
 
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'An error occurred while fetching coordinates.',
-                'error' => $e->getMessage(),
-            ], 500);
+            return null;
         }
     }
 
@@ -122,6 +115,14 @@ class ClientProductController extends Controller
             $request->validate(ValidationHelper::itemValidationRules(false, true));
 
             $geoData = $this->formatAndFetchCoordinates($request);
+            if (!$geoData) {
+                DB::rollBack();
+                return response()->json([
+                    'status'  => 'failed',
+                    'message' => 'Validation Failed',
+                    'errors'  => ['address1' => ['Unable to fetch location for this address. Please check the address and postcode.']],
+                ], 422);
+            }
 
             // Handle main product image
             $imagePath = $request->hasFile('image')
@@ -326,6 +327,14 @@ class ClientProductController extends Controller
             
             $request->validate(ValidationHelper::itemValidationRules(true, true, $product_id));
             $geoData = $this->formatAndFetchCoordinates($request);
+            if (!$geoData) {
+                DB::rollBack();
+                return response()->json([
+                    'status'  => 'failed',
+                    'message' => 'Validation Failed',
+                    'errors'  => ['address1' => ['Unable to fetch location for this address. Please check the address and postcode.']],
+                ], 422);
+            }
 
             $imagePath = $request->hasFile('image')
                 ? ImageHelper::processAndSaveImage($request->file('image'), 'item', false, $product->image)

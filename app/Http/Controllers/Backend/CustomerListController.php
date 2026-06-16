@@ -297,7 +297,7 @@ class CustomerListController extends Controller
 
             $clients = User::withCount('products')
                 ->whereIn('id', $clientIds)
-                ->where('role', 'client')
+                ->where('role', 'restaurant')
                 ->get(['id', 'image', 'firstName', 'lastName', 'email', 'mobile', 'status']);
 
             if ($clients->isEmpty()) {

@@ -64,7 +64,7 @@
 
       if (uploadedBannedImageUrl) {
         try {
-          await axios.post('/client/delete-banned-editor-image', { image_url: uploadedBannedImageUrl });
+          await axios.post('/restaurant/delete-banned-editor-image', { image_url: uploadedBannedImageUrl });
           uploadedBannedImageUrl = null;  
           uploadedBannedImageIndex = null;
         } catch (error) {
@@ -90,14 +90,14 @@
 
         try {
           if (uploadedBannedImageUrl) {
-            await axios.post('/client/delete-banned-editor-image', { image_url: uploadedBannedImageUrl });
+            await axios.post('/restaurant/delete-banned-editor-image', { image_url: uploadedBannedImageUrl });
 
             if (uploadedBannedImageIndex !== null) {
               quill2.deleteText(uploadedBannedImageIndex, 1); 
             }
           }
 
-          const res = await axios.post('/client/upload-banned-editor-image', formData, {
+          const res = await axios.post('/restaurant/upload-banned-editor-image', formData, {
             headers: {
               'Content-Type': 'multipart/form-data',
             },
@@ -151,12 +151,12 @@
       showLoader();
 
       try {
-        let res = await axios.post("/client/store/ban/customer/info", formData, config);
+        let res = await axios.post("/restaurant/store/ban/customer/info", formData, config);
         if (res.status === 201) {
           successToast(res.data.message || 'Customer banned successfully');
           uploadedBannedImageUrl = null;
           uploadedBannedImageIndex = null;
-          window.location.href = '/client/customers';
+          window.location.href = '/restaurant/customers';
           document.getElementById('save-form').reset();
           $('#banned-modal').modal('hide');
         } else {
@@ -214,7 +214,7 @@
   window.addEventListener('beforeunload', async (event) => {
     if (uploadedBannedImageUrl) {
       try {
-        await axios.post('/client/delete-banned-editor-image', { image_url: uploadedBannedImageUrl });
+        await axios.post('/restaurant/delete-banned-editor-image', { image_url: uploadedBannedImageUrl });
       } catch (error) {
         console.error('Failed to delete image on unload:', error);
       }

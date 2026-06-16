@@ -292,7 +292,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 /* ===================== Requirement 2: profile check on load ===================== */
 async function checkHealthProfile() {
     try {
-        const res = await axios.get('/user/get/health-profile');
+        const res = await axios.get('/get/health-profile');
         if (res.data.status === 'success' && res.data.data.has_profile) {
             if (res.data.data.profile) prefillPlannerForm(res.data.data.profile);
             document.getElementById('planner-btn-label').textContent = 'Update My Plan';
@@ -401,7 +401,7 @@ async function loadMealKeywords(mealTypeId) {
     container.innerHTML   = `<div class="text-muted">Loading keywords...</div>`;
     try {
         showLoader();
-        const res = await axios.get(`/user/get/meal-keywords/${mealTypeId}`);
+        const res = await axios.get(`/get/meal-keywords/${mealTypeId}`);
         if (res.status === 200 && res.data.status === 'success' && res.data.data.length > 0) {
             container.innerHTML = '';
             res.data.data.forEach(kw => {
@@ -473,7 +473,7 @@ async function searchProducts(keywords, page = 1) {
     list.innerHTML = `<div class="text-muted text-center py-3">Searching products...</div>`;
     try {
         showLoader();
-        const res = await axios.post(`/user/search/products?page=${page}`, {
+        const res = await axios.post(`/search/products?page=${page}`, {
             keywords,
             meal_type_id: selectedMealTypeId,
             latitude:     userLatitude,
@@ -513,7 +513,7 @@ function renderProducts(products) {
         list.insertAdjacentHTML('beforeend', `
             <div class="col-md-4 col-sm-6">
                 <div class="card h-100 shadow-sm border-0 rounded-3">
-                    <a href="/user/meal/details/${p.id}">
+                    <a href="/meal/details/${p.id}">
                         <img src="{{ asset('upload/product/medium') }}/${p.image}" class="card-img-top rounded-top-3"
                              alt="${p.name}" style="height:200px;object-fit:cover;">
                     </a>
@@ -616,7 +616,7 @@ document.getElementById('confirm-add-meal').addEventListener('click', async () =
 
     try {
         showLoader();
-        const res = await axios.post('/user/store/meal-cart', {
+        const res = await axios.post('/store/meal-cart', {
             product_id:   selectedProduct.id,
             meal_type_id: mealTypeId,
             meal_date:    selectedDate,
@@ -688,7 +688,7 @@ async function generateAiPlan() {
     document.getElementById('ai-loading-section').style.display = 'block';
 
     try {
-        const res = await axios.post('/user/generate/meal-suggestion', { gender, age, weight, height, period, description });
+        const res = await axios.post('/generate/meal-suggestion', { gender, age, weight, height, period, description });
         if (res.data.status === 'success') {
             bootstrap.Modal.getInstance(document.getElementById('aiPlannerModal'))?.hide();
             document.getElementById('planner-btn-label').textContent = 'Update My Plan';
@@ -779,7 +779,7 @@ function renderSuggestions(data) {
                         </div>
                     </div>
                     <div class="d-flex gap-1">
-                        <a href="/user/meal/details/${p.id}" class="btn btn-sm btn-outline-primary rounded-pill flex-grow-1">View</a>
+                        <a href="/meal/details/${p.id}" class="btn btn-sm btn-outline-primary rounded-pill flex-grow-1">View</a>
                         <button class="btn btn-sm btn-outline-success rounded-pill flex-grow-1 suggest-add-btn"
                                 data-product-id="${p.id}" data-date="${day.date}"
                                 data-meal-type-id="${meal.meal_type_id}" data-meal-type-name="${meal.meal_type}">Add</button>

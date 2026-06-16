@@ -31,7 +31,7 @@ document.addEventListener("DOMContentLoaded", function () {
 async function getList() {
     showLoader();
     try {
-        let res = await axios.get("/client/notification/list/info");
+        let res = await axios.get("/restaurant/notification/list/info");
 
         let tableList = $("#tableList");
         tableList.empty(); 
@@ -44,7 +44,7 @@ async function getList() {
         function getNotificationLink(notification) {
             if (notification.data) {
                 if (notification.data.meal_order_id) {
-                    return `/client/meal-order/details/${notification.data.meal_order_id}?notification_id=${notification.id}`;
+                    return `/restaurant/meal-order/details/${notification.data.meal_order_id}?notification_id=${notification.id}`;
                 } 
             }
             return '#'; 
@@ -97,7 +97,7 @@ function initializeDataTable() {
 
 async function deleteNotification(notificationId) {
     try {
-        let res = await axios.delete(`/client/delete/notification/${notificationId}`);
+        let res = await axios.delete(`/restaurant/delete/notification/${notificationId}`);
         if (res.status === 200) {
             successToast(res.data.message || 'Request success');
             await getList(); 

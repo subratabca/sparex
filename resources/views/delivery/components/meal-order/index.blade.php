@@ -30,7 +30,7 @@ document.addEventListener("DOMContentLoaded", function () {
 async function loadDeliveryList() {
     try {
         showLoader();
-        const res = await axios.get("/delivery/get/meal-orders");
+        const res = await axios.get("/rider/get/meal-orders");
 
         const tableList = $("#tableList");
         tableList.empty();
@@ -41,7 +41,7 @@ async function loadDeliveryList() {
             const paymentBadge = `<span class="badge ${item.payment_status === 'paid' ? 'bg-success' : 'bg-warning'}">${item.payment_status}</span>`;
             const deliveryBadge = `<span class="badge ${item.delivery_status === 'delivered' ? 'bg-success' : 'bg-info'}">${item.delivery_status}</span>`;
 
-            const viewButton = `<a href="/delivery/meal-order/details/${item.delivery_charge_ledger_id}" class="btn btn-sm btn-info">
+            const viewButton = `<a href="/rider/meal-order/details/${item.delivery_charge_ledger_id}" class="btn btn-sm btn-info">
                                     <i class="bx bx-show"></i> View
                                 </a>`;
 
@@ -84,26 +84,5 @@ function initializeDataTable() {
     });
 }
 
-function handleError(error) {
-    let message = "An unexpected error occurred.";
-    if (error.response) {
-        const { status, data } = error.response;
-        switch (status) {
-        case 500:
-            message = data?.error || "Internal server error. Please try again later.";
-            break;
-        case 404:
-            message = data?.message || "Data not found.";
-            break;
-        default:
-            message = data?.message || "Something went wrong.";
-        }
-    } else if (error.request) {
-        message = "No response from the server. Please check your internet connection.";
-    } else {
-        message = error.message;
-    }
-
-    errorToast(message);
-}
+// showLoader / hideLoader / errorToast / handleError are provided globally by config.js
 </script>

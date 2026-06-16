@@ -42,7 +42,7 @@ async function NotificationsByType() {
         let pathArray = window.location.pathname.split('/');
         let id = pathArray[pathArray.length - 1]; 
 
-        let res = await axios.get(`/user/notification/${id}`);
+        let res = await axios.get(`/notification/${id}`);
 
         if (res.status === 200) {
             let title = res.data.title;

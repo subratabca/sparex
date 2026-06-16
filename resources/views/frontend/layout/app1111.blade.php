@@ -80,7 +80,7 @@
     <link rel="stylesheet" href="{{ asset('frontend/assets/vendor/css/pages/front-page-landing.css') }}" />
     <!-- Ext Page CSS -->
     <link rel="stylesheet" href="{{ asset('frontend/assets/vendor/css/pages/page-profile.css') }}" />
-    <link href="{{ asset('backend/custom-css/toastify.min.css') }}" rel="stylesheet" />
+    <link href="{{ asset('common/custom-css/toastify.min.css') }}" rel="stylesheet" />
 
     @stack('styles')
 
@@ -124,9 +124,9 @@
     <!-- Helpers -->
     <script src="{{ asset('frontend/assets/vendor/js/helpers.js') }}"></script>
 
-    <script src="{{ asset('backend/custom-js/axios.min.js') }}"></script>
-    <script src="{{asset('backend/custom-js/toastify-js.js')}}"></script>
-    <script src="{{asset('backend/custom-js/config.js')}}"></script>
+    <script src="{{ asset('common/custom-js/axios.min.js') }}"></script>
+    <script src="{{asset('common/custom-js/toastify-js.js')}}"></script>
+    <script src="{{asset('common/custom-js/config.js')}}"></script>
 
 
     <!-- Hotjar Tracking Code for SpareX -->
@@ -246,7 +246,7 @@ function startAutoLogout() {
         document.cookie = 'token=;path=/;expires=Thu, 01 Jan 1970 00:00:01 GMT';
 
         // Redirect
-        window.location.href = '/user/login';
+        window.location.href = '/login';
     };
 
     setTimeout(logoutUser, timeout);

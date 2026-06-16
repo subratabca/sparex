@@ -56,7 +56,7 @@ async function CouponInfo() {
         //let id = segments[segments.length - 1];
         let id = new URL(window.location.href).pathname.split('/').pop();
 
-        let res = await axios.get("/client/show/coupon/info/" + id);
+        let res = await axios.get("/restaurant/show/coupon/info/" + id);
         document.getElementById('updateID').value = id;
         document.getElementById('coupon_name').value = res.data.data['coupon_name'];
         document.getElementById('coupon_discount').value = res.data.data['coupon_discount'];
@@ -147,10 +147,10 @@ async function updateCouponInfo() {
   };
 
   try {
-    const res = await axios.post('/client/update/coupon', formData, config);
+    const res = await axios.post('/restaurant/update/coupon', formData, config);
     if (res.status === 200 && res.data.status === 'success') {
       successToast(res.data.message || 'Request success');
-      window.location.href = '/client/coupon/page';
+      window.location.href = '/restaurant/coupon/page';
       resetCreateForm();
     } else {
       errorToast(res.data.message || "Request failed");

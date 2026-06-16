@@ -161,7 +161,7 @@ class ClientComplaintController extends Controller
 
             $user = User::find($client_id);
 
-            if (!$user || $user->role !== 'client') {
+            if (!$user || $user->role !== 'restaurant') {
                 ActivityLogger::log('complaint_reply_failed', 'Only clients can reply to complaints.', $request, 'complaint_conversations');
                 return response()->json([
                     'status'  => 'failed',

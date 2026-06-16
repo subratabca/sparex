@@ -13,6 +13,8 @@ use App\Helpers\JWTToken;
 use App\Mail\OTPMail;
 use App\Models\User;
 use App\Models\TermCondition;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Exception;
 
 class DeliveryAuthController extends Controller
@@ -86,7 +88,7 @@ class DeliveryAuthController extends Controller
                 'email' => $request->input('email'),
                 'password' => Hash::make($request->input('password')),
                 'accept_registration_tnc' => $request->input('accept_registration_tnc'),
-                'role' => 'delivery'
+                'role' => 'rider'
             ]);
 
             if ($delivery) {
@@ -94,7 +96,7 @@ class DeliveryAuthController extends Controller
                 $admin = User::where('role', 'admin')->first();
                 $admin->notify(new DeliveryRegistrationNotification($delivery));
 
-                Mail::to($delivery->email)->send(new EmailVerificationMail($delivery, 'delivery'));
+                Mail::to($delivery->email)->send(new EmailVerificationMail($delivery, 'rider'));
             }
 
             return response()->json([
@@ -124,7 +126,7 @@ class DeliveryAuthController extends Controller
         $user = User::where('email', $request->input('email'))->first();
 
         if ($user) {
-            if ($user->role === 'delivery' && $user->is_email_verified == 0) {
+            if ($user->role === 'rider' && $user->is_email_verified == 0) {
                 $user->is_email_verified = 1;
                 $user->save();
                 ActivityLogger::beforeAuthLog('email_verified_success', 'Email verification successful.', $request, 'users');
@@ -149,7 +151,7 @@ class DeliveryAuthController extends Controller
                 'password' => 'required|string|min:6'
             ]);
 
-            $user = User::where('role', 'delivery')
+            $user = User::where('role', 'rider')
             ->where('email', $request->input('email'))
             ->select('firstName', 'id', 'password', 'role', 'is_email_verified')
             ->first();
@@ -169,7 +171,7 @@ class DeliveryAuthController extends Controller
                 }
 
                 if (Hash::check($request->input('password'), $user->password)) {
-                    $token = JWTToken::DeliveryCreateToken($request->input('email'), $user->id, $user->role);
+                    $token = JWTToken::CreateToken($request->input('email'), $user->id, $user->role, 'rider');
                     ActivityLogger::beforeAuthLog(
                         'login_success',
                         'Logged in successfully.',
@@ -180,7 +182,7 @@ class DeliveryAuthController extends Controller
                         'status' => 'success',
                         'message' => 'Login Successful',
                         'token' => $token
-                    ], 200)->cookie('token', $token, 60 * 24 * 30, null, null, false, false);
+                    ], 200)->cookie('token', $token, 60 * 24 * 30, null, null, config('jwt.cookie_secure'), true, false, 'Lax');
                 } else {
                     ActivityLogger::beforeAuthLog(
                         'login_failed',
@@ -249,11 +251,12 @@ class DeliveryAuthController extends Controller
             $email = $request->input('email');
             $otp = rand(1000, 9999);
 
-            $user = User::where('email', '=', $email)->first();
+            $user = User::where('role', 'rider')->where('email', '=', $email)->first();
 
             if ($user) {
                 Mail::to($email)->send(new OTPMail($otp));
                 User::where('email', '=', $email)->update(['otp' => $otp]);
+                DB::table('password_reset_tokens')->where('email', $email)->delete();
                 ActivityLogger::beforeAuthLog(
                     'send_otp_success',
                     "OTP sent to email $email",
@@ -318,10 +321,14 @@ class DeliveryAuthController extends Controller
 
             $email = $request->input('email');
             $otp = $request->input('otp');
-            $user = User::where('email', '=', $email)->where('otp', '=', $otp)->first();
+            $user = User::where('role', 'rider')->where('email', '=', $email)->where('otp', '=', $otp)->first();
 
             if ($user !== null) {
                 User::where('email', '=', $email)->update(['otp' => '0']);
+                DB::table('password_reset_tokens')->updateOrInsert(
+                    ['email' => $email],
+                    ['token' => Str::random(64), 'created_at' => now()]
+                );
                 ActivityLogger::beforeAuthLog(
                     'otp_verified_success', 
                     'Success, OTP verified successfully.', 
@@ -387,10 +394,19 @@ class DeliveryAuthController extends Controller
             $email = $request->input('email');
             $password = Hash::make($request->input('password'));
 
-            $user = User::where('email', '=', $email)->first();
+            $user = User::where('role', 'rider')->where('email', '=', $email)->first();
 
             if ($user) {
+                $resetRow = DB::table('password_reset_tokens')->where('email', $email)->first();
+                if (!$resetRow || \Carbon\Carbon::parse($resetRow->created_at)->addMinutes(15)->isPast()) {
+                    return response()->json([
+                        'status' => 'fail',
+                        'message' => 'OTP verification required. Please verify the OTP before resetting your password.',
+                    ], 403);
+                }
+
                 User::where('email', '=', $email)->update(['password' => $password]);
+                DB::table('password_reset_tokens')->where('email', $email)->delete();
                 ActivityLogger::beforeAuthLog('forgot_password_success', 'Password reset successful', $request, 'users');
                 return response()->json([
                     'status' => 'success',

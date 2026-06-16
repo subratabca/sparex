@@ -263,7 +263,7 @@ function fmt(v) { return new Intl.NumberFormat('en-GB', { style:'currency', curr
 
 /* ===== Summary ===== */
 async function loadSummary(params) {
-    const res = await axios.get('/delivery/get/meal-report/summary', { params });
+    const res = await axios.get('/rider/get/meal-report/summary', { params });
     if (res.data.status === 'success') {
         const d = res.data.data;
         document.getElementById('kpi-total').textContent           = d.total_deliveries;
@@ -277,7 +277,7 @@ async function loadSummary(params) {
 
 /* ===== Order Report (bar + table) ===== */
 async function loadOrderReport(params) {
-    const res = await axios.get('/delivery/get/meal-report/orders', { params });
+    const res = await axios.get('/rider/get/meal-report/orders', { params });
     const empty = document.getElementById('order-empty');
     const canvas = document.getElementById('orderChart');
 
@@ -333,7 +333,7 @@ function renderTable(rows) {
 
 /* ===== Delivery Status (pie) ===== */
 async function loadStatusReport(params) {
-    const res = await axios.get('/delivery/get/meal-report/order-status', { params });
+    const res = await axios.get('/rider/get/meal-report/order-status', { params });
     const empty = document.getElementById('status-empty');
     const canvas = document.getElementById('statusChart');
 
@@ -360,7 +360,7 @@ async function loadStatusReport(params) {
 
 /* ===== Payment Status (doughnut) ===== */
 async function loadPaymentReport(params) {
-    const res = await axios.get('/delivery/get/meal-report/payment-status', { params });
+    const res = await axios.get('/rider/get/meal-report/payment-status', { params });
     const empty = document.getElementById('payment-empty');
     const canvas = document.getElementById('paymentChart');
 
@@ -397,7 +397,7 @@ async function loadPaymentReport(params) {
 
 /* ===== Earnings (line) ===== */
 async function loadEarningsReport(params) {
-    const res = await axios.get('/delivery/get/meal-report/earnings', { params });
+    const res = await axios.get('/rider/get/meal-report/earnings', { params });
     const empty = document.getElementById('earnings-empty');
     const canvas = document.getElementById('earningsChart');
 

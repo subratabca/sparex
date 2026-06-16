@@ -24,7 +24,7 @@
                 <p style="margin:0; color:#2e7d32; font-weight:500;">
                     Please review the details and respond promptly to resolve this matter.
                 </p>
-                <a href="{{ url('client/complaint/details/' . $complaint->id) }}" 
+                <a href="{{ url('restaurant/complaint/details/' . $complaint->id) }}"
                    style="display:inline-block; margin:8px 0; padding:8px 16px; background-color:#17a2b8; color:#fff; 
                           text-decoration:none; border-radius:4px; font-size:14px; font-weight:500;">
                    View Complaint Details
@@ -41,7 +41,7 @@
                 <p style="margin:0; color:#2e7d32; font-weight:500;">
                     You can view your complaint details using the link below.
                 </p>
-                <a href="{{ url('user/complaint/details/' . $complaint->id) }}" 
+                <a href="{{ url('complaint/details/' . $complaint->id) }}"
                    style="display:inline-block; margin:8px 0; padding:8px 16px; background-color:#17a2b8; color:#fff; 
                           text-decoration:none; border-radius:4px; font-size:14px; font-weight:500;">
                    View Complaint Details

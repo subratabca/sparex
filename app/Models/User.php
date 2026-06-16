@@ -18,7 +18,7 @@ class User extends BaseUserModel
 
     public function isClient()
     {
-        return $this->role === 'client';
+        return $this->role === 'restaurant';
     }
 
     public function isCustomer()
@@ -28,7 +28,7 @@ class User extends BaseUserModel
 
     public function isDelivery()
     {
-        return $this->role === 'delivery';
+        return $this->role === 'rider';
     }
 
     public function products()
@@ -118,11 +118,6 @@ class User extends BaseUserModel
     public function providedMealCarts()
     {
         return $this->hasMany(MealCart::class, 'client_id');
-    }
-
-    public function mealDeliveryCharges()
-    {
-        return $this->hasMany(MealDeliveryCharge::class, 'client_id');
     }
 
     public function creditTransactions()

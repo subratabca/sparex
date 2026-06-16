@@ -69,7 +69,7 @@
             let segments = url.split('/');
             let id = segments[segments.length - 1];
 
-            let res = await axios.get("/client/customer-complain/details/info/" + id);
+            let res = await axios.get("/restaurant/customer-complain/details/info/" + id);
             let data = res.data.data;
             const customer = data.customer;
             const client = data.client;

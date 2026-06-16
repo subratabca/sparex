@@ -26,7 +26,7 @@ async function productDetailsInfo() {
         let segments = url.split('/');
         let id = segments[segments.length - 1];
 
-        let res = await axios.get("/client/get/product/stock/info/" + id);
+        let res = await axios.get("/restaurant/get/product/stock/info/" + id);
         if (res.status === 200 && res.data.status === 'success') {
             let product = res.data.data;
             const container = document.getElementById('product-details-container');

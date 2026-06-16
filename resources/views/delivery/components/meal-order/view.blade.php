@@ -187,7 +187,7 @@ async function loadDeliveryOrderDetails() {
     try {
         showLoader();
         const segs = window.location.pathname.split('/');
-        const response = await axios.get(`/delivery/get/meal-order/details/${segs[segs.length - 1]}`);
+        const response = await axios.get(`/rider/get/meal-order/details/${segs[segs.length - 1]}`);
 
         if (response.status === 200 && response.data.status === 'success') {
             deliveryData = response.data.data;
@@ -371,7 +371,7 @@ async function handleUpdateDeliveryStatus() {
 
     showLoader();
     try {
-        const res = await axios.post(`/delivery/update/delivery-status/${ledgerId}`, { delivery_status: nextStatus, notes: '' });
+        const res = await axios.post(`/rider/update/delivery-status/${ledgerId}`, { delivery_status: nextStatus, notes: '' });
         if (res.data.status === 'success') {
             Swal.fire({ title: 'Updated!', text: 'Delivery status updated successfully.', icon: 'success', timer: 1500, showConfirmButton: false });
             setTimeout(() => window.location.reload(), 1500);

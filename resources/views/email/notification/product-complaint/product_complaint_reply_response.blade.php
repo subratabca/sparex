@@ -2,13 +2,13 @@
     <div style="margin: 50px auto; width: 80%; max-width: 600px; padding: 30px 0;">
         <!-- Header -->
 @php
-    $sender = $mailSender->role === 'client' ? 'Client' : 'Customer';
-    $senderRole = $mailSender->role === 'client' ? 'seller' : 'customer';
+    $sender = $mailSender->role === 'restaurant' ? 'Client' : 'Customer';
+    $senderRole = $mailSender->role === 'restaurant' ? 'seller' : 'customer';
     $link = $recipientType === 'admin' 
         ? url('admin/complaint/details/'.$complaint->id) 
         : ($senderRole === 'seller' 
-            ? url('user/complaint/details/'.$complaint->id) 
-            : url('client/complaint/details/'.$complaint->id));
+            ? url('complaint/details/'.$complaint->id)
+            : url('restaurant/complaint/details/'.$complaint->id));
     $latestConversation = $complaint->conversations->sortByDesc('created_at')->first();
     $orderItem = optional($complaint->orderItem);
     $product = optional($orderItem->product);

@@ -65,7 +65,7 @@
           <input class="form-check-input" type="checkbox" id="accept_registration_tnc"/>
           <label class="form-check-label" for="terms-conditions">
             I agree to
-            <a href="/client/registration/terms-conditions/client_registration" target="_blank">privacy policy & terms</a>
+            <a href="/restaurant/registration/terms-conditions/client_registration" target="_blank">privacy policy & terms</a>
           </label>
         </div>
         <span class="error-message text-danger" id="accept_registration_tnc-error"></span>
@@ -125,8 +125,9 @@
       errorToast("You must accept the terms and conditions for registration!");
     }
     else{
+      showLoader();
       try {
-        let res = await axios.post("/client/registration", {
+        let res = await axios.post("/restaurant/registration", {
           email: email,
           firstName: firstName,
           password: password,
@@ -141,17 +142,17 @@
           errorToast(res.data['message']);
         }
       } catch (error) {
-        if (error.response && error.response.status === 422) {
-          const errors = error.response.data.errors;
-          for (const key in errors) {
-            if (errors.hasOwnProperty(key)) {
-              const errorMessage = errors[key][0]; 
-              document.getElementById(`${key}-error`).innerText = errorMessage; 
-            }
-          }
+        if (error.response?.status === 422) {
+          Object.entries(error.response.data.errors).forEach(([key, val]) => {
+            const span = document.getElementById(`${key}-error`);
+            if (span) span.innerText = val[0];
+            else errorToast(val[0]);
+          });
         } else {
-          errorToast(error.response ? error.response.data.message : 'Registration failed');
+          errorToast(error.response?.data?.message || 'Registration failed');
         }
+      } finally {
+        hideLoader();
       }
     }
   }

@@ -32,7 +32,7 @@
         try {
             let id = document.getElementById('deleteID').value;
             $('#delete-modal').modal('hide');
-            let res = await axios.post("/user/email/share/delete", {id: id});
+            let res = await axios.post("/email/share/delete", {id: id});
             if (res.status === 200) {
                 successToast(res.data.message || "Data deleted successfully");
                 window.location.reload();

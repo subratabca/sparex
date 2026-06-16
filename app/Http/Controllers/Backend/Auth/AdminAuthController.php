@@ -12,6 +12,8 @@ use App\Models\ActivityLog;
 use App\Helpers\JWTToken;
 use App\Mail\OTPMail;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 
 class AdminAuthController extends Controller
@@ -25,6 +27,15 @@ class AdminAuthController extends Controller
     public function Registration(Request $request)
     {
         try {
+            // Block public admin self-registration once an admin already exists.
+            if (User::where('role', 'admin')->exists()) {
+                ActivityLogger::beforeAuthLog('registration_failed', 'Admin registration blocked: an admin already exists.', $request, 'users');
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'Admin registration is disabled.',
+                ], 403);
+            }
+
             $request->validate([
                 'firstName' => 'required|string|max:50',
                 'email' => 'required|string|email|max:50|unique:users,email',
@@ -79,13 +90,13 @@ class AdminAuthController extends Controller
             ->first();
 
             if ($user !== null && Hash::check($request->input('password'), $user->password)) {
-                $token = JWTToken::AdminCreateToken($request->input('email'), $user->id, $user->role);
+                $token = JWTToken::CreateToken($request->input('email'), $user->id, $user->role, 'admin');
                 ActivityLogger::beforeAuthLog('login_success', 'Admin login successful.', $request, 'users', $user->id);
                 return response()->json([
                     'status' => 'success',
                     'message' => 'User Login Successful',
                     'token' => $token
-                ], 200)->cookie('token', $token, 60 * 24 * 30, null, null, false, false);
+                ], 200)->cookie('token', $token, 60 * 24 * 30, null, null, config('jwt.cookie_secure'), true, false, 'Lax');
             } else {
                 ActivityLogger::beforeAuthLog(
                     'login_failed',
@@ -130,11 +141,12 @@ class AdminAuthController extends Controller
             $email = $request->input('email');
             $otp = rand(1000, 9999);
 
-            $user = User::where('email', '=', $email)->first();
+            $user = User::where('role', 'admin')->where('email', '=', $email)->first();
 
             if ($user) {
                 Mail::to($email)->send(new OTPMail($otp));
                 User::where('email', '=', $email)->update(['otp' => $otp]);
+                DB::table('password_reset_tokens')->where('email', $email)->delete();
                 ActivityLogger::beforeAuthLog(
                     'send_otp_success',
                     "OTP sent to email $email",
@@ -197,10 +209,14 @@ class AdminAuthController extends Controller
 
             $email = $request->input('email');
             $otp = $request->input('otp');
-            $user = User::where('email', '=', $email)->where('otp', '=', $otp)->first();
+            $user = User::where('role', 'admin')->where('email', '=', $email)->where('otp', '=', $otp)->first();
 
             if ($user !== null) {
                 User::where('email', '=', $email)->update(['otp' => '0']);
+                DB::table('password_reset_tokens')->updateOrInsert(
+                    ['email' => $email],
+                    ['token' => Str::random(64), 'created_at' => now()]
+                );
                 ActivityLogger::beforeAuthLog(
                     'otp_verified_success', 
                     'Success, OTP verified successfully.', 
@@ -264,10 +280,19 @@ class AdminAuthController extends Controller
             $email = $request->input('email');
             $password = Hash::make($request->input('password'));
 
-            $user = User::where('email', '=', $email)->first();
+            $user = User::where('role', 'admin')->where('email', '=', $email)->first();
 
             if ($user) {
+                $resetRow = DB::table('password_reset_tokens')->where('email', $email)->first();
+                if (!$resetRow || \Carbon\Carbon::parse($resetRow->created_at)->addMinutes(15)->isPast()) {
+                    return response()->json([
+                        'status' => 'fail',
+                        'message' => 'OTP verification required. Please verify the OTP before resetting your password.',
+                    ], 403);
+                }
+
                 User::where('email', '=', $email)->update(['password' => $password]);
+                DB::table('password_reset_tokens')->where('email', $email)->delete();
                 ActivityLogger::beforeAuthLog('forgot_password_success', 'Password reset successful', $request, 'users');
                 return response()->json([
                     'status' => 'success',

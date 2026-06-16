@@ -202,8 +202,7 @@ class MealOrderHelper
                     $distance = self::getDistanceBetweenLocations($clientAddress, $customerShippingAddress);
                     if ($distance === null) continue;
 
-                    $deliveryCharge = MealDeliveryCharge::where('client_id', $client->id)
-                        ->where('meal_type_id', $mealType->id)
+                    $deliveryCharge = MealDeliveryCharge::where('meal_type_id', $mealType->id)
                         ->first();
 
                     if (!$deliveryCharge) continue;

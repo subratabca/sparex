@@ -34,7 +34,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/user/get/notification/list");
+            let res = await axios.get("/get/notification/list");
 
             let tableList = $("#tableList");
             tableList.empty(); 
@@ -47,15 +47,15 @@
 
             function getNotificationLink(notification) {
                 if (notification.data.customer_id) {
-                    return `/user/details/${notification.data.customer_id}?notification_id=${notification.id}`;
+                    return `/details/${notification.data.customer_id}?notification_id=${notification.id}`;
                 } else if (notification.data.meal_order_id) {
-                    return `/user/meal-order/details/${notification.data.meal_order_id}?notification_id=${notification.id}`;
+                    return `/meal-order/details/${notification.data.meal_order_id}?notification_id=${notification.id}`;
                 } else if (notification.data.order_id) {
-                    return `/user/order/details/${notification.data.order_id}?notification_id=${notification.id}`;
+                    return `/order/details/${notification.data.order_id}?notification_id=${notification.id}`;
                 } else if (notification.data.complaint_id) {
-                    return `/user/complaint/details/${notification.data.complaint_id}?notification_id=${notification.id}`;
+                    return `/complaint/details/${notification.data.complaint_id}?notification_id=${notification.id}`;
                 } else if (notification.data.customer_complain_id) {
-                    return `/user/customer-complain-details/${notification.data.customer_complain_id}?notification_id=${notification.id}`;
+                    return `/customer-complain-details/${notification.data.customer_complain_id}?notification_id=${notification.id}`;
                 }else {
                     return '#';
                 }
@@ -103,7 +103,7 @@
 
     async function deleteNotification(notificationId) {
         try {
-            let res = await axios.delete(`/user/delete/notification/${notificationId}`);
+            let res = await axios.delete(`/delete/notification/${notificationId}`);
             if (res.status === 200) {
                 successToast(res.data.message || 'Request success');
                 await getList(); 

@@ -26,7 +26,7 @@ async function getBannedCustomerDetails() {
         let segments = url.split('/');
         let id = segments[segments.length - 1];
 
-        let res = await axios.get("/client/get/banned/customer/details/" + id);
+        let res = await axios.get("/restaurant/get/banned/customer/details/" + id);
         if (res.status === 200 && res.data.status === 'success') {
             let bannedData = res.data.data;
             const container = document.getElementById('customer-details-container');

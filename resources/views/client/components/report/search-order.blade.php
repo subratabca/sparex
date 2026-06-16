@@ -242,7 +242,7 @@
 
     showLoader();
     try {
-      let res = await axios.post("/client/order/by/search", formData, config);
+      let res = await axios.post("/restaurant/order/by/search", formData, config);
       if (res.status === 200) {
         document.getElementById('result').style.display = 'block';
         document.getElementById('search').style.display = 'none';
@@ -312,9 +312,9 @@
                   <td>${paidAmount}</td>
                   <td><span class="badge ${badgeClass}">${status}</span></td>
                   <td>
-                    <a href="/client/invoice/download/${item.id}" class="btn btn-sm btn-outline-primary" title="Invoice Download"><span class="mdi mdi-arrow-down-circle-outline"></span>
+                    <a href="/restaurant/invoice/download/${item.id}" class="btn btn-sm btn-outline-primary" title="Invoice Download"><span class="mdi mdi-arrow-down-circle-outline"></span>
                     </a>
-                    <a href="/client/order/details/${item.id}" class="btn btn-sm btn-outline-primary" title="Order Details"><span class="mdi mdi-eye-circle"></span>
+                    <a href="/restaurant/order/details/${item.id}" class="btn btn-sm btn-outline-primary" title="Order Details"><span class="mdi mdi-eye-circle"></span>
                     </a>
                   </td>
           </tr>`;

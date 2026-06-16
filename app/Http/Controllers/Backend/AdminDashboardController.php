@@ -19,7 +19,7 @@ class AdminDashboardController extends Controller
     public function TotalInfo(Request $request)
     {
         try {
-            $totalClients = User::where('role', 'client')->count();
+            $totalClients = User::where('role', 'restaurant')->count();
             $totalCustomers = User::where('role', 'customer')->count();
             $totalProducts = Product::count();
             $totalOrders = Order::count();

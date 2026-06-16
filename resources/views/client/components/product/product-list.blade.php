@@ -2,7 +2,7 @@
     <div class="card-header header-elements">
         <span class="me-2"><h5>Product List</h5></span>
         <div class="card-header-elements ms-auto">
-            <a href="/client/create/product" type="button" class="btn btn-primary waves-effect waves-light">
+            <a href="/restaurant/create/product" type="button" class="btn btn-primary waves-effect waves-light">
                 <span class="tf-icon mdi mdi-plus me-1"></span>Add New Product
             </a>
         </div>
@@ -38,7 +38,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/client/index");
+            let res = await axios.get("/restaurant/index");
             if (res.status === 200 && res.data.status === 'success') {
                 let tableList = $("#tableList");
                 tableList.empty(); 
@@ -76,13 +76,13 @@
                                 </span>
                             </td>
                             <td>
-                                <a  href="/client/product/details/${item['id']}" class="btn btn-sm btn-outline-primary" title="Product Details"><span class="mdi mdi-eye-circle"></span>
+                                <a  href="/restaurant/product/details/${item['id']}" class="btn btn-sm btn-outline-primary" title="Product Details"><span class="mdi mdi-eye-circle"></span>
                                 </a>
 
-                                <a href="/client/edit/product/${item['id']}" class="btn btn-sm btn-outline-success" title="Edit Product"><span class="mdi mdi-pencil-outline"></span>
+                                <a href="/restaurant/edit/product/${item['id']}" class="btn btn-sm btn-outline-success" title="Edit Product"><span class="mdi mdi-pencil-outline"></span>
                                 </a>
 
-                                <a href="/client/edit/product/multi-image/${item['id']}" class="btn btn-sm btn-outline-info" target="_blank" title="Edit Multi Image"><span class="mdi mdi-image-edit-outline"></span>
+                                <a href="/restaurant/edit/product/multi-image/${item['id']}" class="btn btn-sm btn-outline-info" target="_blank" title="Edit Multi Image"><span class="mdi mdi-image-edit-outline"></span>
                                 </a>
 
                                 <button data-id="${item['id']}" class="btn deleteBtn btn-sm btn-outline-danger" title="Delete Product"><span class="mdi mdi-trash-can-outline"></span></button>
@@ -127,28 +127,6 @@
         });
     }
 
-    function handleError(error) {
-        let message = "An unexpected error occurred.";
-        if (error.response) {
-            const { status, data } = error.response;
-            switch (status) {
-            case 500:
-                message = data?.error || "Internal server error. Please try again later.";
-                break;
-            case 404:
-                message = data?.message || "Data not found.";
-                break;
-            default:
-                message = data?.message || "Something went wrong.";
-            }
-        } else if (error.request) {
-            message = "No response from the server. Please check your internet connection.";
-        } else {
-            message = error.message;
-        }
-
-        errorToast(message);
-    }
 </script>
 
 

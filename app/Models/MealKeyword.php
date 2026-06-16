@@ -6,10 +6,10 @@ namespace App\Models;
 
 class MealKeyword extends BaseModel
 {
-    protected $fillable = ['meal_type_id','name'];
+    protected $fillable = ['name'];
 
-    public function mealType()
+    public function mealTypes()
     {
-        return $this->belongsTo(MealType::class);
+        return $this->belongsToMany(MealType::class, 'meal_keyword_meal_type');
     }
 }

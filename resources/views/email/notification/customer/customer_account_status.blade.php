@@ -209,7 +209,7 @@
             <p class="status-text {{ $customer->status ? 'active-text' : 'inactive-text' }}">
                 Customer account has been {{ $customer->status ? 'activated' : 'deactivated' }}
             </p>
-            <a href="{{ url('/user/document/') }}" class="btn">View Account Details</a>
+            <a href="{{ url('/document/') }}" class="btn">View Account Details</a>
         </div>
 
         <!-- Client Details -->

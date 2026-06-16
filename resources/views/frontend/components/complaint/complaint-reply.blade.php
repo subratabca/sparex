@@ -60,14 +60,14 @@ function imageHandler() {
 
             try {
                 if (uploadedImageUrl) {
-                    await axios.post('/user/delete-editor-image', { image_url: uploadedImageUrl });
+                    await axios.post('/delete-editor-image', { image_url: uploadedImageUrl });
 
                     if (uploadedImageIndex !== null) {
                         quill.deleteText(uploadedImageIndex, 1); 
                     }
                 }
 
-                const res = await axios.post('/user/upload-editor-image', formData, {
+                const res = await axios.post('/upload-editor-image', formData, {
                     headers: {
                         'Content-Type': 'multipart/form-data',
                     },
@@ -121,14 +121,14 @@ async function Save() {
         };
         showLoader();
         try {
-            let res = await axios.post("/user/store/complaint/reply", formData, config);
+            let res = await axios.post("/store/complaint/reply", formData, config);
 
             if (res.status === 201 && res.data.status === "success") {
                 successToast(res.data.message || 'Request success');
                 uploadedImageUrl = null;
                 uploadedImageIndex = null;
                 quill.root.innerHTML = ''; 
-                window.location.href = '/user/complaints';
+                window.location.href = '/complaints';
             } else {
                 errorToast("Request failed with status: " + res.status);
             }
@@ -193,7 +193,7 @@ function handleError(error) {
 window.addEventListener('beforeunload', async (event) => {
     if (uploadedImageUrl) {
         try {
-            await axios.post('/user/delete-editor-image', { image_url: uploadedImageUrl });
+            await axios.post('/delete-editor-image', { image_url: uploadedImageUrl });
         } catch (error) {
             console.error('Failed to delete image on unload:', error);
         }

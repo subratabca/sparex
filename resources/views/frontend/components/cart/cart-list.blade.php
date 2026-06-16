@@ -59,7 +59,7 @@ let cartTotalItems = 0;
 document.addEventListener("DOMContentLoaded", async function () {
     try {
         showLoader();
-        const response = await axios.get('/user/get-cart-product', {
+        const response = await axios.get('/get-cart-product', {
             params: {
                 page: currentCartPage,
                 per_page: 3
@@ -199,7 +199,7 @@ async function loadMoreCartItems() {
     try {
         showLoader();
         currentCartPage++;
-        const response = await axios.get('/user/get-cart-product', {
+        const response = await axios.get('/get-cart-product', {
             params: {
                 page: currentCartPage,
                 per_page: 3
@@ -352,13 +352,13 @@ async function handleQuantityChange(cartId, newQuantity) {
     // Proceed with valid update
     try {
         showLoader();
-        const response = await axios.post('/user/cart/update', {
+        const response = await axios.post('/cart/update', {
             cart_id: cartId,
             quantity: quantity
         });
 
         if (response.status === 200) {
-            const cartResponse = await axios.get('/user/get-cart-product');
+            const cartResponse = await axios.get('/get-cart-product');
             renderCartItems(cartResponse.data.data.cart_items);
             updateCartSummary(cartResponse.data.data.summary);
             updateCartCount();
@@ -421,13 +421,13 @@ function updateCartSummary(summary) {
 async function removeCartItem(cartId) {
     try {
         showLoader();
-        const response = await axios.post('/user/cart/remove', {
+        const response = await axios.post('/cart/remove', {
             cart_id: cartId
         });
 
         if (response.status === 200) {
             successToast('Item removed from cart');
-            const cartResponse = await axios.get('/user/get-cart-product');
+            const cartResponse = await axios.get('/get-cart-product');
             renderCartItems(cartResponse.data.data.cart_items);
             updateCartSummary(cartResponse.data.data.summary);
             updateCartCount();
@@ -453,7 +453,7 @@ async function applyCoupon() {
         showLoader();
         
         // Validate coupon status
-        const validationResponse = await axios.get(`/user/validate-coupon/${couponCode}`);
+        const validationResponse = await axios.get(`/validate-coupon/${couponCode}`);
         const couponData = validationResponse.data.data;
         
         // Client-side expiration check
@@ -466,13 +466,13 @@ async function applyCoupon() {
         }
 
         // Apply the coupon
-        const applyResponse = await axios.post('/user/cart/apply-coupon', {
+        const applyResponse = await axios.post('/cart/apply-coupon', {
             coupon_code: couponCode
         });
 
         if (applyResponse.status === 200) {
             successToast('Coupon applied successfully');
-            const cartResponse = await axios.get('/user/get-cart-product');
+            const cartResponse = await axios.get('/get-cart-product');
             renderCartItems(cartResponse.data.data.cart_items);
             updateCartSummary(cartResponse.data.data.summary);
             errorSpan.textContent = ''; // Clear error on success
@@ -488,8 +488,8 @@ async function applyCoupon() {
 async function removeCoupon() {
     try {
         showLoader();
-        await axios.post('/user/cart/remove-coupon');
-        const response = await axios.get('/user/get-cart-product');
+        await axios.post('/cart/remove-coupon');
+        const response = await axios.get('/get-cart-product');
         
         if (response.status === 200 && response.data.status === 'success') {
             const cartData = response.data.data;
@@ -510,12 +510,12 @@ async function moveToWishlist(productId, cartId) {
         showLoader();
         
         // 1. Add to Wishlist
-        const wishlistResponse = await axios.post('/user/store/wishlist-request', {
+        const wishlistResponse = await axios.post('/store/wishlist-request', {
             id: productId
         });
 
         // 2. Remove from Cart only if wishlist add succeeded
-        const cartResponse = await axios.post('/user/cart/remove', {
+        const cartResponse = await axios.post('/cart/remove', {
             cart_id: cartId
         });
 
@@ -523,7 +523,7 @@ async function moveToWishlist(productId, cartId) {
             successToast('Item moved to wishlist');
             
             // Refresh cart data
-            const cartData = await axios.get('/user/get-cart-product');
+            const cartData = await axios.get('/get-cart-product');
             renderCartItems(cartData.data.data.cart_items);
             updateCartSummary(cartData.data.data.summary);
             
@@ -539,7 +539,7 @@ async function moveToWishlist(productId, cartId) {
 
             switch(status) {
                 case 401:
-                    window.location.href = '/user/login';
+                    window.location.href = '/login';
                     break;
                 case 403:
                     errorToast(message || "Your wishlist limit is full (max 3 items)");

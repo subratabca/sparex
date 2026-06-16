@@ -164,10 +164,17 @@ class ImageHelper
             $imageName = time() . uniqid() . '.' . $image->getClientOriginalExtension();
         }
 
-        $manager = new ImageManager(new Driver());
+        // PDFs can't be read/resized like images — store the raw file as-is in each path
+        $isPdf   = strtolower($image->getClientOriginalExtension()) === 'pdf';
+        $manager = $isPdf ? null : new ImageManager(new Driver());
 
         foreach ($pathsConfig as $size => $path) {
             File::ensureDirectoryExists($path);
+
+            if ($isPdf) {
+                File::copy($image->getRealPath(), $path . $imageName);
+                continue;
+            }
 
             $resizeDimensions = $resizeConfig[$size] ?? null;
             $manager->read($image->getRealPath())

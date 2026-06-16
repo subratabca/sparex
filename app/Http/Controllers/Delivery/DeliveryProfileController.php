@@ -210,132 +210,94 @@ class DeliveryProfileController extends Controller
         }
     }
 
-    public function deliveryDetailsPage(Request $request)
-    {
-        $email = $request->header('email');
-        $user = User::where('email', $email)->first();
-
-        $notification_id = $request->query('notification_id');
-        if ($notification_id) {
-            $notification = $user->notifications()->where('id', $notification_id)->first();
-
-            if ($notification && is_null($notification->read_at)) {
-                $notification->markAsRead();
-            }
-        }
-
-        return view('client.pages.profile.client-details');
-    }
-
-    public function ClientDetailsInfo($client_id)
-    {
-        try {
-            $client = User::where('id', $client_id)
-            ->where('role', 'client')
-            ->withCount(['foods' => function ($query) {
-                $query->where('status', '!=', 'pending');
-            }])
-            ->withCount(['ordersBasedOnRole as total_orders'])
-            ->withCount(['foods as total_complaints' => function ($query) {
-                $query->whereHas('order.complain');
-            }])
-            ->withCount(['ordersBasedOnRole as total_customers' => function ($query) {
-                $query->select(DB::raw('count(distinct user_id)'));
-            }]) 
-            ->first();
-
-            if (!$client) { 
-                ActivityLogger::log(
-                    'view_client_details_failed',
-                    'No client found with the provided ID.',
-                    $request,
-                    'users'
-                );
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'No client found with this ID',
-                ], 404);
-            }
-
-            ActivityLogger::log(
-                'view_client_details_success',
-                'Client details successfully retrieved.',
-                $request,
-                'users'
-            );
-            return response()->json([
-                'status' => 'success',
-                'data' => $client
-            ], 200);
-
-        } catch (Exception $e) {
-            ActivityLogger::log(
-                'view_client_details_failed',
-                'An error occurred while retrieving client details: ' . $e->getMessage(),
-                $request,
-                'users'
-            );
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'An error occurred while retrieving the customer',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    public function getDeliveryDetails($client_id)
-    {
-        try {
-            $client = User::withCount(['clientOrders'])
-                ->withLocation() 
-                ->where('role', 'client')
-                ->where('id', $client_id)
-                ->first();
-
-            if (!$client) {
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'No client found with this ID',
-                ], 404);
-            }
-
-            $productIds = Product::where('client_id', $client->id)
-                ->where('status', '!=', 'pending')
-                ->pluck('id');
-
-            $totalProducts = $productIds->count();
-
-            $totalCustomers = OrderItem::where('client_id', $client->id)
-                ->whereHas('order', function($query) {
-                    $query->whereNotNull('customer_id');
-                })
-                ->distinct('order_id')
-                ->count('order_id');
-
-            $totalOrders = $client->client_orders_count;
-            $totalComplaints = Complaint::whereIn('product_id', $productIds)->count();
-
-            $client->total_products = $totalProducts;
-            $client->total_customers = $totalCustomers;
-            $client->total_orders = $totalOrders;
-            $client->total_complaints = $totalComplaints;
-            return response()->json([
-                'status' => 'success',
-                'data' => $client
-            ], 200);
-
-        } catch (Exception $e) {
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'An error occurred while retrieving the customer',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
     public function documentPage()
     {
         return view('delivery.pages.profile.document-page');
+    }
+
+    public function storeDocumentInfo(Request $request)
+    {
+        try {
+            $id = $request->header('id');
+            $user = User::find($id);
+
+            if (!$user) {
+                ActivityLogger::log('Delivery Document Submission Failed', 'Delivery person not found', $id, 'user', 'users');
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'User not found.',
+                ], 404);
+            }
+
+            // Images are required only on first upload; on update the existing files are kept
+            $request->validate(ValidationHelper::documentValidationRules(
+                empty($user->doc_image1),
+                empty($user->doc_image2)
+            ));
+
+            $geoData = $this->formatAndFetchCoordinates($request);
+
+            if (!$geoData) {
+                ActivityLogger::log('document_upload_failed', 'Unable to fetch coordinates for address', $request, 'users');
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'Unable to fetch coordinates for the provided address.',
+                ], 400);
+            }
+
+            $oldDocImage1 = $user->doc_image1;
+            $oldDocImage2 = $user->doc_image2;
+
+            $docImage1 = $request->hasFile('doc_image1')
+                ? ImageHelper::processAndSaveDocumentImage($request->file('doc_image1'), 'delivery', 'document', $oldDocImage1, 'doc1')
+                : $oldDocImage1;
+
+            $docImage2 = $request->hasFile('doc_image2')
+                ? ImageHelper::processAndSaveDocumentImage($request->file('doc_image2'), 'delivery', 'document', $oldDocImage2, 'doc2')
+                : $oldDocImage2;
+
+            $docData  = ItemHelper::prepareDocumentData($request, $geoData, $docImage1, $docImage2);
+            $delivery = ItemHelper::storeOrUpdateDocument($id, $docData);
+
+            if ($delivery) {
+                $admin = User::where('role', 'admin')->first();
+                if ($admin) {
+                    $admin->notify(new DeliverytDocumentNotification($delivery));
+                }
+
+                ActivityLogger::log('document_upload_success', 'Delivery documents uploaded successfully', $request, 'users');
+                return response()->json([
+                    'status' => 'success',
+                    'message' => 'Document information saved successfully.',
+                ], 200);
+            }
+        } catch (ValidationException $e) {
+            ActivityLogger::log('document_upload_failed', 'Validation failed: ' . json_encode($e->errors()), $request, 'users');
+            return response()->json([
+                'status' => 'failed',
+                'message' => 'Validation Failed',
+                'errors' => $e->errors(),
+            ], 422);
+        } catch (Exception $e) {
+            ActivityLogger::log('document_upload_failed', 'Unexpected error: ' . $e->getMessage(), $request, 'users');
+            return response()->json([
+                'status' => 'failed',
+                'message' => 'An error occurred while saving document information.',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    private function formatAndFetchCoordinates(Request $request)
+    {
+        $formattedAddress = LocationHelper::formatAddress($request);
+        $geoData = LocationHelper::getCoordinatesFromAddress($formattedAddress);
+
+        if (!$geoData) {
+            throw new Exception('Unable to fetch coordinates for the provided address.');
+        }
+
+        return $geoData;
     }
 
     public function storeVehicle(Request $request)

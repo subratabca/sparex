@@ -87,7 +87,7 @@ async function loadOrderDetails() {
         let orderId = segments[segments.length - 1];
         document.getElementById('orderId').value = orderId;
 
-        let res = await axios.get(`/client/get/order/details/${orderId}`);
+        let res = await axios.get(`/restaurant/get/order/details/${orderId}`);
         if (res.status === 200 && res.data.status === 'success') {
             orderData = res.data.data;
             orderItems = orderData.order_items;
@@ -389,7 +389,7 @@ function loadMoreItems() {
 async function approveItem(itemId) {
     try {
         showLoader();
-        let res = await axios.post("/client/order/approve-item", { item_id: itemId });
+        let res = await axios.post("/restaurant/order/approve-item", { item_id: itemId });
         if (res.status === 200 && res.data.status === 'success') {
             successToast(res.data.message || "Item approved successfully!");
             loadOrderDetails(); // refresh
@@ -406,7 +406,7 @@ async function approveItem(itemId) {
 async function cancelItem(itemId) {
     try {
         showLoader();
-        let res = await axios.post("/client/order/cancel-item", { item_id: itemId });
+        let res = await axios.post("/restaurant/order/cancel-item", { item_id: itemId });
         if (res.status === 200 && res.data.status === 'success') {
             successToast(res.data.message || "Item cancelled successfully!");
             loadOrderDetails();
@@ -423,7 +423,7 @@ async function cancelItem(itemId) {
 async function deliverItem(orderId) {
     try {
         showLoader();
-        let res = await axios.post("/client/order/deliver-item", {order_id: orderId});
+        let res = await axios.post("/restaurant/order/deliver-item", {order_id: orderId});
         if (res.status === 200 && res.data.status === 'success') {
             successToast(res.data.message || "All approved items delivered successfully!");
             loadOrderDetails();

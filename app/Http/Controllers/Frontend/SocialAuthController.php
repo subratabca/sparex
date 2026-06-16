@@ -69,7 +69,7 @@ public function handleProviderCallback($provider)
         $token = JWTToken::CreateToken($user->email, $user->id, $user->role);
         ActivityLogger::socialAuthLog('login_success', 'Login success via ' . ucfirst($provider), $user, 'users');
 
-        return redirect()->to('/user/dashboard')->cookie('token', $token, 60, null, null, false, false);
+        return redirect()->to('/dashboard')->cookie('token', $token, 60, null, null, config('jwt.cookie_secure'), true, false, 'Lax');
 
     } catch (\Exception $e) {
         ActivityLogger::socialAuthLog('login_failed', 'Social login failed for provider ' . ucfirst($provider), null, 'users');

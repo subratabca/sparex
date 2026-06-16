@@ -38,7 +38,7 @@ async function getList() {
 
     showLoader();
     try {
-        let res = await axios.get("/client/get/order/list/by/customer/" + customer_id);
+        let res = await axios.get("/restaurant/get/order/list/by/customer/" + customer_id);
         if (res.status === 200 && res.data.status === 'success') {
             let data = res.data.data;
             let tableList = $("#tableList");
@@ -57,12 +57,12 @@ async function getList() {
                         <tr>
                             <td>${index + 1}</td>
                             <td>
-                                <a href="/client/customer/details/${item['customer']['id']}" target="_blank" title="Customer details">${customerName}
+                                <a href="/restaurant/customer/details/${item['customer']['id']}" target="_blank" title="Customer details">${customerName}
                                 </a>
                             </td>
                             <td>${productOwner}</td>
                             <td>
-                                <a href="/client/order/details/${item.id}" target="_blank" title="Order details">
+                                <a href="/restaurant/order/details/${item.id}" target="_blank" title="Order details">
                                     ${item.order_number}
                                 </a>    
                             </td>
@@ -73,7 +73,7 @@ async function getList() {
                                 <span class="badge ${item.status === 'pending' ? 'bg-danger' : 'bg-success'}">${item.status}</span>
                             </td>
                             <td>
-                                <a href="/client/order/details/${item.id}" class="btn btn-sm btn-outline-primary" target="_blank" title="Order details">
+                                <a href="/restaurant/order/details/${item.id}" class="btn btn-sm btn-outline-primary" target="_blank" title="Order details">
                                     <span class="mdi mdi-eye-circle"></span>
                                 </a>
                             </td>

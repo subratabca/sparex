@@ -1,9 +1,9 @@
 @extends('delivery.layout.master')
 
-@section('title', 'My Reports')
+@section('title', 'Dashboard || Report Summary')
 
 @section('breadcum')
-    <span class="text-muted fw-light"></span>My Reports
+    <span class="text-muted fw-light">Rider /</span>Reports
 @endsection
 
 @section('content')

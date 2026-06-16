@@ -404,7 +404,6 @@ class ItemHelper
     public static function prepareMealKeywordData($request)
     {
         return [
-            'meal_type_id' => $request->input('meal_type_id'),
             'name' => $request->input('name'),
         ];
     }
@@ -423,7 +422,6 @@ class ItemHelper
     public static function prepareMealDeliveryChargeData($request)
     {
         return [
-            'client_id' => $request->input('client_id'),
             'meal_type_id' => $request->input('meal_type_id'),
             'inside_city_2km' => $request->input('inside_city_2km'),
             'inside_city_5km' => $request->input('inside_city_5km'),

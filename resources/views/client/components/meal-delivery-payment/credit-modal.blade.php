@@ -265,7 +265,7 @@ document.querySelectorAll('input[name="credit_payment"]').forEach(radio => {
 async function loadUserProfileForCredit() {
     try {
         showLoader();
-        const userResponse = await axios.get('/client/profile/info');
+        const userResponse = await axios.get('/restaurant/profile/info');
         
         if (userResponse.data && userResponse.data.data) {
             userProfileData = userResponse.data.data;
@@ -518,7 +518,7 @@ async function processCashPayment() {
     }
     errorText.style.display = "none";
 
-    const response = await axios.post("/client/store/meal-delivery/payment/by/cash", {
+    const response = await axios.post("/restaurant/store/meal-delivery/payment/by/cash", {
         payment_method: 'cash',
         ledger_id: ledgerID,
         amount: parseFloat(amount).toFixed(2)
@@ -595,7 +595,7 @@ async function processStripePayment() {
         customer_phone: billingData.phone
     };
 
-    const paymentIntentResponse = await axios.post('/client/meal-delivery/create-payment-intent', {
+    const paymentIntentResponse = await axios.post('/restaurant/meal-delivery/create-payment-intent', {
         amount: paymentAmount,
         currency: 'usd',
         description: `Payment - $${parseFloat(amount).toFixed(2)}`,
@@ -653,7 +653,7 @@ async function processStripePayment() {
 
     if (paymentIntent && paymentIntent.status === 'succeeded') {
         // Store the payment – include ledger_id now
-        const response = await axios.post("/client/store/meal-delivery/payment/by/stripe", {
+        const response = await axios.post("/restaurant/store/meal-delivery/payment/by/stripe", {
             payment_method: 'stripe',
             amount: parseFloat(amount).toFixed(2),
             stripe_payment_id: paymentIntent.id,

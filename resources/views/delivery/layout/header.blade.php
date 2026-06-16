@@ -237,26 +237,26 @@
             <div class="dropdown-divider"></div>
           </li>
           <li>
-            <a class="dropdown-item" href="{{ url('/delivery/profile') }}">
+            <a class="dropdown-item" href="{{ url('/rider/profile') }}">
               <i class="mdi mdi-account-outline me-2"></i>
               <span class="align-middle">My Profile</span>
             </a>
           </li>
           <li>
-            <a class="dropdown-item" href="{{ url('/delivery/password') }}">
+            <a class="dropdown-item" href="{{ url('/rider/password') }}">
               <i class="mdi mdi-cog-outline me-2"></i>
               <span class="align-middle">Update Password</span>
             </a>
           </li>
           <li>
-            <a class="dropdown-item" href="{{ url('/delivery/document') }}">
+            <a class="dropdown-item" href="{{ url('/rider/document') }}">
               <i class="mdi mdi-file-upload-outline me-2"></i>
               <span class="align-middle">Upload Document</span>
             </a>
           </li>
           <li>
           <li>
-            <a class="dropdown-item" href="{{ url('/delivery/vehicle') }}">
+            <a class="dropdown-item" href="{{ url('/rider/vehicle') }}">
               <i class="mdi mdi-file-upload-outline me-2"></i>
               <span class="align-middle">Upload Vehicle Info</span>
             </a>
@@ -295,7 +295,7 @@
         let res = await axios.get("{{ route('delivery.logout') }}");
         if (res.status === 200) {
             successToast(res.data.message || 'Successfully logged out');
-            window.location.href = '/delivery/login';
+            window.location.href = '/rider/login';
         } else {
             errorToast(res.data.message || "Request failed");
         }

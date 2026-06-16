@@ -32,7 +32,7 @@
         try {
             let id = document.getElementById('deleteID').value;
             $('#delete-modal').modal('hide');
-            let res = await axios.post("/client/food/delete", {id: id});
+            let res = await axios.post("/restaurant/product/delete", {id: id});
             if (res.status === 200) {
                 successToast(res.data.message || "Data deleted successfully");
                 window.location.reload();
@@ -40,15 +40,7 @@
                 errorToast("Request failed! Please try again.");
             }
         } catch (error) {
-            if (error.response) {
-              if (error.response.status === 404) {
-                errorToast(error.response.data.message || "Data not found.");
-              } else if (error.response.status === 500) {
-                errorToast(error.response.data.error || "An internal server error occurred.");
-              } else {
-                errorToast("Request failed!");
-              }
-            } 
+            handleError(error);
         } finally{
           hideLoader();
         }

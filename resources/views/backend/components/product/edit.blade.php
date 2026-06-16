@@ -548,7 +548,7 @@ async function productDetailsInfo() {
 async function deleteVariant(productId, variantId) {
     showLoader();
     try {
-        const response = await axios.post('/client/product/variant/delete', {
+        const response = await axios.post('/restaurant/product/variant/delete', {
             product_id: productId,
             variant_id: variantId
         });
@@ -859,6 +859,7 @@ async function updateProduct() {
       headers: {'content-type': 'multipart/form-data'}
   };
 
+  showLoader();
   try {
       let res = await axios.post("/admin/update/product", formData, config);
       if (res.status === 200 && res.data.status === 'success') {
@@ -869,54 +870,18 @@ async function updateProduct() {
           errorToast(res.data.message || "Request failed");
       }
     } catch (error) {
-        handleError(error);
-    } finally {
-        hideLoader(); 
-    }
-}
-
-function handleError(error) {
-    let message = 'An unexpected error occurred';
-
-    if (error.response) {
-        const status = error.response.status;
-        const serverMessage = error.response.data?.message;
-        const errorData = error.response.data;
-
-        switch (status) {
-            case 404:
-                message = serverMessage || 'Data not found.';
-                break;
-            case 400:
-                message = serverMessage || 'Invalid address or coordinates not found.';
-                break;
-            case 422:
-                const errorMessages = errorData.errors;
-                if (errorMessages) {
-                    for (let field in errorMessages) {
-                        if (errorMessages.hasOwnProperty(field)) {
-                            const errorElement = document.getElementById(`${field}-error`);
-                            if (errorElement) {
-                                errorElement.innerText = errorMessages[field][0];
-                            }
-                        }
-                    }
-                }
-                message = serverMessage || 'Validation failed.';
-                break;
-            case 500:
-                message = errorData.error || serverMessage || 'Internal server error.';
-                break;
-            default:
-                message = serverMessage || message;
+        if (error.response?.status === 422) {
+            Object.entries(error.response.data.errors).forEach(([key, val]) => {
+                const span = document.getElementById(`${key.split('.')[0]}-error`);
+                if (span) span.innerText = val[0];
+                else errorToast(val[0]);
+            });
+        } else {
+            handleError(error);
         }
-    } else if (error.request) {
-        message = 'No response received from the server.';
-    } else {
-        message = error.message || message;
+    } finally {
+        hideLoader();
     }
-
-    errorToast(message);
 }
 </script>
  

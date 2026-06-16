@@ -79,7 +79,7 @@ document.addEventListener("DOMContentLoaded", async function () {
     async function loadOrderItems(page = 1, append = false) {
         try {
             showLoader();
-            const response = await axios.get(`/user/get-order-info`, {
+            const response = await axios.get(`/get-order-info`, {
                 params: {
                     order_id: orderId,
                     page: page,

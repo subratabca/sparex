@@ -32,7 +32,7 @@
 async function getList() {
     showLoader();
     try {
-        let res = await axios.get("/client/get/customers"); 
+        let res = await axios.get("/restaurant/get/customers"); 
         if (res.status === 200 && res.data.status === 'success') {
             let data = res.data.data;
 
@@ -49,22 +49,22 @@ async function getList() {
                            ${item.image ? `<img src="/upload/customer-profile/small/${item.image}" width="50" height="50">` : `<img src="/upload/no_image.jpg" width="50" height="50">`}
                         </td>
 
-                        <td><a href="/client/customer/details/${item.id}" target="_blank" title="Customer details">${fullName}</a></td>
+                        <td><a href="/restaurant/customer/details/${item.id}" target="_blank" title="Customer details">${fullName}</a></td>
 
                         <td>${item.total_orders > 0 
-                            ? `<a href="/client/order/list/by/customer/${item.id}" class="badge bg-success" 
+                            ? `<a href="/restaurant/order/list/by/customer/${item.id}" class="badge bg-success" 
                             target="_blank" title="Order list by customer">${item.total_orders}</a>` 
                             : item.total_orders}
                         </td>
 
                         <td>${item.total_product_complaints > 0 
-                            ? `<a href="/client/complaint/list/by/customer/${item.id}" class="badge bg-success" 
+                            ? `<a href="/restaurant/complaint/list/by/customer/${item.id}" class="badge bg-success" 
                             target="_blank" title="Product complaints by customer">${item.total_product_complaints}</a>` 
                             : item.total_product_complaints}
                         </td>
 
                         <td>${item.total_received_complaints > 0 
-                            ? `<a href="/client/customer-complain/list/by/customer/${item.id}" class="badge bg-success" target="_blank" title="Complaints received by customer">${item.total_received_complaints}</a>` 
+                            ? `<a href="/restaurant/customer-complain/list/by/customer/${item.id}" class="badge bg-success" target="_blank" title="Complaints received by customer">${item.total_received_complaints}</a>` 
                             : item.total_received_complaints}
                         </td>
 

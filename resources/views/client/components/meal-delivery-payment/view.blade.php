@@ -241,7 +241,7 @@ async function loadDeliveryOrderDetails() {
         const pathSegments = window.location.pathname.split('/');
         const ledgerId = pathSegments[pathSegments.length - 1];
         
-        const response = await axios.get(`/client/get/meal-order/payment/details/${ledgerId}`);
+        const response = await axios.get(`/restaurant/get/meal-order/payment/details/${ledgerId}`);
         
         if (response.status === 200 && response.data.status === 'success') {
             const data = response.data.data;

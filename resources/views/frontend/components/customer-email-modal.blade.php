@@ -80,7 +80,7 @@ document.addEventListener("DOMContentLoaded", function() {
         showLoader();
 
         try {
-            let res = await axios.post('/user/share-item-with-email', formData, {
+            let res = await axios.post('/share-item-with-email', formData, {
                 headers: { 'content-type': 'multipart/form-data' }
             });
 

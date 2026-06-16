@@ -191,7 +191,7 @@ class AdminComplaintController extends Controller
             }
 
             $client = $complaint->orderItem->product->client ?? null;
-            if ($client && $client->role === 'client') {
+            if ($client && $client->role === 'restaurant') {
                 $client->notify(
                     new ForwardProductComplaintNotification($complaint, 'client')
                 );
@@ -302,7 +302,7 @@ class AdminComplaintController extends Controller
             }
 
             $client = $complaint->orderItem->product->client ?? null;
-            if ($client && $client->role === 'client') {
+            if ($client && $client->role === 'restaurant') {
                 $client->notify(new ForwardProductComplaintNotification($complaint, 'client'));
             }
 
@@ -407,7 +407,7 @@ class AdminComplaintController extends Controller
                 $complaint->customer->notify(new ForwardProductComplaintNotification($complaint, 'customer'));
             }
 
-            if ($complaint->product->client->role === 'client') {
+            if ($complaint->product->client->role === 'restaurant') {
                 $complaint->product->client->notify(new ForwardProductComplaintNotification($complaint, 'client'));
             }
 
@@ -531,7 +531,7 @@ class AdminComplaintController extends Controller
                     $customer->notify(new SolvedProductComplaintNotification($complaint,'customer'));
                 }
 
-                if ($client->role === 'client') {
+                if ($client->role === 'restaurant') {
                     $client->notify(new SolvedProductComplaintNotification($complaint,'client'));
                 }
 
@@ -614,7 +614,7 @@ class AdminComplaintController extends Controller
                     $customer->notify(new ComplaintInvestigationNotification($complaint,'customer')); 
                 }
 
-                if ($client->role === 'client') {
+                if ($client->role === 'restaurant') {
                     $client->notify(new ComplaintInvestigationNotification($complaint,'client')); 
                 }
 

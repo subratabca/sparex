@@ -93,26 +93,4 @@
         });
     }
 
-    function handleError(error) {
-        let message = "An unexpected error occurred.";
-        if (error.response) {
-            const { status, data } = error.response;
-            switch (status) {
-            case 500:
-                message = data?.error || "Internal server error. Please try again later.";
-                break;
-            case 404:
-                message = data?.message || "Data not found.";
-                break;
-            default:
-                message = data?.message || "Something went wrong.";
-            }
-        } else if (error.request) {
-            message = "No response from the server. Please check your internet connection.";
-        } else {
-            message = error.message;
-        }
-
-        errorToast(message);
-    }
 </script>

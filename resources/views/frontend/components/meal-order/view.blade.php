@@ -179,7 +179,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 async function loadMealOrderDetails() {
     try {
         showLoader();
-        const response = await axios.get(`/user/get/meal-order/details/${currentOrderId}`);
+        const response = await axios.get(`/get/meal-order/details/${currentOrderId}`);
 
         if (response.status === 200 && response.data.status === 'success') {
             const data            = response.data.data;
@@ -436,7 +436,7 @@ async function loadDailyCalories(range) {
             params.order_id = currentOrderId;
         }
 
-        const res = await axios.get('/user/get/calories/history', { params });
+        const res = await axios.get('/get/calories/history', { params });
 
         if (res.data.status === 'success') {
             mealTypeBreakdown = { ...res.data.meal_type_breakdown };

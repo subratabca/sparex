@@ -32,10 +32,10 @@
         try {
             let id = document.getElementById('deleteID').value;
             $('#delete-modal').modal('hide');
-            let res = await axios.post("/client/delete/banned/customer", {id: id});
+            let res = await axios.post("/restaurant/delete/banned/customer", {id: id});
             if (res.status === 200 && res.data.status === 'success') {
                 successToast(res.data.message || "Data deleted successfully");
-                window.location.href = '/client/banned/customers';
+                window.location.href = '/restaurant/banned/customers';
             } else {
                 errorToast("Request failed! Please try again.");
             }

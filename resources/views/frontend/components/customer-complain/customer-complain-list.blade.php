@@ -34,7 +34,7 @@
     async function getList() {
         showLoader();
         try {
-            let res = await axios.get("/user/customer-complains");
+            let res = await axios.get("/customer-complains");
 
             let tableList = $("#tableList");
             tableList.empty(); 
@@ -57,10 +57,10 @@
                             </span>
                         </td>
                         <td>
-                            <a href="/user/customer-complain-details/${item['id']}" class="btn btn-sm btn-info">Details</a>
+                            <a href="/customer-complain-details/${item['id']}" class="btn btn-sm btn-info">Details</a>
 
                             ${(item.status === 'under-review') ? 
-                            `<a href="/user/customer-complain/appeal/${item['id']}" class="btn btn-sm btn-danger">Appeal</a>` : ''}
+                            `<a href="/customer-complain/appeal/${item['id']}" class="btn btn-sm btn-danger">Appeal</a>` : ''}
 
                         </td>
                     </tr>`;

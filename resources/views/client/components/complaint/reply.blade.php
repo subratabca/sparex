@@ -63,7 +63,7 @@
 
       if (uploadedImageUrl) {
         try {
-          await axios.post('/client/delete-editor-image', { image_url: uploadedImageUrl });
+          await axios.post('/restaurant/delete-editor-image', { image_url: uploadedImageUrl });
           uploadedImageUrl = null;  
           uploadedImageIndex = null;
         } catch (error) {
@@ -89,14 +89,14 @@
 
         try {
           if (uploadedImageUrl) {
-            await axios.post('/client/delete-editor-image', { image_url: uploadedImageUrl });
+            await axios.post('/restaurant/delete-editor-image', { image_url: uploadedImageUrl });
 
             if (uploadedImageIndex !== null) {
               quill.deleteText(uploadedImageIndex, 1); 
             }
           }
 
-          const res = await axios.post('/client/upload-editor-image', formData, {
+          const res = await axios.post('/restaurant/upload-editor-image', formData, {
             headers: {
               'Content-Type': 'multipart/form-data',
             },
@@ -150,12 +150,12 @@
       showLoader();
 
       try {
-        let res = await axios.post("/client/store/complaint/feedback", formData, config);
+        let res = await axios.post("/restaurant/store/complaint/feedback", formData, config);
         if (res.status === 201) {
           successToast(res.data.message || 'Complain feedback given successfully');
           uploadedImageUrl = null;
           uploadedImageIndex = null;
-          window.location.href = '/client/complaints';
+          window.location.href = '/restaurant/complaints';
           document.getElementById('save-form').reset();
           $('#reply-modal').modal('hide');
         } else {
@@ -215,7 +215,7 @@
   window.addEventListener('beforeunload', async (event) => {
     if (uploadedImageUrl) {
       try {
-        await axios.post('/client/delete-editor-image', { image_url: uploadedImageUrl });
+        await axios.post('/restaurant/delete-editor-image', { image_url: uploadedImageUrl });
       } catch (error) {
         console.error('Failed to delete image on unload:', error);
       }

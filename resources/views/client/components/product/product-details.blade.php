@@ -26,7 +26,7 @@ async function productDetailsInfo() {
         let segments = url.split('/');
         let id = segments[segments.length - 1];
 
-        let res = await axios.get("/client/product/info/" + id);
+        let res = await axios.get("/restaurant/product/info/" + id);
         if (res.status === 200 && res.data.status === 'success') {
             let product = res.data.data;
             let formattedProductName = product.name.replace(/\b\w/g, c => c.toUpperCase());
@@ -166,31 +166,5 @@ async function productDetailsInfo() {
     } finally {
         hideLoader();
     }
-}
-
-function handleError(error) {
-    let message = 'An unexpected error occurred';
-
-    if (error.response) {
-        const status = error.response.status;
-        const serverMessage = error.response.data?.message;
-
-        switch (status) {
-            case 404:
-                message = serverMessage || 'Data not found';
-                break;
-            case 500:
-                message = serverMessage || 'Server error. Please try again later.';
-                break;
-            default:
-                message = serverMessage || message;
-        }
-    } else if (error.request) {
-        message = 'No response received from the server.';
-    } else {
-        message = error.message || message;
-    }
-
-    errorToast(message);
 }
 </script>

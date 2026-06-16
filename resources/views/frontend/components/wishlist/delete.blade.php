@@ -32,10 +32,10 @@
         try {
             let id = document.getElementById('deleteID').value;
             $('#delete-modal').modal('hide');
-            let res = await axios.post("/user/delete/wishlist", {id: id});
+            let res = await axios.post("/delete/wishlist", {id: id});
             if (res.status === 200) {
                 successToast(res.data.message || "Data deleted successfully");
-                window.location.href = '/user/wishlist';
+                window.location.href = '/wishlist';
             } else {
                 errorToast("Request failed! Please try again.");
             }

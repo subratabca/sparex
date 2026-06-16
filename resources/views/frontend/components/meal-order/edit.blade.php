@@ -56,7 +56,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 // Load all meal types
 async function loadMealTypes() {
     try {
-        const res = await axios.get('/user/get/meal-types');
+        const res = await axios.get('/get/meal-types');
         const container = document.getElementById('mealTypesContainer');
         container.innerHTML = '';
 
@@ -89,14 +89,14 @@ async function loadMealTypes() {
 async function loadOrderDetails(orderId) {
     showLoader();
     try {
-        const res = await axios.get(`/user/get/meal-order/details/${orderId}`);
+        const res = await axios.get(`/get/meal-order/details/${orderId}`);
         if (res.data.status !== 'success') return errorToast('Failed to load order details');
 
         const order = res.data.data;
         document.getElementById('orderDate').value = order.order_date;
 
         // Load menus for each meal type and pre-select
-        const menuRes = await axios.get('/user/get/menus/group-by-meal-type');
+        const menuRes = await axios.get('/get/menus/group-by-meal-type');
         if (menuRes.data.status !== 'success') return errorToast('Failed to load menus');
 
         const groupedMenus = menuRes.data.data;
@@ -168,7 +168,7 @@ async function submitOrder(orderId) {
 
     showLoader();
     try {
-        const res = await axios.post('/user/update/meal-order', orderData, {
+        const res = await axios.post('/update/meal-order', orderData, {
             headers: { 'Content-Type': 'application/json' }
         });
 

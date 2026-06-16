@@ -109,6 +109,7 @@
     } else if (password.length === 0) {
       errorToast("Password is required");
     } else {
+      showLoader();
       try {
         let res = await axios.post("/admin/login", { email: email, password: password });
         if (res.status === 200 && res.data['status'] === 'success') {
@@ -117,25 +118,17 @@
           errorToast(res.data['message']);
         }
       } catch (error) {
-        if (error.response) {
-          if (error.response.status === 401) {
-            errorToast(error.response.data.message);
-          } else if (error.response.status === 422) {
-            const errors = error.response.data.errors;
-            for (const key in errors) {
-              if (errors.hasOwnProperty(key)) {
-                const errorMessage = errors[key][0];
-                document.getElementById(`${key}-error`).innerText = errorMessage;
-              }
-            }
-          } else if (error.response.status === 500) {
-            errorToast(error.response.data.message || "An unexpected error occurred. Please try again later.");
-          } else {
-            errorToast(error.response.data.message || 'Login failed');
-          }
+        if (error.response?.status === 422) {
+          Object.entries(error.response.data.errors).forEach(([key, val]) => {
+            const span = document.getElementById(`${key}-error`);
+            if (span) span.innerText = val[0];
+            else errorToast(val[0]);
+          });
         } else {
-          errorToast('Login failed. Please check your network connection.');
+          errorToast(error.response?.data?.message || 'Login failed. Please check your connection.');
         }
+      } finally {
+        hideLoader();
       }
     }
   }

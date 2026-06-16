@@ -28,7 +28,7 @@ class ClientProfileController extends Controller
         return view('client.pages.profile.profile-page');
     }
 
-    public function profile(Request $request)
+    public function getProfileInfo(Request $request)
     {
         try {
             $email = $request->header('email');
@@ -112,12 +112,12 @@ class ClientProfileController extends Controller
         }
     }
 
-    public function PasswordPage()
+    public function passwordPage()
     {
         return view('client.pages.profile.password-change-page');
     }
 
-    public function UpdatePassword(Request $request)
+    public function updatePassword(Request $request)
     {
         try {
             $request->validate([
@@ -214,68 +214,12 @@ class ClientProfileController extends Controller
         return view('client.pages.profile.client-details');
     }
 
-    public function ClientDetailsInfo($client_id)
-    {
-        try {
-            $client = User::where('id', $client_id)
-            ->where('role', 'client')
-            ->withCount(['foods' => function ($query) {
-                $query->where('status', '!=', 'pending');
-            }])
-            ->withCount(['ordersBasedOnRole as total_orders'])
-            ->withCount(['foods as total_complaints' => function ($query) {
-                $query->whereHas('order.complain');
-            }])
-            ->withCount(['ordersBasedOnRole as total_customers' => function ($query) {
-                $query->select(DB::raw('count(distinct user_id)'));
-            }]) 
-            ->first();
-
-            if (!$client) { 
-                ActivityLogger::log(
-                    'view_client_details_failed',
-                    'No client found with the provided ID.',
-                    $request,
-                    'users'
-                );
-                return response()->json([
-                    'status' => 'failed',
-                    'message' => 'No client found with this ID',
-                ], 404);
-            }
-
-            ActivityLogger::log(
-                'view_client_details_success',
-                'Client details successfully retrieved.',
-                $request,
-                'users'
-            );
-            return response()->json([
-                'status' => 'success',
-                'data' => $client
-            ], 200);
-
-        } catch (Exception $e) {
-            ActivityLogger::log(
-                'view_client_details_failed',
-                'An error occurred while retrieving client details: ' . $e->getMessage(),
-                $request,
-                'users'
-            );
-            return response()->json([
-                'status' => 'failed',
-                'message' => 'An error occurred while retrieving the customer',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    public function getClientDetails($client_id)
+    public function getClientDetailsInfo($client_id)
     {
         try {
             $client = User::withCount(['clientOrders'])
                 ->withLocation() 
-                ->where('role', 'client')
+                ->where('role', 'restaurant')
                 ->where('id', $client_id)
                 ->first();
 
@@ -320,7 +264,7 @@ class ClientProfileController extends Controller
         }
     }
 
-    public function DocumentPage()
+    public function documentPage()
     {
         return view('client.pages.profile.client-document-page');
     }
@@ -328,7 +272,6 @@ class ClientProfileController extends Controller
     public function storeDocumentInfo(Request $request)
     {
         try {
-            $request->validate(ValidationHelper::documentValidationRules());
             $id = $request->header('id');
             $user = User::find($id);
 
@@ -339,6 +282,12 @@ class ClientProfileController extends Controller
                     'message' => 'User not found.',
                 ], 404);
             }
+
+            // Images are required only on first upload; on update the existing files are kept
+            $request->validate(ValidationHelper::documentValidationRules(
+                empty($user->doc_image1),
+                empty($user->doc_image2)
+            ));
 
             $geoData = $this->formatAndFetchCoordinates($request);
 
