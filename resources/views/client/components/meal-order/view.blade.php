@@ -416,6 +416,7 @@ function renderMealOrderItems(items, dates, itemsWithTime = []) {
                                         data-order-id="${window.location.pathname.split('/').pop()}"
                                         data-group-name="${typeTitle}"
                                         data-meal-date="${date}"
+                                        data-meal-time="${mealTime || ''}"
                                         data-meal-type-id="${group.meal_type_id}"
                                         data-current-status="${deliveryStatus}"
                                         data-current-status-label="${deliveryStatusLabel}">
@@ -480,7 +481,8 @@ function attachDeliveryStatusGroupEventListeners() {
                 this.dataset.mealDate,
                 this.dataset.mealTypeId,
                 this.dataset.currentStatus,
-                this.dataset.currentStatusLabel
+                this.dataset.currentStatusLabel,
+                this.dataset.mealTime
             );
         });
     });
@@ -491,9 +493,10 @@ function populateStatusOptions(currentStatus) {
     const select = document.getElementById('deliveryStatusSelect');
 
     const transitions = {
-        pending:      [{ value: 'accept_order', label: 'Accept Order' }, { value: 'cancelled', label: 'Cancelled' }],
-        accept_order: [{ value: 'preparing',    label: 'Preparing'    }],
-        preparing:    [{ value: 'ready_for_pickup', label: 'Ready for Pickup' }],
+        pending:         [{ value: 'accept_order', label: 'Accept Order' }, { value: 'cancelled', label: 'Cancelled' }],
+        accept_order:    [{ value: 'cancelled',    label: 'Cancelled'    }],
+        accept_delivery: [{ value: 'preparing',    label: 'Preparing'    }],
+        preparing:       [{ value: 'ready_for_pickup', label: 'Ready for Pickup' }],
         ready_for_pickup: [],
     };
 
@@ -513,10 +516,18 @@ function populateStatusOptions(currentStatus) {
         opt.textContent = o.label;
         select.appendChild(opt);
     });
+
+    // Default-select the primary (forward) next status — it's always listed first
+    // (pending → Accept Order, accept_delivery → Preparing, preparing → Ready for Pickup).
+    // The client can still change it (e.g. to Cancelled). Don't auto-select when the only
+    // option is Cancelled (e.g. accept_order, where the client is waiting for a rider).
+    if (options.length > 0 && options[0].value !== 'cancelled') {
+        select.value = options[0].value;
+    }
 }
 
 // ===== Check & Open Modal =====
-async function checkAndOpenDeliveryModal(itemIds, orderId, groupName, mealDate, mealTypeId, currentStatus, currentStatusLabel) {
+async function checkAndOpenDeliveryModal(itemIds, orderId, groupName, mealDate, mealTypeId, currentStatus, currentStatusLabel, mealTime) {
     try {
         const response = await axios.post(`/client/check/delivery-acceptance/${orderId}`, {
             meal_date:    mealDate,
@@ -526,7 +537,7 @@ async function checkAndOpenDeliveryModal(itemIds, orderId, groupName, mealDate, 
         if (response.data.status === 'success') {
             const data = response.data.data;
 
-            const nextMap  = { pending: 'accept_order', accept_order: 'preparing', preparing: 'ready_for_pickup' };
+            const nextMap  = { pending: 'accept_order', accept_delivery: 'preparing', preparing: 'ready_for_pickup' };
             const nextStat = nextMap[currentStatus];
 
             if (data.blocked_statuses?.includes(nextStat)) {
@@ -550,13 +561,22 @@ async function checkAndOpenDeliveryModal(itemIds, orderId, groupName, mealDate, 
     } catch (error) {
         // Still open modal — backend will validate
         openDeliveryStatusModalForGroup(
-            itemIds, orderId, groupName, mealDate, mealTypeId, currentStatus, currentStatusLabel
+            itemIds, orderId, groupName, mealDate, mealTypeId, currentStatus, currentStatusLabel, mealTime
         );
     }
 }
 
 // ===== Open Modal =====
-function openDeliveryStatusModalForGroup(itemIds, orderId, groupName, mealDate, mealTypeId, currentStatus, currentStatusLabel) {
+// Latest delivery cutoff (meal_date + meal_time) so submit can validate the pickup time
+let modalDeliveryDeadline = null;
+
+// Date -> "YYYY-MM-DDTHH:MM" in local time (for <input type="datetime-local">)
+function toLocalInput(d) {
+    const pad = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function openDeliveryStatusModalForGroup(itemIds, orderId, groupName, mealDate, mealTypeId, currentStatus, currentStatusLabel, mealTime) {
     document.getElementById('updateMealOrderItemId').value  = itemIds;
     document.getElementById('updateOrderId').value          = orderId;
     document.getElementById('currentDeliveryStatus').value  = currentStatus;
@@ -578,15 +598,43 @@ function openDeliveryStatusModalForGroup(itemIds, orderId, groupName, mealDate, 
 
     const pickupContainer = document.getElementById('pickupTimeContainer');
     const pickupInput     = document.getElementById('pickup_time');
+    modalDeliveryDeadline = null;
+
     if (currentStatus === 'preparing') {
         pickupContainer.style.display = 'block';
         pickupInput.required          = true;
-        const now = new Date();
-        now.setHours(now.getHours() + 1);
-        pickupInput.value = now.toISOString().slice(0, 16);
+
+        // Delivery time = meal_date + meal_time (from the order item). Default & latest-allowed
+        // pickup is 30 min before that — the client may pick earlier but not later.
+        // Resolve meal_time: value passed from the button, else look it up by meal_type_id in the order data.
+        let resolvedMealTime = mealTime || '';
+        if (!resolvedMealTime && window.currentOrderData && Array.isArray(window.currentOrderData.items_with_time)) {
+            const wt = window.currentOrderData.items_with_time;
+            let m = wt.find(it => it.meal_date === mealDate && String(it.meal_type_id) === String(mealTypeId));
+            if (!m) m = wt.find(it => String(it.meal_type_id) === String(mealTypeId));
+            resolvedMealTime = (m && m.meal_time) ? m.meal_time : '';
+        }
+        const deliveryDT = (mealDate && resolvedMealTime) ? new Date(`${mealDate}T${resolvedMealTime}`) : null;
+
+        if (deliveryDT && !isNaN(deliveryDT.getTime())) {
+            const cutoffDT = new Date(deliveryDT.getTime() - 30 * 60 * 1000); // 30 min before delivery
+            modalDeliveryDeadline = cutoffDT;
+
+            pickupInput.value = toLocalInput(cutoffDT);
+            pickupInput.min   = `${mealDate}T00:00`;      // keep it on the delivery date
+            pickupInput.max   = toLocalInput(cutoffDT);   // cannot exceed 30 min before delivery
+        } else {
+            const now = new Date();
+            now.setHours(now.getHours() + 1);
+            pickupInput.value = toLocalInput(now);
+            pickupInput.removeAttribute('min');
+            pickupInput.removeAttribute('max');
+        }
     } else {
         pickupContainer.style.display = 'none';
         pickupInput.required          = false;
+        pickupInput.removeAttribute('min');
+        pickupInput.removeAttribute('max');
     }
 
     populateStatusOptions(currentStatus);
@@ -603,9 +651,16 @@ async function updateDeliveryStatus() {
     const pickupTime    = document.getElementById('pickup_time').value;
 
     if (!status) { errorToast('Please select a delivery status.'); return; }
-    if (currentStatus === 'preparing' && status === 'ready_for_pickup' && !pickupTime) {
-        errorToast('Please provide a pickup time.');
-        return;
+    if (currentStatus === 'preparing' && status === 'ready_for_pickup') {
+        if (!pickupTime) {
+            errorToast('Please provide a pickup time.');
+            return;
+        }
+        // Pickup must be at least 30 minutes before the delivery time
+        if (modalDeliveryDeadline && new Date(pickupTime) > modalDeliveryDeadline) {
+            errorToast('Pickup time must be at least 30 minutes before the delivery time.');
+            return;
+        }
     }
 
     try {
@@ -669,6 +724,7 @@ function getDeliveryBadgeClass(status) {
         picked_up:        'bg-info',
         ready_for_pickup: 'bg-warning',
         preparing:        'bg-warning',
+        accept_delivery:  'bg-primary',
         accept_order:     'bg-secondary',
         pending:          'bg-secondary',
         cancelled:        'bg-dark',

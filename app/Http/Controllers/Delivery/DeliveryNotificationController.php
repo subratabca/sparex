@@ -10,6 +10,8 @@ use App\Models\MealShippingAddress;
 use App\Models\MealOrderItem;
 use App\Models\MealDeliveryStatusHistory;
 use App\Models\MealOrder;
+use App\Notifications\Delivery\NewDeliveryAvailableNotification;
+use App\Notifications\Delivery\OrderReadyForPickupNotification;
 use Exception;
 use Carbon\Carbon;
 
@@ -180,6 +182,7 @@ class DeliveryNotificationController extends Controller
                                 'product_name'  => $item->product->name ?? 'N/A',
                                 'product_image' => $item->product->image ?? null,
                                 'quantity'      => $item->quantity,
+                                'meal_date'     => $item->meal_date,
                                 'meal_time'     => $item->meal_time,
                             ];
                         })->values()->all();
@@ -411,6 +414,20 @@ class DeliveryNotificationController extends Controller
                 ->latest()
                 ->get();
 
+            // Build a lookup of this rider's "new delivery available" notifications,
+            // keyed by delivery_charge_ledger_id, so the popup "Details" button can link
+            // to the rider's own notification detail page (/delivery/view/notification/{uuid}).
+            $notifLookup = [];
+            $riderNotifications = $user->notifications()
+                ->where('type', NewDeliveryAvailableNotification::class)
+                ->get();
+            foreach ($riderNotifications as $notif) {
+                $ledgerId = $notif->data['data']['delivery_charge_ledger_id'] ?? null;
+                if ($ledgerId !== null && !isset($notifLookup[$ledgerId])) {
+                    $notifLookup[$ledgerId] = $notif->id;
+                }
+            }
+
             $pending = [];
 
             foreach ($ledgers as $ledger) {
@@ -421,6 +438,7 @@ class DeliveryNotificationController extends Controller
 
                 $pending[] = [
                     'delivery_charge_ledger_id' => $ledger->id,
+                    'notification_id' => $notifLookup[$ledger->id] ?? null,
                     'order_tracking'  => $ledger->order_tracking,
                     'meal_type'       => $ledger->mealType->name ?? 'N/A',
                     'delivery_date'   => $ledger->delivery_date
@@ -466,6 +484,102 @@ class DeliveryNotificationController extends Controller
 
         } catch (Exception $e) {
             \Log::error('getPendingDeliveryRequests: ' . $e->getMessage());
+            return response()->json(['status' => 'failed', 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Lightweight poll endpoint for the delivery layout.
+     * Returns the rider's current unread-notification count plus any unread
+     * "ready for pickup" notifications so the bell badge can update and a popup
+     * can appear in real time (no page refresh) when a client marks an order
+     * ready for pickup.
+     */
+    public function pollPickupNotifications(Request $request)
+    {
+        try {
+            $email = $request->header('email');
+            if (!$email) {
+                return response()->json(['status' => 'failed', 'message' => 'Unauthorized! Need to login.'], 401);
+            }
+
+            $user = User::where('email', $email)->first();
+            if (!$user) {
+                return response()->json(['status' => 'failed', 'message' => 'User not found.'], 404);
+            }
+
+            $unreadCount = $user->unreadNotifications()->count();
+
+            $pickups = $user->unreadNotifications()
+                ->where('type', OrderReadyForPickupNotification::class)
+                ->latest()
+                ->take(5)
+                ->get()
+                ->map(function ($notification) {
+                    $payload = is_string($notification->data)
+                        ? json_decode($notification->data, true)
+                        : $notification->data;
+                    $inner = $payload['data'] ?? [];
+
+                    // Read the scheduled pickup time fresh from the status history so it
+                    // matches exactly what the client picked (no timezone drift), mirroring
+                    // getNotificationDetails().
+                    $pickupTime = null;
+                    if (!empty($inner['delivery_charge_ledger_id'])) {
+                        $readyStatus = MealDeliveryStatusHistory::where('delivery_charge_ledger_id', $inner['delivery_charge_ledger_id'])
+                            ->where('delivery_status', 'ready_for_pickup')
+                            ->latest()
+                            ->first();
+                        if ($readyStatus && $readyStatus->pick_up_at) {
+                            $pickupTime = $readyStatus->pick_up_at->format('d-M-Y g:i A');
+                        }
+                    }
+                    if (!$pickupTime) {
+                        $raw = $inner['delivery_details']['scheduled_pickup_time'] ?? null;
+                        $pickupTime = $raw ? Carbon::parse($raw)->format('d-M-Y g:i A') : 'ASAP';
+                    }
+
+                    $details = $inner['delivery_details'] ?? [];
+
+                    return [
+                        'id'              => $notification->id,
+                        'title'           => $payload['title']   ?? 'Order Ready for Pickup',
+                        'message'         => $payload['message'] ?? null,
+                        'order_tracking'  => $inner['order_tracking'] ?? null,
+                        'order_number'    => $inner['order_number']   ?? null,
+                        'client_name'     => $inner['client_name']    ?? null,
+                        'client_mobile'   => $inner['client_mobile']  ?? null,
+                        'pickup_time'     => $pickupTime,
+                        'meal_type'       => $details['meal_type'] ?? null,
+                        'meal_time'       => $details['meal_time'] ?? null,
+                        'delivery_date'   => !empty($details['delivery_date'])
+                            ? Carbon::parse($details['delivery_date'])->format('d M Y') : null,
+                        'delivery_charge' => isset($details['delivery_charge']) ? (float) $details['delivery_charge'] : null,
+                        'distance_km'     => $details['distance_km'] ?? null,
+                        'pickup_address'  => isset($inner['client_address'])
+                            ? $this->formatAddressFromData($inner['client_address']) : null,
+                        'dropoff_name'    => $inner['delivery_address']['name']  ?? null,
+                        'dropoff_phone'   => $inner['delivery_address']['phone'] ?? null,
+                        'dropoff_address' => isset($inner['delivery_address'])
+                            ? $this->formatAddressFromData($inner['delivery_address']) : null,
+                        'items'           => array_map(function ($item) {
+                            return [
+                                'product_name' => $item['product_name'] ?? 'N/A',
+                                'quantity'     => $item['quantity'] ?? null,
+                            ];
+                        }, $inner['items'] ?? []),
+                        'created_at'      => $notification->created_at->toIso8601String(),
+                    ];
+                })
+                ->values();
+
+            return response()->json([
+                'status'       => 'success',
+                'unread_count' => $unreadCount,
+                'pickups'      => $pickups,
+            ], 200);
+
+        } catch (Exception $e) {
             return response()->json(['status' => 'failed', 'message' => $e->getMessage()], 500);
         }
     }

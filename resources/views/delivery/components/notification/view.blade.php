@@ -314,9 +314,17 @@ async function acceptDelivery() {
                 confirmButtonText: 'OK', customClass: { confirmButton: 'btn btn-danger' }, buttonsStyling: false });
         }
     } catch (error) {
-        const msg = error.response?.data?.message || 'This order may have already been accepted.';
-        Swal.fire({ title: 'Error!', text: msg, icon: 'error', confirmButtonText: 'OK',
-            customClass: { confirmButton: 'btn btn-danger' }, buttonsStyling: false });
+        // Map 422 validation errors to inline fields, otherwise use the global handler (config.js)
+        if (error.response?.status === 422) {
+            const errors = error.response.data.errors || {};
+            Object.keys(errors).forEach(key => {
+                const el = document.getElementById(`${key}-error`);
+                if (el) el.innerText = errors[key][0];
+                else errorToast(errors[key][0]);
+            });
+        } else {
+            handleError(error);
+        }
     } finally { hideLoader(); }
 }
 
@@ -332,9 +340,13 @@ function populateNotificationDetails() {
 
     // Stat tiles — Delivery Date uses the date + the actual delivery (meal) time
     document.getElementById('stat-mealtype').textContent = toTitleCase(deliveryDetails.meal_type) || 'N/A';
+    // Delivery date & time come from the order item (meal_date / meal_time); time is highlighted
+    const item0    = (data.items && data.items[0]) || {};
+    const mealDate = item0.meal_date || deliveryDetails.delivery_date;
+    const mealTime = item0.meal_time || deliveryDetails.meal_time;
     document.getElementById('stat-date').innerHTML       =
-        fmtDateOnly(deliveryDetails.delivery_date) +
-        (deliveryDetails.meal_time ? ` <span class="nd-hl">${formatTime(deliveryDetails.meal_time)}</span>` : '');
+        fmtDateOnly(mealDate) +
+        (mealTime ? ` <span class="nd-hl">${formatTime(mealTime)}</span>` : '');
     document.getElementById('stat-distance').textContent = deliveryDetails.distance_km ?? '0';
     document.getElementById('stat-charge').textContent   = fmtGBP(deliveryDetails.delivery_charge);
 
@@ -408,13 +420,15 @@ function joinAddress(a) {
 function statusBadge(status) {
     const map = {
         pending:          'bg-secondary',      accept_order:    'bg-info',
+        accept_delivery:  'bg-primary',
         preparing:        'bg-primary',        ready_for_pickup:'bg-warning text-dark',
         picked_up:        'bg-warning text-dark', on_the_way:   'bg-primary',
         arrived:          'bg-info',           delivered:       'bg-success',
         cancelled:        'bg-danger',         due:             'bg-warning text-dark',
         paid:             'bg-success'
     };
-    const label = status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const labelMap = { accept_delivery: 'Delivery Accepted' };
+    const label = labelMap[status] || status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
     return `<span class="badge ${map[status] || 'bg-secondary'}">${label}</span>`;
 }
 
@@ -492,7 +506,7 @@ function setupActionButtons() {
             html = `<button class="btn btn-success btn-lg rounded-pill px-4" disabled><i class="mdi mdi-check-circle me-1"></i>Delivered</button>`;
         } else if (status === 'cancelled') {
             html = `<button class="btn btn-danger btn-lg rounded-pill px-4" disabled><i class="mdi mdi-close-circle me-1"></i>Cancelled</button>`;
-        } else if (status === 'accept_order') {
+        } else if (status === 'accept_order' || status === 'accept_delivery') {
             html = `<button class="btn btn-info btn-lg rounded-pill px-4" disabled><i class="mdi mdi-account-check me-1"></i>Awaiting Preparation</button>`;
         } else if (status === 'preparing') {
             html = `<button class="btn btn-primary btn-lg rounded-pill px-4" disabled><i class="mdi mdi-chef-hat me-1"></i>Being Prepared</button>`;
@@ -556,17 +570,6 @@ function formatTime(t) {
     return `${h % 12 || 12}:${m} ${ampm}`;
 }
 
-function handleError(error) {
-    let message = 'An unexpected error occurred';
-    if (error.response) {
-        message = error.response.data?.message || message;
-    } else if (error.request) {
-        message = 'No response received from the server.';
-    } else {
-        message = error.message || message;
-    }
-    errorToast(message);
-}
 </script>
 
 <style>

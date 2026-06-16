@@ -232,6 +232,7 @@ class ClientMealOrderController extends Controller
                         'meal_type_id'              => $mealTypeId,
                         'client_id'                 => $item->client_id,
                         'meal_date'                 => $mealDate,
+                        'meal_time'                 => $item->meal_time,
                         'delivery_status'           => $deliveryStatus,
                         'delivery_status_label'     => $deliveryStatusLabel,
                         'delivery_person_name'      => $deliveryPersonName,
@@ -390,7 +391,7 @@ class ClientMealOrderController extends Controller
             // Validate request
             $request->validate([
                 'meal_order_item_id' => 'required|string',
-                'delivery_status' => 'required|in:pending,accept_order,preparing,ready_for_pickup,cancelled',
+                'delivery_status' => 'required|in:pending,accept_order,accept_delivery,preparing,ready_for_pickup,cancelled',
                 'notes' => 'nullable|string|max:500',
                 'pickup_time' => 'nullable|date_format:Y-m-d\TH:i',
                 'meal_date' => 'required|date',
@@ -442,7 +443,8 @@ class ClientMealOrderController extends Controller
             // Define client's valid status transitions
             $validClientTransitions = [
                 'pending' => ['accept_order', 'cancelled'],
-                'accept_order' => ['preparing', 'cancelled'],
+                'accept_order' => ['cancelled'],
+                'accept_delivery' => ['preparing', 'cancelled'],
                 'preparing' => ['ready_for_pickup', 'cancelled'],
             ];
 
@@ -457,8 +459,8 @@ class ClientMealOrderController extends Controller
                 ], 400);
             }
 
-            // Special validation for accept_order -> preparing transition
-            if ($currentStatus === 'accept_order' && $newStatus === 'preparing') {
+            // Special validation for accept_delivery -> preparing transition
+            if ($currentStatus === 'accept_delivery' && $newStatus === 'preparing') {
                 if (!$deliveryLedger->delivery_person_id) {
                     return response()->json([
                         'status' => 'failed',
@@ -474,6 +476,22 @@ class ClientMealOrderController extends Controller
                         'status' => 'failed',
                         'message' => 'Cannot change to ready_for_pickup. No delivery person has accepted the order yet.'
                     ], 400);
+                }
+
+                // Pickup time must be at least 30 minutes before the delivery time (meal_date + meal_time)
+                if ($pickupTime) {
+                    $mealTime = optional($mealOrderItems->first())->meal_time;
+                    if ($mealTime) {
+                        $deliveryDateTime = Carbon::parse($mealDate . ' ' . $mealTime);
+                        $cutoff           = $deliveryDateTime->copy()->subMinutes(30);
+                        $pickupDateTime   = Carbon::createFromFormat('Y-m-d\TH:i', $pickupTime);
+                        if ($pickupDateTime->gt($cutoff)) {
+                            return response()->json([
+                                'status' => 'failed',
+                                'message' => 'Pickup time must be at least 30 minutes before the delivery time.'
+                            ], 400);
+                        }
+                    }
                 }
             }
 

@@ -17,6 +17,7 @@ class DeliveryChargeLedger extends Model
     // Delivery Status Constants
     const STATUS_PENDING = 'pending';
     const STATUS_ACCEPT_ORDER = 'accept_order';
+    const STATUS_ACCEPT_DELIVERY = 'accept_delivery';
     const STATUS_PREPARING = 'preparing';
     const STATUS_READY_FOR_PICKUP = 'ready_for_pickup';
     const STATUS_PICKED_UP = 'picked_up';
@@ -34,6 +35,7 @@ class DeliveryChargeLedger extends Model
     const STATUS_LABELS = [
         self::STATUS_PENDING => 'Pending',
         self::STATUS_ACCEPT_ORDER => 'Accept Order',
+        self::STATUS_ACCEPT_DELIVERY => 'Delivery Accepted',
         self::STATUS_PREPARING => 'Preparing',
         self::STATUS_READY_FOR_PICKUP => 'Ready for Pickup',
         self::STATUS_PICKED_UP => 'Picked Up',
@@ -46,9 +48,12 @@ class DeliveryChargeLedger extends Model
 public const STATUS_PROGRESS = [
     'pending' => 10,
     'accept_order' => 20,
+    'accept_delivery' => 30,
     'preparing' => 40,
     'ready_for_pickup' => 60,
-    'out_for_delivery' => 80,
+    'picked_up' => 70,
+    'on_the_way' => 80,
+    'arrived' => 90,
     'delivered' => 100,
     'cancelled' => 0,
 ];

@@ -206,8 +206,12 @@
 <script>
 (function () {
     let pdModalInstance = null;
-    let pdPollTimer     = null;
-    let pdMaps          = {};   // ledgerId -> Leaflet map instance
+    let pdPollTimer     = null;   // refresh timer while the popup is open
+    let pdBgTimer       = null;   // always-on background poll (detects new requests)
+    let pdSeenIds       = new Set();   // ledger ids already shown to this rider
+    let pdMaps          = {};     // ledgerId -> Leaflet map instance
+
+    const PD_BG_POLL_MS = 10000;  // how often to check for new delivery requests
 
     document.addEventListener('DOMContentLoaded', async function () {
         const requests = await fetchPendingDeliveries();
@@ -215,7 +219,30 @@
             renderPendingDeliveries(requests);
             openPendingModal();
         }
+        // Seed "seen" with whatever is already pending so they don't re-pop,
+        // then start the background poll so new requests appear without a refresh.
+        pdSeenIds = new Set(requests.map(r => r.delivery_charge_ledger_id));
+        clearInterval(pdBgTimer);
+        pdBgTimer = setInterval(pollPendingInBackground, PD_BG_POLL_MS);
     });
+
+    // Background poll: while the popup is closed, watch for newly available
+    // delivery requests (e.g. a client just accepted an order) and pop the modal
+    // automatically. While the popup is open, its own pdPollTimer keeps it in sync.
+    async function pollPendingInBackground() {
+        const el = document.getElementById('pendingDeliveryModal');
+        if (el && el.classList.contains('show')) return;   // open → handled by pdPollTimer
+
+        const requests   = await fetchPendingDeliveries();
+        const currentIds = requests.map(r => r.delivery_charge_ledger_id);
+        const newIds     = currentIds.filter(id => !pdSeenIds.has(id));
+
+        if (newIds.length > 0) {
+            renderPendingDeliveries(requests);
+            openPendingModal();
+        }
+        pdSeenIds = new Set(currentIds);
+    }
 
     async function fetchPendingDeliveries() {
         try {
@@ -250,6 +277,8 @@
     async function refreshPendingDeliveries() {
         const requests = await fetchPendingDeliveries();
         renderPendingDeliveries(requests);
+        // Keep "seen" current while the popup is open so these don't re-pop after close.
+        pdSeenIds = new Set(requests.map(r => r.delivery_charge_ledger_id));
         if (requests.length === 0) {
             clearInterval(pdPollTimer);
             setTimeout(() => pdModalInstance?.hide(), 1500);
@@ -344,7 +373,7 @@
                         </div>
                     </div>
                     <div class="d-flex gap-2">
-                        <a href="/delivery/meal-order/details/${r.delivery_charge_ledger_id}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Details</a>
+                        <a href="${r.notification_id ? `/delivery/view/notification/${r.notification_id}` : `/delivery/meal-order/details/${r.delivery_charge_ledger_id}`}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Details</a>
                         <button class="btn btn-sm pd-accept-btn rounded-pill px-4"
                                 onclick="acceptPendingDelivery(${r.delivery_charge_ledger_id}, this)">
                             <i class="mdi mdi-check-circle-outline me-1"></i>Accept
@@ -437,6 +466,166 @@
     }
 })();
 </script>
+
+{{-- ===== Order Ready-for-Pickup live popup (no page refresh) ===== --}}
+<div class="modal fade" id="pickupReadyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 overflow-hidden pu-modal">
+            <div class="modal-header pu-header text-white border-0">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="pu-bell"><i class="mdi mdi-package-variant-closed-check"></i></span>
+                    <div>
+                        <h5 class="modal-title fw-bold mb-0">Order Ready for Pickup</h5>
+                        <small class="opacity-75">The restaurant has prepared an order for you</small>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3 p-md-4 bg-light">
+                <div id="puBody" class="d-flex flex-column gap-3"></div>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+                <a href="#" id="puDetailsBtn" class="btn pu-accept-btn rounded-pill px-4">
+                    <i class="mdi mdi-eye-outline me-1"></i>View Details
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const PU_POLL_MS  = 12000;            // how often to check for ready-for-pickup orders
+    const PU_SEEN_KEY = 'puSeenPickupIds';
+    let   puModalInstance = null;
+    let   puQueue = [];                   // pickups waiting to be shown one-by-one
+
+    function puLoadSeen() {
+        try { return new Set(JSON.parse(localStorage.getItem(PU_SEEN_KEY) || '[]')); }
+        catch (e) { return new Set(); }
+    }
+    function puSaveSeen(set) {
+        try {
+            // keep the list bounded so it can't grow forever
+            const arr = Array.from(set).slice(-50);
+            localStorage.setItem(PU_SEEN_KEY, JSON.stringify(arr));
+        } catch (e) {}
+    }
+    let puSeen = puLoadSeen();
+
+    document.addEventListener('DOMContentLoaded', function () {
+        pollPickupNotifications();
+        setInterval(pollPickupNotifications, PU_POLL_MS);
+    });
+
+    async function pollPickupNotifications() {
+        let res;
+        try {
+            res = await axios.get('/delivery/poll/pickup-notifications');
+        } catch (e) { return; /* silent — non-blocking */ }
+
+        if (res.status !== 200 || res.data.status !== 'success') return;
+
+        // 1) Live-update the bell count (no refresh)
+        updateNotificationBadges(res.data.unread_count);
+
+        // 2) Detect brand-new ready-for-pickup notifications and pop them
+        const pickups = res.data.pickups || [];
+        const fresh   = pickups.filter(p => !puSeen.has(p.id));
+
+        if (fresh.length > 0) {
+            fresh.forEach(p => puSeen.add(p.id));
+            puSaveSeen(puSeen);
+            puQueue.push(...fresh);
+            // refresh the dropdown list so the new item is there without a reload
+            if (typeof refreshNotificationDropdown === 'function') refreshNotificationDropdown();
+            showNextPickup();
+        }
+    }
+
+    function updateNotificationBadges(count) {
+        const c = (count === undefined || count === null) ? 0 : count;
+        const badge  = document.getElementById('notificationCount');
+        const badge1 = document.getElementById('notificationCount1');
+        if (badge)  badge.innerText  = c;
+        if (badge1) badge1.innerText = c;
+    }
+
+    function fmtCurrency(v) {
+        if (v === null || v === undefined) return '';
+        return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP' }).format(parseFloat(v) || 0);
+    }
+
+    function showNextPickup() {
+        const el = document.getElementById('pickupReadyModal');
+        if (!el) return;
+        // don't stack popups — wait until the current one is closed
+        if (el.classList.contains('show')) return;
+        const p = puQueue.shift();
+        if (!p) return;
+
+        const itemsHtml = (p.items && p.items.length)
+            ? p.items.map(i => `<li>${i.product_name}${i.quantity ? ` <span class="text-muted">× ${i.quantity}</span>` : ''}</li>`).join('')
+            : '<li class="text-muted">No items listed</li>';
+
+        document.getElementById('puBody').innerHTML = `
+            <div class="pu-time-card">
+                <div class="pu-time-label"><i class="mdi mdi-clock-time-four-outline me-1"></i>Scheduled Pickup Time</div>
+                <div class="pu-time-value">${p.pickup_time || 'ASAP'}</div>
+            </div>
+
+            <div class="pu-info">
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    ${p.order_tracking ? `<span class="badge pu-track"><i class="mdi mdi-pound"></i>${p.order_tracking}</span>` : ''}
+                    ${p.meal_type ? `<span class="badge bg-warning text-dark">${p.meal_type}</span>` : ''}
+                    ${p.delivery_date ? `<span class="text-muted small"><i class="mdi mdi-calendar-outline me-1"></i>${p.delivery_date}</span>` : ''}
+                </div>
+
+                <div class="pu-row"><i class="mdi mdi-storefront-outline text-danger"></i>
+                    <div>
+                        <div class="fw-semibold">${p.client_name || 'Restaurant'}</div>
+                        ${p.client_mobile ? `<div class="small text-muted"><i class="mdi mdi-phone-outline me-1"></i>${p.client_mobile}</div>` : ''}
+                        ${p.pickup_address ? `<div class="small text-muted">${p.pickup_address}</div>` : ''}
+                    </div>
+                </div>
+
+                ${(p.dropoff_address || p.dropoff_name) ? `
+                <div class="pu-row"><i class="mdi mdi-map-marker-radius-outline text-success"></i>
+                    <div>
+                        ${p.dropoff_name ? `<div class="fw-semibold">${p.dropoff_name}</div>` : ''}
+                        ${p.dropoff_phone ? `<div class="small text-muted"><i class="mdi mdi-phone-outline me-1"></i>${p.dropoff_phone}</div>` : ''}
+                        ${p.dropoff_address ? `<div class="small text-muted">${p.dropoff_address}</div>` : ''}
+                    </div>
+                </div>` : ''}
+
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    ${p.meal_time ? `<span class="pu-chip"><i class="mdi mdi-silverware-fork-knife"></i> ${p.meal_time}</span>` : ''}
+                    ${p.distance_km != null ? `<span class="pu-chip"><i class="mdi mdi-map-marker-distance"></i> ${p.distance_km} km</span>` : ''}
+                    ${p.delivery_charge != null ? `<span class="pu-chip pu-chip-charge"><i class="mdi mdi-cash"></i> ${fmtCurrency(p.delivery_charge)}</span>` : ''}
+                </div>
+
+                <div class="pu-items mt-3">
+                    <div class="pu-items-head"><i class="mdi mdi-format-list-bulleted me-1"></i>Items</div>
+                    <ul class="mb-0">${itemsHtml}</ul>
+                </div>
+            </div>`;
+
+        const detailsBtn = document.getElementById('puDetailsBtn');
+        detailsBtn.href = '/delivery/view/notification/' + p.id;
+
+        const elModal = document.getElementById('pickupReadyModal');
+        puModalInstance = bootstrap.Modal.getInstance(elModal) || new bootstrap.Modal(elModal);
+
+        if (!elModal.dataset.puHiddenBound) {
+            elModal.dataset.puHiddenBound = '1';
+            // when one popup closes, show the next queued pickup (if any)
+            elModal.addEventListener('hidden.bs.modal', () => setTimeout(showNextPickup, 300));
+        }
+        puModalInstance.show();
+    }
+})();
+</script>
   </body>
 </html>
 
@@ -473,6 +662,21 @@ document.addEventListener("DOMContentLoaded", async function () {
         hideLoader();
     }
 });
+
+// Re-fetch the limited notification list and re-render the bell dropdown.
+// Used by the ready-for-pickup poller so a new notification shows in the
+// dropdown without a page refresh.
+async function refreshNotificationDropdown() {
+    try {
+        const response = await axios.get('/delivery/limited/notification/list');
+        if (response.status === 200) {
+            displayNotifications(
+                response.data.unreadNotifications || [],
+                response.data.readNotifications || []
+            );
+        }
+    } catch (error) { /* silent — non-blocking */ }
+}
 
 
 function displayNotifications(unreadNotifications, readNotifications) {
@@ -788,5 +992,35 @@ function handleError(error) {
     font-size:.7rem; font-weight:600; display:flex; gap:.7rem; box-shadow:0 1px 4px rgba(0,0,0,.15);
 }
 .pd-map-legend span { display:flex; align-items:center; gap:.2rem; }
+
+/* ===== Order Ready-for-Pickup popup ===== */
+.pu-modal { border-radius: 18px; }
+.pu-header {
+    background: linear-gradient(135deg, #16a34a 0%, #22c55e 60%, #4ade80 100%);
+    padding: 1.1rem 1.5rem;
+}
+.pu-bell {
+    width: 46px; height: 46px; border-radius: 50%;
+    background: rgba(255,255,255,.2); display:flex; align-items:center; justify-content:center;
+    font-size: 1.5rem; animation: pdRing 1.6s ease-in-out infinite;
+}
+.pu-time-card {
+    background: linear-gradient(135deg,#ecfdf5,#d1fae5); border:1px solid #a7f3d0;
+    border-radius: 14px; padding: 1rem 1.2rem; text-align:center;
+}
+.pu-time-label { font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#047857; }
+.pu-time-value { font-size:1.5rem; font-weight:800; color:#065f46; margin-top:.15rem; }
+.pu-info { background:#fff; border:1px solid #eef0f4; border-radius:14px; padding:1rem 1.1rem; box-shadow:0 2px 10px rgba(0,0,0,.04); }
+.pu-track { background:#eef2ff; color:#6366f1; }
+.pu-row { display:flex; gap:.6rem; align-items:flex-start; padding:.5rem 0; border-top:1px dashed #eef0f4; }
+.pu-row:first-of-type { border-top:none; }
+.pu-row > i { font-size:1.2rem; margin-top:.15rem; }
+.pu-chip { background:#f1f5f9; border-radius:20px; padding:.3rem .8rem; font-size:.78rem; font-weight:600; color:#0f172a; }
+.pu-chip-charge { background:#ecfdf5; color:#047857; }
+.pu-items { background:#f8f9fb; border-radius:10px; padding:.7rem .85rem; }
+.pu-items-head { font-size:.78rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:#64748b; margin-bottom:.3rem; }
+.pu-items ul { padding-left:1.1rem; }
+.pu-accept-btn { background:linear-gradient(135deg,#16a34a,#22c55e); color:#fff; border:none; font-weight:600; }
+.pu-accept-btn:hover { filter:brightness(.95); color:#fff; }
 
 </style>

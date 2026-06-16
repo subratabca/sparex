@@ -157,6 +157,24 @@ let moMap = null;
 
 function toTitleCase(s) { return s ? s.toLowerCase().replace(/\b\w/g, c => c.toUpperCase()) : ''; }
 function gbp(v) { return '£' + (v ?? '0.00'); }
+
+// e.g. "2026-06-14" -> "14-June-2026"
+function fmtDateOnly(value) {
+    if (!value) return '—';
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return value;
+    const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    return `${String(d.getUTCDate()).padStart(2, '0')}-${months[d.getUTCMonth()]}-${d.getUTCFullYear()}`;
+}
+// e.g. "08:00:00" -> "8:00 AM"
+function formatTime(t) {
+    if (!t) return '';
+    const p = String(t).split(':');
+    if (p.length < 2) return t;
+    const h = parseInt(p[0], 10), m = p[1];
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    return `${h % 12 || 12}:${m} ${ampm}`;
+}
 function getImageUrl(type, file) {
     if (!file) return '/upload/no_image.jpg';
     return ({ restaurant: '/upload/client-profile/medium/', customer: '/upload/customer-profile/medium/', product: '/upload/product/small/' }[type]) + file;
@@ -176,8 +194,14 @@ async function loadDeliveryOrderDetails() {
             const di = deliveryData.delivery_info;
             const os = deliveryData.order_summary;
 
-            document.getElementById('tracking-number').textContent = di.tracking_number || '—';
-            document.getElementById('delivery-date').textContent = di.delivery_date || '—';
+            document.getElementById('tracking-number').textContent = os.order_number || '—';
+
+            // Delivery date & time come from the order item (meal_date / meal_time); time is highlighted
+            const item0 = (deliveryData.order_items && deliveryData.order_items[0]) || null;
+            const mealDate = item0 ? item0.meal_date : di.delivery_date;
+            const mealTime = item0 ? item0.meal_time : null;
+            document.getElementById('delivery-date').innerHTML =
+                fmtDateOnly(mealDate) + (mealTime ? ` <span class="mo-hl">${formatTime(mealTime)}</span>` : '');
 
             const badge = document.getElementById('delivery-status-badge');
             badge.textContent = di.delivery_status_label || '—';
@@ -328,7 +352,7 @@ function setupDeliveryActionsCard(data) {
     }
 }
 function getNextDeliveryStatus(s) { return ({ ready_for_pickup: 'picked_up', picked_up: 'on_the_way', on_the_way: 'arrived', arrived: 'delivered' })[s] || null; }
-function getStatusLabel(s) { return ({ pending: 'Pending', accept_order: 'Order Accepted', preparing: 'Preparing', ready_for_pickup: 'Ready for Pickup', picked_up: 'Picked Up', on_the_way: 'On the Way', arrived: 'Arrived', delivered: 'Delivered', cancelled: 'Cancelled' })[s] || s; }
+function getStatusLabel(s) { return ({ pending: 'Pending', accept_order: 'Order Accepted', accept_delivery: 'Delivery Accepted', preparing: 'Preparing', ready_for_pickup: 'Ready for Pickup', picked_up: 'Picked Up', on_the_way: 'On the Way', arrived: 'Arrived', delivered: 'Delivered', cancelled: 'Cancelled' })[s] || s; }
 function getStatusButtonLabel(s) { return ({ ready_for_pickup: 'Mark as Picked Up', picked_up: 'Mark as On the Way', on_the_way: 'Mark as Arrived', arrived: 'Mark as Delivered' })[s] || 'Update Status'; }
 
 async function handleUpdateDeliveryStatus() {
@@ -365,17 +389,11 @@ function getDeliveryBadgeClass(status) {
     return ({
         delivered: 'bg-success', arrived: 'bg-info', on_the_way: 'bg-primary',
         picked_up: 'bg-warning text-dark', ready_for_pickup: 'bg-warning text-dark',
-        preparing: 'bg-primary', accept_order: 'bg-info', pending: 'bg-secondary', cancelled: 'bg-danger'
+        preparing: 'bg-primary', accept_delivery: 'bg-primary', accept_order: 'bg-info', pending: 'bg-secondary', cancelled: 'bg-danger'
     })[status] || 'bg-secondary';
 }
 
-function handleError(error) {
-    let message = 'An unexpected error occurred.';
-    if (error.response) message = error.response.data?.message || message;
-    else if (error.request) message = 'No response from server.';
-    else message = error.message;
-    errorToast(message);
-}
+// showLoader / hideLoader / successToast / errorToast / handleError are provided globally by config.js
 </script>
 
 <style>
@@ -401,4 +419,6 @@ function handleError(error) {
 .timeline-marker { position:absolute;left:-24px;top:6px;width:10px;height:10px;border-radius:50%;background:#6366f1;border:2px solid #fff;box-shadow:0 0 0 3px rgba(99,102,241,.15); }
 #locationMap { z-index:1; }
 .leaflet-container { font-family:inherit; }
+/* Highlight chip for the delivery time */
+.mo-hl { background:#eef2ff; color:#4f46e5; font-weight:700; padding:.05rem .4rem; border-radius:5px; }
 </style>

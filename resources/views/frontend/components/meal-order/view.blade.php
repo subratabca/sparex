@@ -588,6 +588,7 @@ function getDeliveryBadgeClass(status) {
         picked_up:        'bg-info',
         ready_for_pickup: 'bg-warning',
         preparing:        'bg-warning',
+        accept_delivery:  'bg-primary',
         accept_order:     'bg-secondary',
         pending:          'bg-secondary',
         cancelled:        'bg-dark',
