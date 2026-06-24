@@ -11,6 +11,7 @@
         "firebase/php-jwt": "^6.11",
         "intervention/image": "^3.11",
         "laravel/framework": "^11.31",
+        "laravel/socialite": "^5.28",
         "laravel/tinker": "^2.9",
         "stripe/stripe-php": "^16.6"
     },

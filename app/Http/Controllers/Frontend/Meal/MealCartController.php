@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Str;
 use App\Models\MealCart;
+use App\Models\CustomerMealLocation;
 use App\Models\Product;
 use App\Models\MealType;
 use App\Models\User;
@@ -25,20 +26,48 @@ class MealCartController extends Controller
             'meal_date' => 'required|date|after:today',
             'meal_time' => 'nullable|date_format:H:i',
             'meal_type_id' => 'required|integer|exists:meal_types,id',
+            'location_id' => 'nullable|integer|exists:customer_meal_locations,id',
             'product_id' => 'required|integer|exists:products,id',
             'quantity' => 'required|integer|min:1',
         ]);
 
         try {
             $customerId = $request->header('id');
+            $locationId = $request->location_id;
 
             $product = Product::findOrFail($request->product_id);
 
-            $unitPrice = $product->discount_price > 0 
-                        ? $product->discount_price 
+            $unitPrice = $product->discount_price > 0
+                        ? $product->discount_price
                         : $product->price;
 
             $totalPrice = $unitPrice * $request->quantity;
+
+            // a supplied location must belong to this customer
+            if ($locationId && !CustomerMealLocation::where('id', $locationId)->where('customer_id', $customerId)->exists()) {
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'Invalid delivery location.',
+                ], 422);
+            }
+
+            // one delivery location per (date, meal type) group
+            $groupLocation = MealCart::where('customer_id', $customerId)
+                ->where('meal_date', $request->meal_date)
+                ->where('meal_type_id', $request->meal_type_id)
+                ->whereNotNull('location_id')
+                ->value('location_id');
+
+            if ($groupLocation && $locationId && (int) $groupLocation !== (int) $locationId) {
+                return response()->json([
+                    'status' => 'failed',
+                    'message' => 'All items for this date and meal type must use the same delivery location.',
+                ], 422);
+            }
+            // inherit the group's location when none was supplied
+            if ($groupLocation && !$locationId) {
+                $locationId = $groupLocation;
+            }
 
             // prevent duplicate in cart
             $exists = MealCart::where('customer_id', $customerId)
@@ -56,10 +85,11 @@ class MealCartController extends Controller
 
             MealCart::create([
                 'meal_date' => $request->meal_date,
-                'meal_time' => $request->meal_time, 
+                'meal_time' => $request->meal_time,
                 'client_id' => $product->client_id,
                 'customer_id' => $customerId,
                 'meal_type_id' => $request->meal_type_id,
+                'location_id' => $locationId,
                 'product_id' => $request->product_id,
                 'quantity' => $request->quantity,
                 'unit_price' => $unitPrice,
@@ -93,7 +123,9 @@ class MealCartController extends Controller
             $mealCart = MealCart::with([
                     'product:id,name,image,price,discount_price',
                     'mealType:id,name',
-                    'client:id,firstName,lastName'
+                    'client:id,firstName,lastName',
+                    'location:id,label,address1,zip_code,city_id',
+                    'location.city:id,name',
                 ])
                 ->where('customer_id', $customerId)
                 ->orderBy('meal_date', 'asc')
@@ -141,6 +173,13 @@ class MealCartController extends Controller
                                     'client'      => $item->client ? [
                                         'firstName' => $item->client->firstName,
                                         'lastName'  => $item->client->lastName,
+                                    ] : null,
+                                    'location'    => $item->location ? [
+                                        'id'       => $item->location->id,
+                                        'label'    => $item->location->label,
+                                        'address1' => $item->location->address1,
+                                        'zip_code' => $item->location->zip_code,
+                                        'city'     => $item->location->city->name ?? null,
                                     ] : null,
                                 ];
                             });

@@ -6,11 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 
 class MealOrderItem extends Model
 {
-    protected $fillable = ['meal_order_id','meal_date','meal_time','client_id','meal_type_id','product_id','quantity','unit_price','total_price'];
+    protected $fillable = ['meal_order_id','meal_date','meal_time','client_id','meal_type_id','delivery_address_id','product_id','quantity','unit_price','total_price'];
 
     public function client()
     {
         return $this->belongsTo(User::class, 'client_id');
+    }
+
+    public function deliveryAddress()
+    {
+        return $this->belongsTo(MealShippingAddress::class, 'delivery_address_id');
     }
 
     public function mealOrder()

@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class MealCart extends Model
 {
-    protected $fillable = ['meal_date','meal_time','client_id','customer_id','meal_type_id','product_id','quantity','unit_price','total_price'];
+    protected $fillable = ['meal_date','meal_time','client_id','customer_id','meal_type_id','location_id','product_id','quantity','unit_price','total_price'];
 
     public function customer()
     {
@@ -26,5 +26,10 @@ class MealCart extends Model
     public function product()
     {
         return $this->belongsTo(Product::class, 'product_id');
+    }
+
+    public function location()
+    {
+        return $this->belongsTo(CustomerMealLocation::class, 'location_id');
     }
 }

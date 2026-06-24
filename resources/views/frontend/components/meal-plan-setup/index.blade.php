@@ -44,19 +44,6 @@
             <div id="suggestion-analysis" class="row g-2 mb-4"></div>
             <div id="weekly-plan" class="accordion"></div>
 
-            {{-- ===== Submit edited plan to the meal cart ===== --}}
-            <div class="d-flex flex-wrap justify-content-end align-items-center gap-2 mt-4 pt-3 border-top">
-                <small class="text-muted me-auto">
-                    <i class="mdi mdi-information-outline me-1"></i>
-                    Use <strong>Speak</strong> to add or remove items, then submit the plan to your cart.
-                </small>
-                <button id="plan-submit-voice-btn" type="button" class="btn btn-outline-primary rounded-pill" title="Say &quot;submit plan&quot;">
-                    <i class="mdi mdi-microphone"></i>
-                </button>
-                <button id="plan-submit-btn" type="button" class="btn btn-success rounded-pill px-4">
-                    <i class="mdi mdi-cart-plus me-1"></i> Submit Plan to Cart
-                </button>
-            </div>
         </div>
     </div>
 
@@ -121,9 +108,7 @@
             </div>
             <div class="row gy-4 mb-4" id="product-list"></div>
 
-            <nav class="d-flex justify-content-center">
-                <ul class="pagination mb-0"></ul>
-            </nav>
+            <div id="browse-loadmore" class="d-flex justify-content-center"></div>
         </div>
     </div>
 </div>
@@ -282,6 +267,38 @@
                     </div>
                 </div>
                 <div class="mb-3">
+                    <label for="modal-location" class="form-label fw-semibold">Delivery Location</label>
+                    <select id="modal-location" class="form-select">
+                        <option value="">Select a location</option>
+                        <option value="__add__">＋ Add new location…</option>
+                    </select>
+                    <div class="form-text" id="location-bind-note" style="display:none;"></div>
+                    <div class="text-danger small mt-1" id="err-location"></div>
+                </div>
+
+                {{-- Inline add-new-location (country → county → city cascade) --}}
+                <div id="add-location-box" class="border rounded-3 p-3 mb-3" style="display:none; background:#f8f9fa;">
+                    <div class="fw-semibold mb-2"><i class="mdi mdi-map-marker-plus me-1"></i>New location</div>
+                    <div class="mb-2">
+                        <input type="text" id="loc-label" class="form-control form-control-sm" placeholder="Label (e.g. Home, Office)">
+                        <div class="text-danger small mt-1" id="err-loc-label"></div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6"><select id="loc-country" class="form-select form-select-sm"><option value="">Country</option></select><div class="text-danger small mt-1" id="err-loc-country"></div></div>
+                        <div class="col-6"><select id="loc-county" class="form-select form-select-sm" disabled><option value="">County</option></select><div class="text-danger small mt-1" id="err-loc-county"></div></div>
+                    </div>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6"><select id="loc-city" class="form-select form-select-sm" disabled><option value="">City</option></select><div class="text-danger small mt-1" id="err-loc-city"></div></div>
+                        <div class="col-6"><input type="text" id="loc-zip" class="form-control form-control-sm" placeholder="Zip code"><div class="text-danger small mt-1" id="err-loc-zip"></div></div>
+                    </div>
+                    <div class="mb-2"><input type="text" id="loc-address1" class="form-control form-control-sm" placeholder="Address 1"><div class="text-danger small mt-1" id="err-loc-address1"></div></div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" id="loc-cancel" class="btn btn-sm btn-light">Cancel</button>
+                        <button type="button" id="loc-save" class="btn btn-sm btn-primary">Save location</button>
+                    </div>
+                </div>
+
+                <div class="mb-3">
                     <label for="meal-quantity" class="form-label fw-semibold">Quantity</label>
                     <input type="number" id="meal-quantity" class="form-control" value="1" min="1">
                     <div class="text-danger small mt-1" id="err-quantity"></div>
@@ -354,6 +371,38 @@
     </div>
 </div>
 
+{{-- ===== Add Food to a suggested-plan group ===== --}}
+<div class="modal fade" id="setupAddItemModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-semibold">Add Food to <span id="setup-add-meal-label"></span></h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                {{-- keyword chips for this meal type --}}
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="text-muted fw-semibold">Keywords</small>
+                        <label class="small mb-0" style="cursor:pointer;">
+                            <input type="checkbox" id="setup-add-select-all"> Select all
+                        </label>
+                    </div>
+                    <div id="setup-add-keywords" class="d-flex flex-wrap gap-2"></div>
+                </div>
+
+                <div class="input-group mb-3">
+                    <span class="input-group-text"><i class="mdi mdi-magnify"></i></span>
+                    <input type="text" id="setup-add-search" class="form-control" placeholder="Search food by keyword (e.g. chicken), then press Enter">
+                </div>
+
+                <div id="setup-add-results" class="row g-2"></div>
+                <nav class="mt-3"><ul class="pagination pagination-sm justify-content-center mb-0" id="setup-add-pagination"></ul></nav>
+            </div>
+        </div>
+    </div>
+</div>
+
 @endsection
 
 @push('styles')
@@ -406,6 +455,11 @@ let selectedMealTime   = null;
 let lastSearchTerms    = [];
 let suggestionProductMap = {};
 const MEAL_DEFAULT_TIMES = { breakfast:'08:00', lunch:'12:00', snacks:'16:00', dinner:'19:00' };
+
+/* ===== Browse Meals (default 12 random + load more) ===== */
+let browseSeed     = Math.floor(Math.random() * 1e9);   // stable random order for this page visit
+let browsePage     = 1;
+let browseLastPage = 1;
 
 /* ===== Voice-edit state ===== */
 let currentPlan     = [];   // the rendered weekly_plan (set in renderSuggestions)
@@ -460,8 +514,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         initAiPlanner();
         bindWeeklyPlanButtons();
         initVoiceAssistant();
+        initMealLocations();
+        initSetupAddItem();
 
         await checkHealthProfile();
+        await loadSetupSuggestion();   // last multi-address order → editable plan (overrides health suggestion)
+        await browseDefaultMeals();    // Browse Meals: 12 random meals by default + Load More
 
     } catch (error) {
         handleError(error);
@@ -479,13 +537,13 @@ async function checkHealthProfile() {
             document.getElementById('planner-btn-label').textContent = 'Update My Plan';
             // profile exists → reveal the Update Health Info button
             document.getElementById('update-health-btn').style.display = 'inline-block';
-            renderSuggestions(res.data.data);
+            healthWeeklyPlan = res.data.data;          // rendered by loadSetupSuggestion (editable grid)
         } else {
-            // no profile → show order-based suggestions if any, then open "Update Health Info"
+            // no profile → keep order-based suggestion (if any) for the grid, then open "Update Health Info"
             document.getElementById('update-health-btn').style.display = 'none';
             const d = res.data.data || {};
             if (d.has_history && (d.weekly_plan || []).length) {
-                renderSuggestions(d);
+                healthWeeklyPlan = d;
             }
             openPlanner('health');
         }
@@ -685,21 +743,34 @@ document.getElementById('keyword-input').addEventListener('keydown', (e) => {
     if (e.key === 'Enter') { e.preventDefault(); document.getElementById('search-btn').click(); }
 });
 
-async function searchProducts(keywords, page = 1) {
+// Default browse: 12 random meals (mixed restaurants), with Load More
+function browseDefaultMeals() {
+    lastSearchTerms = [];
+    return searchProducts([], 1, false);
+}
+
+async function searchProducts(keywords, page = 1, append = false) {
     const list = document.getElementById('product-list');
-    list.innerHTML = `<div class="text-muted text-center py-3">Searching products...</div>`;
+    if (!append) list.innerHTML = `<div class="text-muted text-center py-3">Loading meals...</div>`;
     try {
         showLoader();
-        const res = await axios.post(`/search/products?page=${page}`, {
+        const body = {
             keywords,
             meal_type_id: selectedMealTypeId,
             latitude:     userLatitude,
-            longitude:    userLongitude
-        });
+            longitude:    userLongitude,
+            per_page:     12
+        };
+        // stable random order only for the default browse (no keyword, no meal type)
+        if ((!keywords || keywords.length === 0) && !selectedMealTypeId) body.seed = browseSeed;
+
+        const res = await axios.post(`/search/products?page=${page}`, body);
         if (res.status === 200 && res.data.status === 'success' && res.data.products.data.length > 0) {
-            renderProducts(res.data.products.data, res.data.total);
-            updatePagination(res.data.products);
-        } else {
+            renderProducts(res.data.products.data, res.data.total, append);
+            browsePage     = res.data.products.current_page;
+            browseLastPage = res.data.products.last_page;
+            renderLoadMore();
+        } else if (!append) {
             document.getElementById('results-heading').style.display = 'none';
             list.innerHTML = `
                 <div class="col-12">
@@ -708,7 +779,7 @@ async function searchProducts(keywords, page = 1) {
                         <p class="mb-0 mt-2">No meals found. Try different keywords or a food name.</p>
                     </div>
                 </div>`;
-            document.querySelector('.pagination').innerHTML = '';
+            document.getElementById('browse-loadmore').innerHTML = '';
         }
     } catch (error) {
         handleError(error);
@@ -717,18 +788,30 @@ async function searchProducts(keywords, page = 1) {
     }
 }
 
+function renderLoadMore() {
+    const box = document.getElementById('browse-loadmore');
+    box.innerHTML = (browsePage < browseLastPage)
+        ? `<button class="btn btn-outline-primary rounded-pill px-4" onclick="loadMoreMeals()"><i class="mdi mdi-reload me-1"></i>Load More</button>`
+        : '';
+}
+
+function loadMoreMeals() {
+    searchProducts(lastSearchTerms, browsePage + 1, true);
+}
+
 /* ===================== attractive result cards ===================== */
-function renderProducts(products, total) {
-    allProducts = products;
+function renderProducts(products, total, append = false) {
     const list = document.getElementById('product-list');
-    list.innerHTML = '';
+    if (!append) { allProducts = []; list.innerHTML = ''; }
 
     // results heading
     const heading = document.getElementById('results-heading');
     heading.style.display = 'flex';
     document.getElementById('results-count').textContent = `${total ?? products.length} found`;
 
-    products.forEach((p, index) => {
+    products.forEach((p) => {
+        const index = allProducts.length;   // global index across appended pages
+        allProducts.push(p);
         const mealTypesHTML = (p.meal_types && p.meal_types.length > 0)
             ? p.meal_types.map(mt => `<span class="badge rounded-pill bg-primary-subtle text-primary result-meal-badge me-1 mb-1 text-capitalize">${mt.name}</span>`).join('')
             : '';
@@ -828,20 +911,6 @@ function setupModalDates(preferred) {
     mDate.value = val;
 }
 
-/* ===== Inline modal validation helpers (no error toast) ===== */
-const MODAL_ERROR_IDS = ['err-meal-type','err-meal-date','err-meal-time','err-quantity','err-general'];
-function toTitleCase(s) {
-    return (s || '').toString().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-}
-function setModalError(id, msg) {
-    const el = document.getElementById(id);
-    if (el) el.textContent = msg;
-}
-function clearModalErrors() {
-    MODAL_ERROR_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
-}
-document.getElementById('addMealPlanModal')?.addEventListener('show.bs.modal', clearModalErrors);
-
 document.getElementById('confirm-add-meal').addEventListener('click', async () => {
     const sel = document.getElementById('modal-meal-type');
     const mealTypeId = parseInt(sel.value);
@@ -849,20 +918,28 @@ document.getElementById('confirm-add-meal').addEventListener('click', async () =
     const selectedTime = document.getElementById('modal-meal-time').value;
     const quantity = parseInt(document.getElementById('meal-quantity').value);
 
+    const locationId = document.getElementById('modal-location')?.value;
+
     clearModalErrors();
     let valid = true;
-    if (!selectedProduct)           { setModalError('err-general', 'No product selected.'); valid = false; }
-    if (!mealTypeId)                { setModalError('err-meal-type', 'Please select a meal type.'); valid = false; }
-    if (!selectedDate)              { setModalError('err-meal-date', 'Please choose a date.'); valid = false; }
-    if (!selectedTime)              { setModalError('err-meal-time', 'Please choose a time.'); valid = false; }
-    if (!quantity || quantity <= 0) { setModalError('err-quantity', 'Please enter a valid quantity.'); valid = false; }
+    if (!selectedProduct)                        { setModalError('err-general', 'No product selected.'); valid = false; }
+    if (!mealTypeId)                             { setModalError('err-meal-type', 'Please select a meal type.'); valid = false; }
+    if (!selectedDate)                           { setModalError('err-meal-date', 'Please choose a date.'); valid = false; }
+    if (!selectedTime)                           { setModalError('err-meal-time', 'Please choose a time.'); valid = false; }
+    if (!locationId || locationId === '__add__') { setModalError('err-location', 'Please select a delivery location.'); valid = false; }
+    if (!quantity || quantity <= 0)              { setModalError('err-quantity', 'Please enter a valid quantity.'); valid = false; }
     if (!valid) return;
 
     const key = `${selectedDate}_${mealTypeId}`;
+    const name = sel.options[sel.selectedIndex]?.text || 'this meal type';
+
     const existingTime = customerMealTimes[key];
     if (existingTime && existingTime !== selectedTime) {
-        const name = sel.options[sel.selectedIndex]?.text || 'this meal type';
         return setModalError('err-meal-time', `All ${name} items on ${selectedDate} must use the same time (${existingTime}).`);
+    }
+    const existingLoc = mealSetupLocations[key];
+    if (existingLoc && String(existingLoc) !== String(locationId)) {
+        return setModalError('err-location', `All ${name} items on ${selectedDate} must deliver to the same location.`);
     }
 
     try {
@@ -872,11 +949,13 @@ document.getElementById('confirm-add-meal').addEventListener('click', async () =
             meal_type_id: mealTypeId,
             meal_date:    selectedDate,
             meal_time:    selectedTime,
+            location_id:  locationId,
             quantity:     quantity
         });
         if (res.status === 201 && res.data.status === 'success') {
             successToast(res.data.message || 'Meal added successfully!');
             customerMealTimes[key] = selectedTime;
+            mealSetupLocations[key] = locationId;
             bootstrap.Modal.getInstance(document.getElementById('addMealPlanModal')).hide();
             await updateMealCartCount();
         } else {
@@ -885,7 +964,7 @@ document.getElementById('confirm-add-meal').addEventListener('click', async () =
     } catch (error) {
         const errs = error.response?.data?.errors;
         if (errs) {
-            const map = { meal_type_id:'err-meal-type', meal_date:'err-meal-date', meal_time:'err-meal-time', quantity:'err-quantity' };
+            const map = { meal_type_id:'err-meal-type', meal_date:'err-meal-date', meal_time:'err-meal-time', location_id:'err-location', quantity:'err-quantity' };
             Object.keys(errs).forEach(f => setModalError(map[f] || 'err-general', errs[f][0]));
         } else {
             setModalError('err-general', error.response?.data?.message || 'Something went wrong. Please try again.');
@@ -1022,7 +1101,12 @@ async function generateAiPlan() {
             bootstrap.Modal.getInstance(document.getElementById('aiPlannerModal'))?.hide();
             document.getElementById('planner-btn-label').textContent = 'Update My Plan';
             document.getElementById('update-health-btn').style.display = 'inline-block';
-            renderSuggestions(res.data.data);
+            // render the freshly generated plan in the editable grid
+            healthWeeklyPlan = res.data.data;
+            await loadMealLocations();
+            setupPlan = healthPlanToSetup(res.data.data.weekly_plan || []);
+            setupPlanSource = 'health';
+            renderSetupPlan();
             document.getElementById('suggestion-section').scrollIntoView({ behavior: 'smooth' });
         } else {
             err.textContent = res.data.message || 'Failed to generate suggestions.';
@@ -1196,6 +1280,10 @@ function renderSuggestions(data) {
             </div>`);
     });
 
+    // health/history fallback uses the legacy voice submit bar (the editable plan hides it again)
+    const legacyBar = document.getElementById('voice-submit-bar');
+    if (legacyBar) legacyBar.style.display = '';
+
     document.getElementById('suggestion-section').style.display = 'block';
 }
 
@@ -1342,8 +1430,8 @@ function vaGetRecognition() {
     vaRecognition.onerror = (e) => {
         if (e.error === 'aborted') { vaMicIdle(); return; }
         if (e.error === 'no-speech') {
-            if (vaVoiceMode && vaNoSpeechRetries < 2) { vaNoSpeechRetries++; vaMicIdle(); vaAutoListen(); return; }
-            vaSetStatus('Didn’t catch that — tap the mic to try again.'); vaStopVoiceMode(); return;
+            if (vaVoiceMode && vaNoSpeechRetries < 6) { vaNoSpeechRetries++; vaMicIdle(); vaSetStatus('Listening… (go ahead)'); vaAutoListen(); return; }
+            vaSetStatus('Paused — tap the mic to keep going.'); vaStopVoiceMode(); return;
         }
         vaSetStatus(({
             'audio-capture': 'No audio from the mic — check the Windows input device & level.',
@@ -1355,7 +1443,11 @@ function vaGetRecognition() {
     vaRecognition.onend = () => {
         vaMicIdle();
         // short words (e.g. "egg") may arrive only as interim — process them on end
-        if (!vaFinalHandled && vaLastTranscript) { const t = vaLastTranscript; vaLastTranscript = ''; vaHandleSpeech(t); }
+        if (!vaFinalHandled && vaLastTranscript) {
+            const t = vaLastTranscript; vaLastTranscript = ''; vaHandleSpeech(t);
+        } else if (vaVoiceMode && vaListeningFor) {
+            vaAutoListen();   // keep the mic alive while a step is still pending
+        }
     };
     return vaRecognition;
 }
@@ -1370,7 +1462,7 @@ function vaStartListening(forWhat) {
 function vaAutoListen() {
     if (!vaVoiceMode || !vaSpeechSupported()) return;
     clearTimeout(vaAutoTimer);
-    vaAutoTimer = setTimeout(() => { if (vaVoiceMode && vaListeningFor) vaStartListening(vaListeningFor); }, 450);
+    vaAutoTimer = setTimeout(() => { if (vaVoiceMode && vaListeningFor) vaStartListening(vaListeningFor); }, 300);
 }
 function vaStopVoiceMode() {
     vaVoiceMode = false;
@@ -1424,8 +1516,9 @@ function vaHandleSpeech(text) {
     if (vaListeningFor === 'date') {
         const dm = vaMatchDate(' ' + t + ' ');
         if (dm) { vaSetDate(dm.date, dm.label); return; }
-        const idx = vaParseOrdinal(t, currentPlan.length);
-        if (idx !== null && currentPlan[idx]) { vaSetDate(currentPlan[idx].date, currentPlan[idx].day_label); return; }
+        const days = vaPlanDays();
+        const idx  = vaParseOrdinal(t, days.length);
+        if (idx !== null && days[idx]) { vaSetDate(days[idx].date, days[idx].label); return; }
         vaSetStatus('Say a date or its number (1, 2, 3…).'); return;
     }
     if (vaListeningFor === 'command' && vaState.action === 'add' && !vaState.food) {
@@ -1553,12 +1646,12 @@ function vaAskMealType() {
 
 function vaAskDate() {
     vaClearDynamic();
-    vaSetStatus('Which date?');
     document.getElementById('va-question').textContent =
         `${vaState.action === 'delete' ? 'Remove from' : 'Add to'} ${vaState.mealTypeName} on which date?`;
-    document.getElementById('va-options').innerHTML = currentPlan.map((d, i) =>
+    const days = vaPlanDays();
+    document.getElementById('va-options').innerHTML = days.map((d, i) =>
         `<button type="button" class="btn ${i===0?'btn-primary':'btn-outline-primary'} rounded-pill va-pick-date"
-                 data-date="${d.date}" data-label="${d.day_label}">${i + 1}. ${d.day_label}${i===0?' (default)':''}</button>`
+                 data-date="${d.date}" data-label="${d.label}">${i + 1}. ${d.label}${i===0?' (default)':''}</button>`
     ).join('');
     vaSetStatus('Tap a date — or say its number (1, 2, 3…).');
     vaListeningFor = 'date';
@@ -1585,35 +1678,66 @@ function vaParseOrdinal(t, len) {
     if (m) return parseInt(m[1], 10) - 1;
     return null;
 }
-function vaMealTypeIdFor(name) {
-    const lname = (name||'').toLowerCase();
-    for (const d of currentPlan) for (const m of d.meals)
-        if ((m.meal_type||'').toLowerCase() === lname) return m.meal_type_id;
-    return null;
+/* voice targets the editable setup plan when present, else the old suggestion */
+function vaUsingSetup() { return Array.isArray(setupPlan) && setupPlan.length > 0; }
+function vaPlanDays() {
+    if (vaUsingSetup()) return setupPlan.map(d => ({
+        date:  d.date,
+        label: new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' })
+    }));
+    return (currentPlan || []).map(d => ({ date: d.date, label: d.day_label }));
 }
 function vaPlanMealTypes() {
     const seen = {}, out = [];
-    for (const d of currentPlan) for (const m of d.meals)
-        if (!seen[m.meal_type_id]) { seen[m.meal_type_id] = 1; out.push({ id:m.meal_type_id, name:m.meal_type }); }
+    if (vaUsingSetup()) {
+        for (const d of setupPlan) for (const g of d.groups)
+            if (!seen[g.meal_type_id]) { seen[g.meal_type_id] = 1; out.push({ id:g.meal_type_id, name:g.meal_type }); }
+    } else {
+        for (const d of (currentPlan || [])) for (const m of d.meals)
+            if (!seen[m.meal_type_id]) { seen[m.meal_type_id] = 1; out.push({ id:m.meal_type_id, name:m.meal_type }); }
+    }
     return out;
 }
+function vaMealTypeIdFor(name) {
+    const l = (name||'').toLowerCase();
+    const mt = vaPlanMealTypes().find(m => (m.name||'').toLowerCase() === l);
+    return mt ? mt.id : null;
+}
 function vaMatchDate(lower) {
-    for (const d of currentPlan) {
+    const days = vaPlanDays();
+    for (const d of days) {
         const da     = parseInt(d.date.split('-')[2], 10);
         const monNm  = MONTHS[parseInt(d.date.split('-')[1], 10) - 1];
         const reNumMon = new RegExp('\\b' + da + '(st|nd|rd|th)?\\s*(of\\s*)?' + monNm + '[a-z]*\\b');
         const reMonNum = new RegExp('\\b' + monNm + '[a-z]*\\s*' + da + '(st|nd|rd|th)?\\b');
-        if (reNumMon.test(lower) || reMonNum.test(lower)) return { date:d.date, label:d.day_label };
+        if (reNumMon.test(lower) || reMonNum.test(lower)) return { date:d.date, label:d.label };
     }
-    if (/\btomorrow\b/.test(lower) && currentPlan[0]) return { date:currentPlan[0].date, label:currentPlan[0].day_label };
+    if (/\btomorrow\b/.test(lower) && days[0]) return { date:days[0].date, label:days[0].label };
     const m = lower.match(/\b([0-9]{1,2})(st|nd|rd|th)?\b/);
-    if (m) { const num = parseInt(m[1],10); const d = currentPlan.find(d => parseInt(d.date.split('-')[2],10) === num); if (d) return { date:d.date, label:d.day_label }; }
+    if (m) { const num = parseInt(m[1],10); const d = days.find(d => parseInt(d.date.split('-')[2],10) === num); if (d) return { date:d.date, label:d.label }; }
     return null;
+}
+
+/* ---------- finish a voice command: close the assistant + focus the day ---------- */
+function vaFinishAndFocus(di, msg) {
+    vaState = {}; vaListeningFor = null;
+    vaStopVoiceMode();
+    bootstrap.Modal.getInstance(document.getElementById('voiceAssistantModal'))?.hide();
+    successToast('✓ ' + msg);
+    setTimeout(() => {
+        const collapseEl = document.getElementById('setupDay' + di);
+        if (collapseEl) {
+            bootstrap.Collapse.getOrCreateInstance(collapseEl, { toggle:false }).show();
+            collapseEl.scrollIntoView({ behavior:'smooth', block:'center' });
+        }
+    }, 350);
 }
 
 /* ---------- commit ADD ---------- */
 function vaCommitAdd() {
     if (!vaState.mealTypeId) { vaFeedback('Could not match that meal type.', 'warning'); return; }
+    if (vaUsingSetup()) return vaCommitAddSetup();
+
     const slotKey = `${vaState.date}|${vaState.mealTypeId}`;
     if (vaSlotHasProduct(slotKey, vaState.product.id)) {
         vaFeedback(`${vaState.product.name} is already in ${vaState.mealTypeName} on ${vaState.dayLabel}.`, 'warning'); return;
@@ -1628,6 +1752,25 @@ function vaCommitAdd() {
     vaState = {}; vaListeningFor = null;
 }
 
+function vaCommitAddSetup() {
+    const di = setupPlan.findIndex(d => d.date === vaState.date);
+    if (di < 0) { vaFeedback('That date is not in your plan.', 'warning'); return; }
+
+    let gi = setupPlan[di].groups.findIndex(g => String(g.meal_type_id) === String(vaState.mealTypeId));
+    if (gi < 0) {
+        setupPlan[di].groups.push({ meal_type_id: vaState.mealTypeId, meal_type: vaState.mealTypeName, meal_time: '', location: null, items: [] });
+        gi = setupPlan[di].groups.length - 1;
+    }
+    const g = setupPlan[di].groups[gi];
+    if (g.items.some(it => String(it.product.id) === String(vaState.product.id))) {
+        vaFeedback(`${vaState.product.name} is already in ${vaState.mealTypeName}.`, 'warning'); return;
+    }
+    const p = vaState.product;
+    g.items.push({ product: { id:p.id, name:p.name, image:p.image, price:p.price }, client: null, quantity: 1 });
+    renderSetupPlan();
+    vaFinishAndFocus(di, `Added ${p.name} to ${vaState.mealTypeName}.`);
+}
+
 /* ---------- DELETE path ---------- */
 function vaContinueDelete() {
     if (!vaState.mealTypeId) return vaAskMealType();
@@ -1635,6 +1778,8 @@ function vaContinueDelete() {
     return vaCommitDelete();
 }
 function vaCommitDelete() {
+    if (vaUsingSetup()) return vaCommitDeleteSetup();
+
     const slotKey = `${vaState.date}|${vaState.mealTypeId}`;
     const items   = vaSlotItems(slotKey);
     if (!items.length) { vaFeedback(`Nothing to remove in ${vaState.mealTypeName} on ${vaState.dayLabel}.`, 'warning'); return; }
@@ -1658,6 +1803,36 @@ function vaCommitDelete() {
         `<button type="button" class="btn btn-outline-danger rounded-pill va-pick-remove" data-i="${i}">${it.product.name}</button>`
     ).join('');
     vaListeningFor = null;
+}
+
+function vaCommitDeleteSetup() {
+    const di = setupPlan.findIndex(d => d.date === vaState.date);
+    if (di < 0) { vaFeedback('That date is not in your plan.', 'warning'); return; }
+    const gi = setupPlan[di].groups.findIndex(g => String(g.meal_type_id) === String(vaState.mealTypeId));
+    if (gi < 0 || !setupPlan[di].groups[gi].items.length) {
+        vaFeedback(`Nothing to remove in ${vaState.mealTypeName} on ${vaState.dayLabel}.`, 'warning'); return;
+    }
+    const g = setupPlan[di].groups[gi];
+
+    let idx = -1;
+    if (vaState.food) idx = g.items.findIndex(it => (it.product.name || '').toLowerCase().includes(vaState.food.toLowerCase()));
+
+    if (idx < 0) {
+        // couldn't match by name → let them pick
+        vaClearDynamic();
+        document.getElementById('va-question').textContent = `Which item to remove from ${vaState.mealTypeName}?`;
+        vaDeleteCandidates = g.items.map((it, i) => ({ product: it.product, _setup: { di, gi, ii: i } }));
+        document.getElementById('va-options').innerHTML = g.items.map((it, i) =>
+            `<button type="button" class="btn btn-outline-danger rounded-pill va-pick-remove" data-i="${i}">${toTitleCase(it.product.name)}</button>`
+        ).join('');
+        vaListeningFor = null;
+        return;
+    }
+
+    const removed = g.items[idx].product.name;
+    g.items.splice(idx, 1);
+    renderSetupPlan();
+    vaFinishAndFocus(di, `Removed ${removed} from ${vaState.mealTypeName}.`);
 }
 
 function vaSlotItems(slotKey) {
@@ -1778,7 +1953,14 @@ function initVoiceAssistant() {
         const rm = e.target.closest('.va-pick-remove');
         if (rm) {
             const it = vaDeleteCandidates[parseInt(rm.dataset.i)];
-            if (it) {
+            if (!it) return;
+            if (it._setup) {
+                const { di, gi, ii } = it._setup;
+                const removed = setupPlan[di].groups[gi].items[ii]?.product.name || it.product.name;
+                setupPlan[di].groups[gi].items.splice(ii, 1);
+                renderSetupPlan();
+                vaFinishAndFocus(di, `Removed ${removed} from ${vaState.mealTypeName || 'the plan'}.`);
+            } else {
                 vaRemoveItem(`${vaState.date}|${vaState.mealTypeId}`, it);
                 document.getElementById('va-options').innerHTML  = '';
                 document.getElementById('va-question').innerHTML = '';
@@ -1805,6 +1987,531 @@ function initVoiceAssistant() {
     document.getElementById('plan-submit-voice-btn')?.addEventListener('click', () => {
         if (!vaSpeechSupported()) return submitPlanToCart();   // no mic → submit directly
         vaStartListening('submit');
+    });
+}
+
+/* ==========================================================================
+   DELIVERY LOCATIONS (Meal Plan Setup only)
+   List + add-new with country → county → city cascade.
+   location_id rides along in the add-to-cart payload + is bound per (date, meal type).
+   ========================================================================== */
+/* ==========================================================================
+   SUGGESTED PLAN = editable clone of the customer's last multi-address order.
+   Falls back silently to the health/history suggestion when there is none.
+   ========================================================================== */
+let setupPlan        = [];
+let setupPlanSource  = '';      // 'last_order' | 'health'
+let healthWeeklyPlan = null;    // health/history suggestion data (stored on load)
+const SETUP_ICONS = {
+    Breakfast:{i:'mdi-coffee-outline',c:'bg-warning'}, Lunch:{i:'mdi-food-outline',c:'bg-primary'},
+    Snacks:{i:'mdi-food-apple-outline',c:'bg-success'}, Dinner:{i:'mdi-silverware-fork-knife',c:'bg-danger'}
+};
+
+async function loadSetupSuggestion() {
+    try {
+        const res = await axios.get('/get/setup-suggestion');
+        if (res.data.status === 'success' && res.data.source === 'last_order' && (res.data.days || []).length) {
+            await loadMealLocations();        // ensure saved places are ready for the dropdowns
+            setupPlan = res.data.days;
+            setupPlanSource = 'last_order';
+            renderSetupPlan();
+            return;
+        }
+    } catch (_) {}
+
+    // no last order → render the health/history suggestion in the SAME editable grid
+    if (healthWeeklyPlan && (healthWeeklyPlan.weekly_plan || []).length) {
+        await loadMealLocations();
+        setupPlan = healthPlanToSetup(healthWeeklyPlan.weekly_plan);
+        setupPlanSource = 'health';
+        renderSetupPlan();
+    }
+}
+
+// convert a health/history weekly_plan into the editable setupPlan shape (no locations yet)
+function healthPlanToSetup(weeklyPlan) {
+    return (weeklyPlan || []).map(day => ({
+        date: day.date,
+        groups: (day.meals || []).filter(m => m.product).map(m => ({
+            meal_type_id: m.meal_type_id,
+            meal_type:    m.meal_type,
+            meal_time:    MEAL_DEFAULT_TIMES[(m.meal_type || '').toLowerCase()] || '12:00',
+            location:     null,
+            items: [{
+                product:  { id:m.product.id, name:m.product.name, image:m.product.image, price:m.product.price },
+                client:   m.product.client_name ? { name: m.product.client_name } : null,
+                quantity: 1
+            }]
+        }))
+    }));
+}
+
+function setupLocationOptions(selectedId) {
+    let html = '<option value="">Select location</option>';
+    (mealLocations || []).forEach(l => {
+        const place = l.city ? `${toTitleCase(l.label)} (${toTitleCase(l.city.name)})` : toTitleCase(l.label);
+        html += `<option value="${l.id}"${String(l.id) === String(selectedId) ? ' selected' : ''}>${place}</option>`;
+    });
+    return html;
+}
+
+function renderSetupPlan() {
+    const isHealth = setupPlanSource === 'health';
+    document.getElementById('suggestion-period-badge').textContent = isHealth ? 'Based on your health profile' : 'Based on your last order';
+    document.getElementById('suggestion-summary').innerHTML = isHealth
+        ? `<i class="mdi mdi-account-heart-outline fs-5"></i><div><strong>Suggested for the next ${setupPlan.length} day(s) from your health profile.</strong> Edit anything, set a delivery location per meal, then add it all to your cart.</div>`
+        : `<i class="mdi mdi-history fs-5"></i><div><strong>Your last order, ready for the next ${setupPlan.length} day(s).</strong> Edit anything below, then add it all to your cart.</div>`;
+    const analysisEl = document.getElementById('suggestion-analysis');
+    if (analysisEl) analysisEl.innerHTML = '';
+
+    const container = document.getElementById('weekly-plan');
+    container.innerHTML = '';
+
+    setupPlan.forEach((day, di) => {
+        const dLabel = new Date(day.date + 'T00:00:00').toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' });
+        let groupsHtml = '';
+
+        day.groups.forEach((g, gi) => {
+            const cfg = SETUP_ICONS[g.meal_type] || { i:'mdi-food', c:'bg-secondary' };
+            let itemsHtml = '';
+            g.items.forEach((it, ii) => {
+                const img = it.product?.image ? `/upload/product/small/${it.product.image}` : '/upload/no_image.jpg';
+                itemsHtml += `
+                  <div class="d-flex align-items-center gap-2 py-2 border-top">
+                    <img src="${img}" class="rounded" style="width:46px;height:46px;object-fit:cover;">
+                    <div class="flex-grow-1">
+                        <div class="fw-semibold small">${toTitleCase(it.product?.name || '')}</div>
+                        ${it.client ? `<small class="text-muted">Provided By: ${toTitleCase(it.client.name)}</small>` : ''}
+                    </div>
+                    <input type="number" min="1" value="${it.quantity}" class="form-control form-control-sm" style="width:64px;"
+                           onchange="setupQty(${di},${gi},${ii},this.value)">
+                    <button class="btn btn-sm btn-link text-danger p-0" title="Remove" onclick="setupRemoveItem(${di},${gi},${ii})"><i class="mdi mdi-close-circle"></i></button>
+                  </div>`;
+            });
+
+            groupsHtml += `
+              <div class="col-md-6">
+                <div class="card border h-100">
+                  <div class="card-body p-3">
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                        <span class="meal-badge ${cfg.c} text-white"><i class="mdi ${cfg.i}"></i></span>
+                        <div class="fw-semibold flex-grow-1">${toTitleCase(g.meal_type)}</div>
+                    </div>
+                    <div class="row g-2 mb-1">
+                        <div class="col-7">
+                            <label class="form-label small mb-0 text-muted">Location</label>
+                            <select class="form-select form-select-sm" onchange="setupLoc(${di},${gi},this.value)">${setupLocationOptions(g.location?.id)}</select>
+                        </div>
+                        <div class="col-5">
+                            <label class="form-label small mb-0 text-muted">Time</label>
+                            <input type="time" class="form-control form-control-sm" value="${g.meal_time || ''}" onchange="setupTime(${di},${gi},this.value)">
+                        </div>
+                    </div>
+                    ${itemsHtml || '<div class="text-muted small py-2">No items.</div>'}
+                    <button class="btn btn-sm btn-outline-success w-100 mt-2" onclick="openSetupAddItem(${di},${gi})">
+                        <i class="mdi mdi-plus"></i> Add item
+                    </button>
+                  </div>
+                </div>
+              </div>`;
+        });
+
+        container.insertAdjacentHTML('beforeend', `
+          <div class="accordion-item">
+            <h2 class="accordion-header">
+              <button class="accordion-button ${di !== 0 ? 'collapsed' : ''}" type="button" data-bs-toggle="collapse" data-bs-target="#setupDay${di}">
+                <i class="mdi mdi-calendar-outline me-2 text-primary"></i><span class="fw-semibold">${dLabel}</span>
+              </button>
+            </h2>
+            <div id="setupDay${di}" class="accordion-collapse collapse ${di === 0 ? 'show' : ''}" data-bs-parent="#weekly-plan">
+              <div class="accordion-body"><div class="row g-3">${groupsHtml}</div></div>
+            </div>
+          </div>`);
+    });
+
+    let bar = document.getElementById('setup-addall-bar');
+    if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'setup-addall-bar';
+        bar.className = 'd-flex justify-content-end mt-3';
+        container.parentNode.appendChild(bar);
+    }
+    bar.innerHTML = `<button class="btn btn-success rounded-pill px-4" onclick="setupAddAllToCart()"><i class="mdi mdi-cart-plus me-1"></i> Add this plan to cart</button>`;
+
+    // hide the legacy voice submit bar so only one submit button shows
+    const legacyBar = document.getElementById('voice-submit-bar');
+    if (legacyBar) legacyBar.style.display = 'none';
+
+    document.getElementById('suggestion-section').style.display = 'block';
+}
+
+function setupQty(di, gi, ii, v) { setupPlan[di].groups[gi].items[ii].quantity = Math.max(1, parseInt(v) || 1); }
+function setupTime(di, gi, v)     { setupPlan[di].groups[gi].meal_time = v; }
+function setupLoc(di, gi, v) {
+    const loc = (mealLocations || []).find(l => String(l.id) === String(v));
+    setupPlan[di].groups[gi].location = loc ? { id: loc.id, label: loc.label, city: loc.city ? loc.city.name : null } : null;
+}
+function setupRemoveItem(di, gi, ii) { setupPlan[di].groups[gi].items.splice(ii, 1); renderSetupPlan(); }
+
+async function setupAddAllToCart() {
+    const payload = [];
+    for (const day of setupPlan) {
+        for (const g of day.groups) {
+            if (!g.items.length) continue;
+            if (!g.location || !g.location.id) { errorToast(`Please set a location for ${g.meal_type} on ${day.date}.`); return; }
+            if (!g.meal_time)                  { errorToast(`Please set a time for ${g.meal_type} on ${day.date}.`); return; }
+            for (const it of g.items) {
+                payload.push({
+                    product_id:   it.product.id,
+                    meal_type_id: g.meal_type_id,
+                    meal_date:    day.date,
+                    meal_time:    g.meal_time,
+                    location_id:  g.location.id,
+                    quantity:     it.quantity,
+                });
+            }
+        }
+    }
+    if (!payload.length) { errorToast('Nothing to add.'); return; }
+    if (!confirm(`Add ${payload.length} item(s) to your cart?`)) return;
+
+    showLoader();
+    let added = 0, dup = 0, failed = 0;
+    for (const it of payload) {
+        try {
+            const r = await axios.post('/store/meal-cart', it);
+            if (r.status === 201) added++; else dup++;
+        } catch (e) {
+            if (e.response?.status === 409) dup++; else failed++;
+        }
+    }
+    hideLoader();
+    let msg = `${added} added`;
+    if (dup)    msg += `, ${dup} already in cart`;
+    if (failed) msg += `, ${failed} failed`;
+    successToast(msg + '.');
+    setTimeout(() => { window.location.href = '{{ route("meal.checkout.multi") }}'; }, 1300);
+}
+
+/* ----- Add a food into a suggested-plan group (keyword chips + pagination) ----- */
+let setupAddCtx        = { di:null, gi:null };
+let setupAddMealType   = null;
+let setupSearchResults = {};
+
+function openSetupAddItem(di, gi) {
+    setupAddCtx = { di, gi };
+    const g = setupPlan[di].groups[gi];
+    setupAddMealType = g.meal_type_id;
+
+    const d = new Date(setupPlan[di].date + 'T00:00:00').toLocaleDateString('en-US', { month:'short', day:'numeric' });
+    document.getElementById('setup-add-meal-label').textContent = `${toTitleCase(g.meal_type)} · ${d}`;
+    document.getElementById('setup-add-search').value = '';
+    document.getElementById('setup-add-select-all').checked = false;
+    document.getElementById('setup-add-results').innerHTML = '';
+    document.getElementById('setup-add-pagination').innerHTML = '';
+
+    loadSetupKeywords(g.meal_type_id);
+    setupSearchFood(1);                 // initial: all foods for this meal type
+    new bootstrap.Modal(document.getElementById('setupAddItemModal')).show();
+}
+
+async function loadSetupKeywords(mealTypeId) {
+    const box = document.getElementById('setup-add-keywords');
+    box.innerHTML = '<span class="text-muted small">Loading…</span>';
+    try {
+        const res = await axios.get(`/get/meal-keywords/${mealTypeId}`);
+        const kws = res.data?.data || [];
+        if (!kws.length) { box.innerHTML = '<span class="text-muted small">No keywords for this meal type.</span>'; return; }
+        box.innerHTML = kws.map(k => `
+            <label class="badge bg-light text-dark border d-inline-flex align-items-center gap-1 p-2 fw-normal" style="cursor:pointer;">
+                <input type="checkbox" class="setup-kw" value="${k.name}"> ${toTitleCase(k.name)}
+            </label>`).join('');
+    } catch (_) { box.innerHTML = '<span class="text-danger small">Failed to load keywords.</span>'; }
+}
+
+function setupSelectedTerms() {
+    const checked = Array.from(document.querySelectorAll('.setup-kw:checked')).map(c => c.value);
+    const typed   = (document.getElementById('setup-add-search').value || '').split(/[, ]+/).map(s => s.trim()).filter(Boolean);
+    return [...new Set([...checked, ...typed])];
+}
+
+async function setupSearchFood(page = 1) {
+    const box = document.getElementById('setup-add-results');
+    box.innerHTML = '<div class="text-muted small">Searching…</div>';
+    document.getElementById('setup-add-pagination').innerHTML = '';
+    try {
+        const res  = await axios.post('/search/products', { keywords: setupSelectedTerms(), meal_type_id: setupAddMealType, page });
+        const pg   = res.data?.products || {};
+        const list = pg.data || [];
+        if (!list.length) { box.innerHTML = '<div class="text-muted small">No items found.</div>'; return; }
+
+        setupSearchResults = {};
+        box.innerHTML = list.map(p => {
+            setupSearchResults[p.id] = p;
+            const img    = p.image ? `/upload/product/small/${p.image}` : '/upload/no_image.jpg';
+            const price  = (p.is_free || Number(p.price) === 0) ? 'Free' : `£${p.price}`;
+            const cal    = p.nutrients?.calories ? `${p.nutrients.calories} ${p.nutrients.calories_unit||'kcal'}` : '';
+            const client = p.client_info ? `${p.client_info.first_name||''} ${p.client_info.last_name||''}`.trim() : '';
+            return `<div class="col-md-6">
+                <button type="button" class="btn btn-outline-primary w-100 text-start d-flex align-items-center gap-2 setup-pick-food" data-id="${p.id}">
+                    <img src="${img}" style="width:42px;height:42px;object-fit:cover;border-radius:8px;">
+                    <span class="flex-grow-1"><span class="fw-semibold d-block">${toTitleCase(p.name)}</span>
+                    <small class="text-muted">${cal}${cal && price ? ' · ' : ''}${price}${client ? ' · ' + toTitleCase(client) : ''}</small></span>
+                </button></div>`;
+        }).join('');
+
+        setupRenderPagination(pg);
+    } catch (_) { box.innerHTML = '<div class="text-danger small">Search failed. Please try again.</div>'; }
+}
+
+function setupRenderPagination(pg) {
+    const ul   = document.getElementById('setup-add-pagination');
+    const cur  = pg.current_page || 1;
+    const last = pg.last_page || 1;
+    if (last <= 1) { ul.innerHTML = ''; return; }
+    let html = `<li class="page-item ${cur === 1 ? 'disabled' : ''}"><a class="page-link" href="#" data-pg="${cur - 1}">«</a></li>`;
+    for (let i = 1; i <= last; i++) html += `<li class="page-item ${i === cur ? 'active' : ''}"><a class="page-link" href="#" data-pg="${i}">${i}</a></li>`;
+    html += `<li class="page-item ${cur === last ? 'disabled' : ''}"><a class="page-link" href="#" data-pg="${cur + 1}">»</a></li>`;
+    ul.innerHTML = html;
+}
+
+function setupPickFood(id) {
+    const p = setupSearchResults[id];
+    if (!p) return;
+    const g = setupPlan[setupAddCtx.di].groups[setupAddCtx.gi];
+    if (g.items.some(it => String(it.product.id) === String(id))) { errorToast('That item is already in this meal.'); return; }
+    g.items.push({
+        product:  { id: p.id, name: p.name, image: p.image, price: p.price },
+        client:   p.client_info ? { id: p.client_info.id, name: `${p.client_info.first_name||''} ${p.client_info.last_name||''}`.trim() } : null,
+        quantity: 1,
+    });
+    bootstrap.Modal.getInstance(document.getElementById('setupAddItemModal'))?.hide();
+    renderSetupPlan();
+    successToast(`${toTitleCase(p.name)} added to ${toTitleCase(g.meal_type)}.`);
+}
+
+function initSetupAddItem() {
+    document.getElementById('setup-add-search')?.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); setupSearchFood(1); }
+    });
+
+    // keyword chip toggles → re-search + keep "select all" in sync
+    document.getElementById('setup-add-keywords')?.addEventListener('change', e => {
+        if (!e.target.classList.contains('setup-kw')) return;
+        const all = Array.from(document.querySelectorAll('.setup-kw'));
+        document.getElementById('setup-add-select-all').checked = all.length > 0 && all.every(c => c.checked);
+        setupSearchFood(1);
+    });
+
+    document.getElementById('setup-add-select-all')?.addEventListener('change', e => {
+        document.querySelectorAll('.setup-kw').forEach(c => { c.checked = e.target.checked; });
+        setupSearchFood(1);
+    });
+
+    document.getElementById('setup-add-results')?.addEventListener('click', e => {
+        const b = e.target.closest('.setup-pick-food');
+        if (b) setupPickFood(parseInt(b.dataset.id));
+    });
+
+    document.getElementById('setup-add-pagination')?.addEventListener('click', e => {
+        const a = e.target.closest('a[data-pg]');
+        if (!a) return;
+        e.preventDefault();
+        const li = a.closest('.page-item');
+        if (li.classList.contains('disabled') || li.classList.contains('active')) return;
+        setupSearchFood(parseInt(a.dataset.pg));
+    });
+}
+
+let mealLocations      = [];   // saved customer locations
+let mealSetupLocations = {};   // { "date_mealTypeId": location_id } — session binding
+
+const MODAL_ERROR_IDS = ['err-meal-type','err-meal-date','err-meal-time','err-location','err-quantity','err-general',
+                         'err-loc-label','err-loc-country','err-loc-county','err-loc-city','err-loc-zip','err-loc-address1'];
+
+function toTitleCase(s) {
+    return (s || '').toString().toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
+function setModalError(id, msg) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = msg;
+}
+function clearModalErrors() {
+    MODAL_ERROR_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ''; });
+}
+
+async function loadMealLocations(selectId) {
+    try {
+        const res = await axios.get('/get/my-meal-locations');
+        if (res.data.status === 'success') {
+            mealLocations = res.data.data || [];
+            renderLocationOptions(selectId);
+        }
+    } catch (_) {}
+}
+
+function renderLocationOptions(selectId) {
+    const sel = document.getElementById('modal-location');
+    if (!sel) return;
+    let html = '<option value="">Select a location</option>';
+    mealLocations.forEach(l => {
+        const place = l.city ? `${toTitleCase(l.label)} (${toTitleCase(l.city.name)})` : toTitleCase(l.label);
+        html += `<option value="${l.id}"${String(l.id) === String(selectId) ? ' selected' : ''}>${place}</option>`;
+    });
+    html += '<option value="__add__">＋ Add new location…</option>';
+    sel.innerHTML = html;
+}
+
+async function loadCountriesForLocation() {
+    const cSel = document.getElementById('loc-country');
+    if (cSel.options.length > 1) return;   // already loaded
+    try {
+        const res = await axios.get('/countries');
+        (res.data.data || res.data || []).forEach(c => cSel.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.name}</option>`));
+    } catch (_) {}
+}
+
+/* Auto-select + lock the location/time for an already-used (date, meal type) group */
+function applyGroupBinding() {
+    const locSel    = document.getElementById('modal-location');
+    const note      = document.getElementById('location-bind-note');
+    const timeInput = document.getElementById('modal-meal-time');
+    if (!locSel) return;
+
+    // reset to editable first
+    locSel.disabled = false;
+    if (note) note.style.display = 'none';
+    if (timeInput) timeInput.readOnly = false;
+
+    const mealTypeId = document.getElementById('modal-meal-type')?.value;
+    const date       = document.getElementById('modal-meal-date')?.value;
+    if (!mealTypeId || !date) return;
+
+    const key = `${date}_${mealTypeId}`;
+
+    const boundLoc = mealSetupLocations[key];
+    if (boundLoc) {
+        document.getElementById('add-location-box').style.display = 'none';
+        locSel.value = String(boundLoc);
+        locSel.disabled = true;
+        if (note) {
+            note.style.display = 'block';
+            note.innerHTML = '<i class="mdi mdi-lock-outline me-1"></i>Auto-set — all items for this date &amp; meal type deliver to the same location.';
+        }
+    }
+
+    const boundTime = customerMealTimes[key];
+    if (boundTime && timeInput) { timeInput.value = boundTime; timeInput.readOnly = true; }
+}
+
+/* Pre-load existing cart groups so the binding survives a page reload */
+async function preloadCartBindings() {
+    try {
+        const res  = await axios.get('/get/meal-cart');
+        const cart = res.data?.data?.meal_cart || {};
+        Object.keys(cart).forEach(date => {
+            Object.keys(cart[date]).forEach(mealTypeId => {
+                const first = Object.values(cart[date][mealTypeId])[0];
+                if (!first) return;
+                const key = `${date.slice(0, 10)}_${mealTypeId}`;
+                if (first.meal_time)    customerMealTimes[key]  = first.meal_time.slice(0, 5);
+                if (first.location?.id) mealSetupLocations[key] = first.location.id;
+            });
+        });
+    } catch (_) {}
+}
+
+function initMealLocations() {
+    const locSel = document.getElementById('modal-location');
+    if (!locSel) return;
+
+    loadMealLocations();
+    preloadCartBindings();
+
+    // reload locations + apply group binding whenever the Add-to-Plan modal opens
+    document.getElementById('addMealPlanModal')?.addEventListener('show.bs.modal', () => {
+        document.getElementById('add-location-box').style.display = 'none';
+        clearModalErrors();
+        loadMealLocations().then(applyGroupBinding);
+    });
+
+    // re-apply binding when the date or meal type changes inside the modal
+    document.getElementById('modal-meal-type')?.addEventListener('change', applyGroupBinding);
+    document.getElementById('modal-meal-date')?.addEventListener('change', applyGroupBinding);
+
+    locSel.addEventListener('change', (e) => {
+        const box = document.getElementById('add-location-box');
+        if (e.target.value === '__add__') { box.style.display = 'block'; loadCountriesForLocation(); }
+        else { box.style.display = 'none'; }
+    });
+
+    document.getElementById('loc-cancel')?.addEventListener('click', () => {
+        document.getElementById('add-location-box').style.display = 'none';
+        locSel.value = '';
+    });
+
+    document.getElementById('loc-country')?.addEventListener('change', async (e) => {
+        const cy = document.getElementById('loc-county'), ci = document.getElementById('loc-city');
+        ci.innerHTML = '<option value="">City</option>'; ci.disabled = true;
+        cy.innerHTML = '<option value="">County</option>'; cy.disabled = true;
+        if (!e.target.value) return;
+        try {
+            const res = await axios.get(`/counties/${e.target.value}`);
+            (res.data.data || res.data || []).forEach(c => cy.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.name}</option>`));
+            cy.disabled = false;
+        } catch (_) {}
+    });
+
+    document.getElementById('loc-county')?.addEventListener('change', async (e) => {
+        const ci = document.getElementById('loc-city');
+        ci.innerHTML = '<option value="">City</option>'; ci.disabled = true;
+        if (!e.target.value) return;
+        try {
+            const res = await axios.get(`/cities/${e.target.value}`);
+            (res.data.data || res.data || []).forEach(c => ci.insertAdjacentHTML('beforeend', `<option value="${c.id}">${c.name}</option>`));
+            ci.disabled = false;
+        } catch (_) {}
+    });
+
+    document.getElementById('loc-save')?.addEventListener('click', async () => {
+        const payload = {
+            label:      document.getElementById('loc-label').value.trim(),
+            address1:   document.getElementById('loc-address1').value.trim(),
+            zip_code:   document.getElementById('loc-zip').value.trim(),
+            country_id: document.getElementById('loc-country').value,
+            county_id:  document.getElementById('loc-county').value,
+            city_id:    document.getElementById('loc-city').value,
+        };
+        ['err-loc-label','err-loc-country','err-loc-county','err-loc-city','err-loc-zip','err-loc-address1'].forEach(id => setModalError(id, ''));
+        let ok = true;
+        if (!payload.label)      { setModalError('err-loc-label', 'Please enter a label.'); ok = false; }
+        if (!payload.country_id) { setModalError('err-loc-country', 'Please select a country.'); ok = false; }
+        if (!payload.county_id)  { setModalError('err-loc-county', 'Please select a county.'); ok = false; }
+        if (!payload.city_id)    { setModalError('err-loc-city', 'Please select a city.'); ok = false; }
+        if (!payload.zip_code)   { setModalError('err-loc-zip', 'Please enter a zip code.'); ok = false; }
+        if (!payload.address1)   { setModalError('err-loc-address1', 'Please enter an address.'); ok = false; }
+        if (!ok) return;
+        try {
+            showLoader();
+            const res = await axios.post('/store/meal-location', payload);
+            if (res.status === 201 && res.data.status === 'success') {
+                successToast('Location added.');
+                mealLocations.push(res.data.data);
+                renderLocationOptions(res.data.data.id);
+                document.getElementById('add-location-box').style.display = 'none';
+                ['loc-label', 'loc-zip', 'loc-address1'].forEach(id => document.getElementById(id).value = '');
+            } else {
+                setModalError('err-loc-label', res.data.message || 'Failed to add location.');
+            }
+        } catch (err) {
+            const errs = err.response?.data?.errors;
+            if (errs) {
+                const map = { label:'err-loc-label', country_id:'err-loc-country', county_id:'err-loc-county', city_id:'err-loc-city', zip_code:'err-loc-zip', address1:'err-loc-address1' };
+                Object.keys(errs).forEach(f => setModalError(map[f] || 'err-loc-label', errs[f][0]));
+            } else {
+                setModalError('err-loc-label', err.response?.data?.message || 'Failed to add location.');
+            }
+        } finally { hideLoader(); }
     });
 }
 </script>

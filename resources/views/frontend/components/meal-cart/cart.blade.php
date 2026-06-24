@@ -14,9 +14,7 @@
             <div class="border rounded p-3 shadow-sm" id="meal-summary"></div>
 
             <div class="d-grid mt-4">
-                <a href="{{ route('meal.checkout') }}">
-                    <button class="btn btn-info btn-lg">Proceed to Checkout</button>
-                </a>
+                <button class="btn btn-info btn-lg" onclick="proceedToCheckout()">Proceed to Checkout</button>
             </div>
         </div>
     </div>
@@ -28,9 +26,33 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadMealCart();
 });
 
+let currentMealCart = {};
+
 function toTitleCase(str) {
     if (!str) return "";
     return str.trim().toLowerCase().replace(/\b\w/g, char => char.toUpperCase());
+}
+
+// Route to the right checkout based on cart contents:
+//  - any item with a location  → multi-address checkout (/meal-plan-setup orders)
+//  - otherwise                 → existing single-address checkout (/meal-plans orders)
+function proceedToCheckout() {
+    let hasLocation = false, hasPlain = false;
+    Object.values(currentMealCart || {}).forEach(byType =>
+        Object.values(byType).forEach(items =>
+            Object.values(items).forEach(it => {
+                if (it.location && it.location.id) hasLocation = true; else hasPlain = true;
+            })
+        )
+    );
+    if (!hasLocation && !hasPlain) { errorToast('Your cart is empty.'); return; }
+    if (hasLocation && hasPlain) {
+        errorToast('Your cart mixes single-address and multi-address items. Please check out one type at a time.');
+        return;
+    }
+    window.location.href = hasLocation
+        ? '{{ route("meal.checkout.multi") }}'
+        : '{{ route("meal.checkout") }}';
 }
 
 function formatTime(timeString) {
@@ -56,6 +78,8 @@ async function loadMealCart() {
         if (response.status === 200 && response.data.status === 'success') {
             const mealCart = response.data.data.meal_cart;
             const summary  = response.data.data.summary;
+
+            currentMealCart = mealCart;   // keep for checkout routing
 
             const title = document.getElementById('mealPlanTitle');
             title.textContent = `My Weekly Meal Plan (${summary.total_items} items)`;
@@ -107,6 +131,13 @@ function renderMealCart(mealCart) {
             const typeTitle     = toTitleCase(items[0]?.meal_type?.name || 'Unknown');
             const mealTime      = items[0]?.meal_time;
             const formattedTime = formatTime(mealTime);
+            const location      = items[0]?.location;
+            const locationHtml  = location
+                ? `<div class="text-success">
+                       <i class="mdi mdi-map-marker me-1"></i>
+                       <strong>Deliver To:</strong> ${toTitleCase(location.label)}${location.city ? ' · ' + toTitleCase(location.city) : ''}
+                   </div>`
+                : '';
 
             let itemsHtml = '';
             items.forEach(item => {
@@ -115,14 +146,22 @@ function renderMealCart(mealCart) {
                     ? `/upload/product/small/${item.product.image}`
                     : '/upload/no_image.jpg';
 
+                const clientName = item.client
+                    ? toTitleCase(`${item.client.firstName || ''} ${item.client.lastName || ''}`.trim())
+                    : '';
+                const providedByHtml = clientName
+                    ? `<br><small class="text-muted"><strong>Provided By:</strong> ${clientName}</small>`
+                    : '';
+
                 itemsHtml += `
                     <li class="list-group-item d-flex justify-content-between align-items-center">
                         <div class="d-flex align-items-center gap-3">
-                            <img src="${img}" alt="${productName}" class="rounded" 
+                            <img src="${img}" alt="${productName}" class="rounded"
                                  style="width:60px;height:60px;object-fit:cover;">
                             <div>
                                 <strong>${productName}</strong><br>
                                 <small class="text-muted">$${parseFloat(item.unit_price).toFixed(2)} each</small>
+                                ${providedByHtml}
                             </div>
                         </div>
                         <div class="d-flex align-items-center gap-2">
@@ -146,11 +185,14 @@ function renderMealCart(mealCart) {
 
             mealTypeHtml += `
                 <div class="mb-4">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="d-flex justify-content-between align-items-start mb-2 flex-wrap gap-2">
                         <h6 class="mb-0 fw-bold">${typeTitle} (${items.length} items)</h6>
-                        <div class="text-primary">
-                            <i class="mdi mdi-clock-outline me-1"></i>
-                            <strong>Delivery Time:</strong> ${formattedTime}
+                        <div class="text-end small">
+                            <div class="text-primary">
+                                <i class="mdi mdi-clock-outline me-1"></i>
+                                <strong>Delivery Time:</strong> ${formattedTime}
+                            </div>
+                            ${locationHtml}
                         </div>
                     </div>
                     <div class="border rounded p-3 bg-light">

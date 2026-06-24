@@ -44,6 +44,8 @@ class MealPlanController extends Controller
                 'latitude'     => 'nullable|numeric|between:-90,90',
                 'longitude'    => 'nullable|numeric|between:-180,180',
                 'page'         => 'nullable|integer|min:1',
+                'per_page'     => 'nullable|integer|min:1|max:48',
+                'seed'         => 'nullable|integer',
             ]);
 
             $keywords = $request->input('keywords', []);
@@ -129,8 +131,13 @@ class MealPlanController extends Controller
                 ];
             });
 
+            // optional stable-random ordering for the "browse" grid (mixes restaurants; same seed → same order across pages)
+            if ($request->filled('seed')) {
+                $allProducts = $allProducts->shuffle((int) $request->seed)->values();
+            }
+
             $page    = LengthAwarePaginator::resolveCurrentPage();
-            $perPage = 6;
+            $perPage = (int) $request->input('per_page', 6);
             $paginated = new LengthAwarePaginator(
                 $allProducts->forPage($page, $perPage)->values(),
                 $allProducts->count(), $perPage, $page,

@@ -11,6 +11,8 @@ use App\Models\FacebookUser;
 use App\Models\GoogleUser;
 use App\Models\TwitterUser;
 use App\Helpers\JWTToken;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class SocialAuthController extends Controller
 {
@@ -21,51 +23,49 @@ class SocialAuthController extends Controller
 
 public function handleProviderCallback($provider)
 {
+    $provider = strtolower($provider);
+
+    if (!in_array($provider, ['facebook', 'google', 'twitter'])) {
+        return redirect()->route('login.page')->with('error', 'Unsupported provider.');
+    }
+
     try {
         $socialUser = Socialite::driver($provider)->user();
-        $user = User::where('email', $socialUser->getEmail())->first();
 
-        if (!$user) {
-            $user = User::create([
-                'firstName' => $socialUser->getName(),
-                'email' => $socialUser->getEmail(),
-                'role' => 'user',
-            ]);
+        // Some providers (e.g. Twitter/X OAuth 2.0) don't return an email — fall back to a stable handle-based address.
+        $email = $socialUser->getEmail()
+            ?: (($socialUser->getNickname() ?: $provider . '_' . $socialUser->getId()) . '@' . $provider . '.local');
 
+        $user = User::firstOrCreate(
+            ['email' => $email],
+            [
+                'firstName'         => $socialUser->getName() ?: ($socialUser->getNickname() ?: ucfirst($provider) . ' User'),
+                'role'              => 'customer',
+                'status'            => 1,
+                'is_email_verified' => 1,
+                'password'          => Hash::make(Str::random(40)),
+            ]
+        );
+
+        if ($user->wasRecentlyCreated) {
             ActivityLogger::socialAuthLog('registration_success', 'New user registered successfully via ' . ucfirst($provider), $user, 'users');
         }
 
-        if (strtolower($provider) === 'facebook') {
-            FacebookUser::updateOrCreate(
-                ['user_id' => $user->id],
-                [
-                    'provider' => $provider,
-                    'provider_id' => $socialUser->getId(),
-                    'access_token' => $socialUser->token,
-                ]
-            );
-        } elseif (strtolower($provider) === 'google') {
-            GoogleUser::updateOrCreate(
-                ['user_id' => $user->id],
-                [
-                    'provider' => $provider,
-                    'provider_id' => $socialUser->getId(),
-                    'access_token' => $socialUser->token,
-                ]
-            );
-        } elseif (strtolower($provider) === 'twitter') {
-            TwitterUser::updateOrCreate(
-                ['user_id' => $user->id],
-                [
-                    'provider' => $provider,
-                    'provider_id' => $socialUser->getId(),
-                    'access_token' => $socialUser->token,
-                ]
-            );
-        } else {
-            return redirect()->route('login.page')->with('error', 'Unsupported provider.');
+        $providerData = [
+            'provider'     => $provider,
+            'provider_id'  => $socialUser->getId(),
+            'access_token' => $socialUser->token ?? null,
+        ];
+
+        if ($provider === 'facebook') {
+            FacebookUser::updateOrCreate(['user_id' => $user->id], $providerData);
+        } elseif ($provider === 'google') {
+            GoogleUser::updateOrCreate(['user_id' => $user->id], $providerData);
+        } else { // twitter
+            TwitterUser::updateOrCreate(['user_id' => $user->id], $providerData);
         }
 
+        // Build the token from the local user's id/role (not the Socialite user's).
         $token = JWTToken::CreateToken($user->email, $user->id, $user->role);
         ActivityLogger::socialAuthLog('login_success', 'Login success via ' . ucfirst($provider), $user, 'users');
 

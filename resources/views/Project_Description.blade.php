@@ -17,9 +17,9 @@ i have a laravel project which have 4 type of user in User model which role is a
 Customer can order in below way.An order may contain multiple date,multiple date may have multiple meal_type,multiple meal_type may come from multiple restaurent,each meal_type may contain multiple food.
 
 Customer_id   meal_order    date             mel_type        Restaurent/Client           product/food
-1               0001      20-05-2026          breakfast         1                           2,4
+1               0001      20-06-2026          breakfast         1                           2,4
 
-1               0001      20-05-2026           dinner            2                          5,6
+1               0001      20-06-2026           dinner            2                          5,6
 
 
 1               0001      21-05-2026          breakfast          3                           2,4

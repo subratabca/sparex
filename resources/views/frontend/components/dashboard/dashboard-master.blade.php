@@ -81,7 +81,7 @@
                         </ul>
                       </li>
         <li class="nav-item mb-1">
-          <a class="nav-link dropdown-toggle {{ Route::is(['meal.plan','meal.order','user.meal.reports']) ? 'active' : '' }}" 
+          <a class="nav-link dropdown-toggle {{ Route::is(['meal.plan','meal.plan.setup','meal.order','user.meal.reports']) ? 'active' : '' }}"
              href="#" id="menuTypesDropdown" role="button" data-bs-toggle="dropdown" 
              aria-expanded="false">
             <i class="mdi mdi-food me-2"></i>
@@ -92,6 +92,13 @@
               <a class="dropdown-item {{ Route::is('meal.plan') ? 'active' : '' }}" href="{{ route('meal.plan') }}">
                 <i class="mdi mdi-food-fork-drink me-2"></i>
                 <span>Meal Plan</span>
+              </a>
+            </li>
+
+            <li>
+              <a class="dropdown-item {{ Route::is('meal.plan.setup') ? 'active' : '' }}" href="{{ route('meal.plan.setup') }}">
+                <i class="mdi mdi-map-marker-radius me-2"></i>
+                <span>Meal Plan Setup</span>
               </a>
             </li>
 

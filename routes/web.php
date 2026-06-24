@@ -80,7 +80,6 @@ use App\Http\Controllers\Frontend\CustomerComplainController;
 use App\Http\Controllers\Frontend\JWTTokenController;
 use App\Http\Controllers\Frontend\FacebookShareController;
 use App\Http\Controllers\Frontend\EmailShareController;
-use App\Http\Controllers\Frontend\TwitterController;
 use App\Http\Controllers\Frontend\SocialShareController;
 use App\Http\Controllers\Frontend\CartController;
 use App\Http\Controllers\Frontend\CheckoutController;
@@ -88,6 +87,9 @@ use App\Http\Controllers\Frontend\PaymentController;
 use App\Http\Controllers\Frontend\CustomerOrderTermsConditionsController;
 
 use App\Http\Controllers\Frontend\Meal\MealPlanController;
+use App\Http\Controllers\Frontend\Meal\MealPlanSetupController;
+use App\Http\Controllers\Frontend\Meal\MealMultiCheckoutController;
+use App\Http\Controllers\Frontend\Meal\MealMultiStoreController;
 use App\Http\Controllers\Frontend\Meal\MealCartController;
 use App\Http\Controllers\Frontend\Meal\MealStoreController;
 use App\Http\Controllers\Frontend\Meal\MealOrderController;
@@ -102,11 +104,6 @@ Route::controller(SocialShareController::class)->group(function () {
 Route::controller(SocialAuthController::class)->group(function () {
     Route::get('/auth/{provider}','redirectToProvider')->name('auth.socialite.redirect');
     Route::get('/auth/{provider}/callback', 'handleProviderCallback')->name('auth.socialite.callback');
-});
-
-Route::controller(TwitterController::class)->group(function(){
-    Route::get('auth/twitter', 'redirectToTwitter')->name('auth.twitter');
-    Route::get('auth/twitter/callback', 'handleTwitterCallback');
 });
 
 Route::controller(CommonController::class)->group(function () {
@@ -177,6 +174,24 @@ Route::middleware('jwt.auth')->group(function () {
         Route::get('/get/health-profile', 'getHealthProfile');
         Route::post('/search/products', 'searchProducts');
         Route::post('/generate/meal-suggestion', 'generateMealSuggestion');
+    });
+
+    Route::controller(MealPlanSetupController::class)->group(function () {
+        Route::get('/meal-plan-setup', 'index')->name('meal.plan.setup');
+        Route::get('/get/setup-suggestion', 'getSetupSuggestion');
+        Route::get('/get/my-meal-locations', 'getMyLocations');
+        Route::post('/store/meal-location', 'storeLocation');
+    });
+
+    Route::controller(MealMultiCheckoutController::class)->group(function () {
+        Route::get('/meal/multi-checkout', 'index')->name('meal.checkout.multi');
+        Route::get('/get/multi-checkout-data', 'getMultiCheckoutData');
+    });
+
+    Route::controller(MealMultiStoreController::class)->group(function () {
+        Route::post('/store/multi-meal-order/by/cash', 'storeByCash');
+        Route::post('/store/multi-meal-order/by/credit', 'storeByCredit');
+        Route::post('/store/multi-meal-order/by/stripe', 'storeByStripe');
     });
 
     Route::controller(MealCartController::class)->group(function () {
