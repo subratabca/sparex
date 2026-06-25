@@ -176,7 +176,11 @@ class ClientAuthController extends Controller
                 }
 
                 if (Hash::check($request->input('password'), $user->password)) {
-                    $token = JWTToken::CreateToken($request->input('email'), $user->id, $user->role, 'restaurant');
+                    $remember      = $request->boolean('remember');
+                    $tokenMinutes  = $remember ? 60 * 24 * 30 : 60 * 12;   // 30 days vs 12 hours
+                    $cookieMinutes = $remember ? 60 * 24 * 30 : 0;          // 0 = session cookie
+
+                    $token = JWTToken::CreateToken($request->input('email'), $user->id, $user->role, 'restaurant', $tokenMinutes);
                     ActivityLogger::beforeAuthLog(
                         'login_success',
                         'Client logged in successfully.',
@@ -187,7 +191,7 @@ class ClientAuthController extends Controller
                         'status' => 'success',
                         'message' => 'User Login Successful',
                         'token' => $token
-                    ], 200)->cookie('token', $token, 60 * 24 * 30, null, null, config('jwt.cookie_secure'), true, false, 'Lax');
+                    ], 200)->cookie('token', $token, $cookieMinutes, null, null, config('jwt.cookie_secure'), true, false, 'Lax');
                 } else {
                     ActivityLogger::beforeAuthLog(
                         'login_failed',

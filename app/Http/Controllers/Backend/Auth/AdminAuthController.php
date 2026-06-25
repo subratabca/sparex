@@ -90,13 +90,17 @@ class AdminAuthController extends Controller
             ->first();
 
             if ($user !== null && Hash::check($request->input('password'), $user->password)) {
-                $token = JWTToken::CreateToken($request->input('email'), $user->id, $user->role, 'admin');
+                $remember      = $request->boolean('remember');
+                $tokenMinutes  = $remember ? 60 * 24 * 30 : 60 * 12;   // 30 days vs 12 hours
+                $cookieMinutes = $remember ? 60 * 24 * 30 : 0;          // 0 = session cookie
+
+                $token = JWTToken::CreateToken($request->input('email'), $user->id, $user->role, 'admin', $tokenMinutes);
                 ActivityLogger::beforeAuthLog('login_success', 'Admin login successful.', $request, 'users', $user->id);
                 return response()->json([
                     'status' => 'success',
                     'message' => 'User Login Successful',
                     'token' => $token
-                ], 200)->cookie('token', $token, 60 * 24 * 30, null, null, config('jwt.cookie_secure'), true, false, 'Lax');
+                ], 200)->cookie('token', $token, $cookieMinutes, null, null, config('jwt.cookie_secure'), true, false, 'Lax');
             } else {
                 ActivityLogger::beforeAuthLog(
                     'login_failed',

@@ -111,7 +111,8 @@
       } else {
           showLoader();
           try {
-              let res = await axios.post("/login", { email: email, password: password });
+              let remember = document.getElementById('remember-me').checked;
+              let res = await axios.post("/login", { email: email, password: password, remember: remember });
               if (res.status === 200 && res.data['status'] === 'success') {
                   window.location.href = res.data['redirect'];
               } else {

@@ -199,7 +199,11 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            $token = JWTToken::CreateToken($request->input('email'), $customer->id, $customer->role);
+            $remember      = $request->boolean('remember');
+            $tokenMinutes  = $remember ? 60 * 24 * 30 : 60 * 12;   // 30 days vs 12 hours
+            $cookieMinutes = $remember ? 60 * 24 * 30 : 0;          // 0 = session cookie (clears on browser close)
+
+            $token = JWTToken::CreateToken($request->input('email'), $customer->id, $customer->role, 'customer', $tokenMinutes);
             session()->forget('url.intended');
             $intendedUrl = session('url.intended', '/dashboard');
 
@@ -209,7 +213,7 @@ class AuthController extends Controller
                 'message' => 'User Login Successful',
                 'token' => $token,
                 'redirect' => $intendedUrl,
-            ], 200)->cookie('token', $token, 60 * 24 * 30, null, null, config('jwt.cookie_secure'), true, false, 'Lax');
+            ], 200)->cookie('token', $token, $cookieMinutes, null, null, config('jwt.cookie_secure'), true, false, 'Lax');
 
             //cookie('token', $token, 60, null, null, false, false);
 

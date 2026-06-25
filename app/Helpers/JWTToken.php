@@ -19,12 +19,13 @@ class JWTToken
         };
     }
 
-    public static function CreateToken($userEmail, $userID, $userRole, string $guard = 'customer'): string
+    // $minutes = token validity (default 30 days). "Remember me" passes a shorter value when unchecked.
+    public static function CreateToken($userEmail, $userID, $userRole, string $guard = 'customer', int $minutes = 43200): string
     {
         $payload = [
             'iss'       => 'laravel-token',
             'iat'       => time(),
-            'exp'       => time() + 60 * 60 * 24 * 30,
+            'exp'       => time() + ($minutes * 60),
             'userEmail' => $userEmail,
             'userID'    => $userID,
             'userRole'  => $userRole,
